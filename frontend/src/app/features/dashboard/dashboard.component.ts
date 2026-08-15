@@ -3,7 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { Entity } from '../../core/models/entity.model';
-import { EntityBalanceInput, ImportPayload, MonthlyRecordResponse } from '../../core/models/monthly-record.model';
+import { EntityBalanceInput, ImportPayload, MonthlyRecordResponse, TimelinePoint } from '../../core/models/monthly-record.model';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { environment } from '../../../environments/environment';
@@ -12,6 +12,7 @@ import { DonutChartComponent } from './components/donut-chart/donut-chart.compon
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
 import { BalanceFormComponent } from './components/balance-form/balance-form.component';
 import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
+import { TimelineChartComponent } from './components/timeline-chart/timeline-chart.component';
 
 const FIXED_DEFAULT_YEAR = 2026;
 
@@ -25,6 +26,7 @@ const FIXED_DEFAULT_YEAR = 2026;
     DiffBadgeComponent,
     BalanceFormComponent,
     JsonImportDialogComponent,
+    TimelineChartComponent,
   ],
   templateUrl: './dashboard.component.html',
 })
@@ -44,12 +46,15 @@ export class DashboardComponent {
   readonly showImportDialog = signal<boolean>(false);
   readonly importErrorMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
+  readonly timelinePoints = signal<TimelinePoint[]>([]);
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
+  readonly hasTimeline = computed(() => this.timelinePoints().length > 0);
 
   constructor() {
     this.loadEntities();
     this.loadRecord();
+    this.loadTimeline();
   }
 
   onMonthChange(next: { year: number; month: number }): void {
@@ -83,6 +88,17 @@ export class DashboardComponent {
     });
   }
 
+  private loadTimeline(): void {
+    this.api.getTimeline().subscribe({
+      next: (response) => this.timelinePoints.set(response.points),
+      error: () => this.timelinePoints.set([]),
+    });
+  }
+
+  private refreshAfterSave(): void {
+    this.loadTimeline();
+  }
+
   onSaveMonth(balances: EntityBalanceInput[]): void {
     this.saving.set(true);
     this.errorMessage.set(null);
@@ -90,6 +106,7 @@ export class DashboardComponent {
       next: (response) => {
         this.recordResponse.set(response);
         this.saving.set(false);
+        this.refreshAfterSave();
       },
       error: () => {
         this.saving.set(false);
@@ -118,6 +135,7 @@ export class DashboardComponent {
         this.recordResponse.set(response);
         this.importing.set(false);
         this.showImportDialog.set(false);
+        this.refreshAfterSave();
       },
       error: (err) => {
         this.importing.set(false);

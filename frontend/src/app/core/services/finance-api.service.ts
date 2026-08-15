@@ -8,6 +8,7 @@ import {
   ImportPayload,
   MonthlyRecordResponse,
   MonthlyRecordUpsert,
+  TimelineResponse,
 } from '../models/monthly-record.model';
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +22,10 @@ export class FinanceApiService {
 
   getMonthlyRecord(year: number, month: number): Observable<MonthlyRecordResponse> {
     return this.http.get<MonthlyRecordResponse>(`${this.baseUrl}/records/${year}/${month}`);
+  }
+
+  getTimeline(): Observable<TimelineResponse> {
+    return this.http.get<TimelineResponse>(`${this.baseUrl}/records/timeline`);
   }
 
   upsertMonthlyRecord(

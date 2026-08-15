@@ -47,6 +47,7 @@ class MonthlyRecordDto(BaseModel):
     total_net_worth: float
     invested_percentage: float
     monthly_diff: float | None = None
+    invested_diff: float | None = None
 
 
 class MonthlyRecordResponse(BaseModel):
@@ -55,6 +56,20 @@ class MonthlyRecordResponse(BaseModel):
     month: int
     record: MonthlyRecordDto | None = None
     previous_net_worth: float | None = None
+    previous_total_invested: float | None = None
+
+
+class TimelinePoint(BaseModel):
+    year: int
+    month: int
+    total_net_worth: float
+    total_invested: float
+    net_worth_diff: float | None = None
+    invested_diff: float | None = None
+
+
+class TimelineResponse(BaseModel):
+    points: list[TimelinePoint] = []
 
 
 class SimpleBalanceImport(BaseModel):

@@ -1,43 +1,36 @@
 <div class="flex h-full flex-col justify-between rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
   <div class="flex items-center justify-between">
     <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Variación mensual</span>
-
-    @if (hasPrevious()) {
-      <span
-        class="flex h-8 w-8 items-center justify-center rounded-full"
-        [class.bg-emerald-500/15]="isPositive()"
-        [class.bg-rose-500/15]="!isPositive()"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          class="h-4 w-4"
-          [class.text-emerald-400]="isPositive()"
-          [class.text-rose-400]="!isPositive()"
-          [class.rotate-180]="!isPositive()"
-        >
-          <path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 1 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z" clip-rule="evenodd" />
-        </svg>
-      </span>
-    }
   </div>
 
   @if (hasPrevious()) {
-    <div class="mt-3">
-      <span
-        class="text-3xl font-bold"
-        [class.text-emerald-400]="isPositive()"
-        [class.text-rose-400]="!isPositive()"
-      >
-        {{ isPositive() ? '+' : '' }}{{ diff() | eurCurrency }}
-      </span>
+    <div class="mt-3 space-y-4">
+      <div>
+        <p class="text-xs font-medium uppercase tracking-wide text-orange-400/80">Patrimonio neto</p>
+        <span
+          class="text-2xl font-bold"
+          [class.text-emerald-400]="isPositive()"
+          [class.text-rose-400]="!isPositive()"
+        >
+          {{ isPositive() ? '+' : '' }}{{ diff() | eurCurrency }}
+        </span>
+        @if (percentageChange() !== null) {
+          <p class="mt-0.5 text-xs text-slate-500">
+            {{ isPositive() ? '+' : '' }}{{ percentageChange()! | number: '1.1-1' }}% vs mes anterior
+          </p>
+        }
+      </div>
 
-      @if (percentageChange() !== null) {
-        <p class="mt-1 text-sm text-slate-400">
-          {{ isPositive() ? '+' : '' }}{{ percentageChange()! | number: '1.1-1' }}% respecto al mes anterior
-        </p>
-      }
+      <div class="border-t border-white/5 pt-3">
+        <p class="text-xs font-medium uppercase tracking-wide text-purple-400/80">Total invertido</p>
+        <span
+          class="text-xl font-bold"
+          [class.text-emerald-400]="isInvestedPositive()"
+          [class.text-rose-400]="!isInvestedPositive()"
+        >
+          {{ isInvestedPositive() ? '+' : '' }}{{ investedDiff() | eurCurrency }}
+        </span>
+      </div>
     </div>
   } @else {
     <p class="mt-3 text-sm text-slate-500">Sin datos del mes anterior para comparar.</p>

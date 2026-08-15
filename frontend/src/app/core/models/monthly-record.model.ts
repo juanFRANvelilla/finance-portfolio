@@ -36,6 +36,7 @@ export interface MonthlyRecord {
   total_net_worth: number;
   invested_percentage: number;
   monthly_diff: number | null;
+  invested_diff: number | null;
 }
 
 export interface MonthlyRecordResponse {
@@ -44,6 +45,20 @@ export interface MonthlyRecordResponse {
   month: number;
   record: MonthlyRecord | null;
   previous_net_worth: number | null;
+  previous_total_invested: number | null;
+}
+
+export interface TimelinePoint {
+  year: number;
+  month: number;
+  total_net_worth: number;
+  total_invested: number;
+  net_worth_diff: number | null;
+  invested_diff: number | null;
+}
+
+export interface TimelineResponse {
+  points: TimelinePoint[];
 }
 
 export interface SimpleBalanceImport {

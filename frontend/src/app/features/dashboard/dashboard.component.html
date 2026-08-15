@@ -45,6 +45,7 @@
 
         <app-diff-badge
           [diff]="recordResponse()!.record!.monthly_diff"
+          [investedDiff]="recordResponse()!.record!.invested_diff"
           [previousNetWorth]="recordResponse()!.previous_net_worth"
         />
       </section>
@@ -98,6 +99,28 @@
         (save)="onSaveMonth($event)"
         (importJson)="openImportDialog()"
       />
+    }
+
+    @if (hasTimeline()) {
+      <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Evolución mensual</h2>
+            <p class="mt-1 text-xs text-slate-500">Progreso del patrimonio neto e invertido mes a mes</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs text-slate-400">
+            <span class="flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-full bg-orange-500"></span>
+              Patrimonio
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-full bg-purple-500"></span>
+              Invertido
+            </span>
+          </div>
+        </div>
+        <app-timeline-chart [points]="timelinePoints()" />
+      </section>
     }
   </main>
 

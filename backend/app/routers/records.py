@@ -9,7 +9,14 @@ from app.models.entity import Entity, EntityType
 from app.models.monthly_entity_balance import MonthlyEntityBalance
 from app.models.monthly_hybrid_account import MonthlyHybridAccount
 from app.models.monthly_record import MonthlyRecord
-from app.schemas.monthly_record import ImportPayload, MonthlyRecordDto, MonthlyRecordResponse, MonthlyRecordUpsert
+from app.schemas.monthly_record import (
+    ImportPayload,
+    MonthlyRecordDto,
+    MonthlyRecordResponse,
+    MonthlyRecordUpsert,
+    TimelinePoint,
+    TimelineResponse,
+)
 from app.services.record_calculator import compute_totals_from_import, compute_totals_from_simple_balances
 
 router = APIRouter(prefix="/api/records", tags=["records"])
@@ -53,18 +60,31 @@ def _persisted_net_worth(record: MonthlyRecord | None) -> float | None:
     return float(record.total_net_worth)
 
 
+def _persisted_total_invested(record: MonthlyRecord | None) -> float | None:
+    if record is None:
+        return None
+    return float(record.total_invested)
+
+
 def _apply_persisted_totals(record: MonthlyRecord, totals: dict[str, float]) -> None:
     record.total_liquid = totals["total_liquid"]
     record.total_invested = totals["total_invested"]
     record.total_net_worth = totals["total_net_worth"]
 
 
-def _to_dto(record: MonthlyRecord, previous_net_worth: float | None) -> MonthlyRecordDto:
+def _to_dto(
+    record: MonthlyRecord,
+    previous_net_worth: float | None,
+    previous_total_invested: float | None,
+) -> MonthlyRecordDto:
     total_liquid = float(record.total_liquid)
     total_invested = float(record.total_invested)
     total_net_worth = float(record.total_net_worth)
     invested_percentage = (total_invested / total_net_worth * 100) if total_net_worth else 0.0
     monthly_diff = total_net_worth - previous_net_worth if previous_net_worth is not None else None
+    invested_diff = (
+        total_invested - previous_total_invested if previous_total_invested is not None else None
+    )
 
     return MonthlyRecordDto(
         id=record.id,
@@ -78,6 +98,7 @@ def _to_dto(record: MonthlyRecord, previous_net_worth: float | None) -> MonthlyR
         total_net_worth=total_net_worth,
         invested_percentage=round(invested_percentage, 2),
         monthly_diff=monthly_diff,
+        invested_diff=invested_diff,
     )
 
 
@@ -91,6 +112,7 @@ def _build_response(
     prev_year, prev_month = _previous_year_month(year, month)
     previous_record = _get_record(db, prev_year, prev_month)
     previous_net_worth = _persisted_net_worth(previous_record)
+    previous_total_invested = _persisted_total_invested(previous_record)
 
     if record is None:
         return MonthlyRecordResponse(
@@ -99,14 +121,16 @@ def _build_response(
             month=month,
             record=None,
             previous_net_worth=previous_net_worth,
+            previous_total_invested=previous_total_invested,
         )
 
     return MonthlyRecordResponse(
         exists=True,
         year=year,
         month=month,
-        record=_to_dto(record, previous_net_worth),
+        record=_to_dto(record, previous_net_worth, previous_total_invested),
         previous_net_worth=previous_net_worth,
+        previous_total_invested=previous_total_invested,
     )
 
 
@@ -209,6 +233,35 @@ def _upsert_record_balances(
     saved = _get_record(db, year, month)
     assert saved is not None
     return saved
+
+
+@router.get("/timeline", response_model=TimelineResponse)
+def get_records_timeline(db: Session = Depends(get_db)) -> TimelineResponse:
+    """Serie temporal mes a mes con patrimonio e invertido persistidos."""
+    stmt = select(MonthlyRecord).order_by(MonthlyRecord.year, MonthlyRecord.month)
+    records = list(db.scalars(stmt).all())
+
+    points: list[TimelinePoint] = []
+    previous_net_worth: float | None = None
+    previous_invested: float | None = None
+
+    for record in records:
+        net_worth = float(record.total_net_worth)
+        invested = float(record.total_invested)
+        points.append(
+            TimelinePoint(
+                year=record.year,
+                month=record.month,
+                total_net_worth=net_worth,
+                total_invested=invested,
+                net_worth_diff=net_worth - previous_net_worth if previous_net_worth is not None else None,
+                invested_diff=invested - previous_invested if previous_invested is not None else None,
+            )
+        )
+        previous_net_worth = net_worth
+        previous_invested = invested
+
+    return TimelineResponse(points=points)
 
 
 @router.get("/{year}/{month}", response_model=MonthlyRecordResponse)
