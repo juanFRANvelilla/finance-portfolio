@@ -1,0 +1,74 @@
+<form (ngSubmit)="onSubmit()" class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+  <div class="mb-5 flex items-start gap-3">
+    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+        <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd" />
+      </svg>
+    </div>
+    <div>
+      <h3 class="text-lg font-semibold text-white">Todavía no hay datos para este mes</h3>
+      <p class="text-sm text-slate-400">
+        Introduce el saldo de cada entidad para calcular automáticamente el patrimonio del mes.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    @for (entity of simpleEntities(); track entity.id) {
+      <label class="block">
+        <span class="mb-1 flex items-center gap-2 text-sm font-medium text-slate-300">
+          {{ entity.name }}
+          <span
+            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            [class.bg-sky-500/15]="entity.entity_type === 'LIQUID'"
+            [class.text-sky-300]="entity.entity_type === 'LIQUID'"
+            [class.bg-purple-500/15]="entity.entity_type === 'INVESTED'"
+            [class.text-purple-300]="entity.entity_type === 'INVESTED'"
+          >
+            {{ entity.entity_type === 'LIQUID' ? 'Líquido' : 'Invertido' }}
+          </span>
+        </span>
+        <div class="relative">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0,00"
+            class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
+            (input)="onValueChange(entity.id, $any($event.target).value)"
+          />
+          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
+        </div>
+      </label>
+    }
+  </div>
+
+  @if (simpleEntities().length === 0) {
+    <p class="mt-2 text-sm text-slate-500">No hay entidades activas disponibles.</p>
+  }
+
+  <div class="mt-6 flex flex-wrap items-center gap-3">
+    <button
+      type="submit"
+      [disabled]="saving() || simpleEntities().length === 0"
+      class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      @if (saving()) {
+        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+        </svg>
+      }
+      Guardar mes
+    </button>
+
+    <button
+      type="button"
+      disabled
+      title="Próximamente: importación masiva de meses históricos"
+      class="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-500 cursor-not-allowed"
+    >
+      Importar JSON histórico
+    </button>
+  </div>
+</form>

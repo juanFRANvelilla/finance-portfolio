@@ -1,0 +1,50 @@
+<div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/10 backdrop-blur">
+  <div class="flex items-center gap-2">
+    <button
+      type="button"
+      (click)="previousMonth()"
+      [disabled]="isAtMinimum()"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700/70 text-slate-200 transition hover:bg-indigo-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-slate-700/70"
+      aria-label="Mes anterior"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+
+    <div class="flex items-center gap-2">
+      <select
+        class="rounded-xl border-none bg-slate-700/70 px-3 py-2 text-sm font-medium text-slate-100 outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+        (change)="onMonthSelect(+($any($event.target).value))"
+      >
+        @for (m of months; track m; let i = $index) {
+          <option [value]="i + 1" [selected]="i + 1 === month()">{{ m }}</option>
+        }
+      </select>
+
+      <select
+        class="rounded-xl border-none bg-slate-700/70 px-3 py-2 text-sm font-medium text-slate-100 outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+        (change)="onYearSelect(+($any($event.target).value))"
+      >
+        @for (y of years(); track y) {
+          <option [value]="y" [selected]="y === year()">{{ y }}</option>
+        }
+      </select>
+    </div>
+
+    <button
+      type="button"
+      (click)="nextMonth()"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700/70 text-slate-200 transition hover:bg-indigo-600 hover:text-white"
+      aria-label="Mes siguiente"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 0-1.06L10.94 10 7.21 6.29a.75.75 0 1 1 1.06-1.06l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+
+  <span class="text-sm font-semibold uppercase tracking-wide text-slate-400">
+    {{ months[month() - 1] }} · {{ year() }}
+  </span>
+</div>
