@@ -46,6 +46,6 @@ cd frontend && ./run.sh
 ## Notas de diseño
 
 - El backend mapea modelos SQLAlchemy sobre las tablas ya existentes en `finance_portfolio`; no gestiona migraciones (no se usa Alembic).
-- Las entidades de tipo `HYBRID` (p. ej. Trade Republic, MyInvestor) se listan en `GET /api/entities`, pero el formulario mensual y los cálculos de totales solo consideran entidades `LIQUID` e `INVESTED` ("entidades simples"), ya que la tabla `monthly_hybrid_accounts` queda fuera de alcance por ahora.
-- El endpoint `POST /api/records/import-json` está estructurado con un placeholder (`TODO`) para la futura ingesta masiva de meses históricos.
+- Los totales (`total_liquid`, `total_invested`, etc.) **no se persisten**; se calculan al vuelo en el backend y se envían como DTO.
+- El endpoint `POST /api/records/{year}/{month}/import` valida `expected_totals` y persiste solo balances.
 - CORS está habilitado en el backend únicamente para `http://localhost:4200`.

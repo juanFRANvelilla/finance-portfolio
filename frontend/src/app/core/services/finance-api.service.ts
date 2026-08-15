@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Entity } from '../models/entity.model';
 import {
-  ImportJsonResponse,
+  ImportPayload,
   MonthlyRecordResponse,
   MonthlyRecordUpsert,
 } from '../models/monthly-record.model';
@@ -34,7 +34,14 @@ export class FinanceApiService {
     );
   }
 
-  importHistoricalJson(months: unknown[]): Observable<ImportJsonResponse> {
-    return this.http.post<ImportJsonResponse>(`${this.baseUrl}/records/import-json`, { months });
+  importMonthlyRecord(
+    year: number,
+    month: number,
+    payload: ImportPayload,
+  ): Observable<MonthlyRecordResponse> {
+    return this.http.post<MonthlyRecordResponse>(
+      `${this.baseUrl}/records/${year}/${month}/import`,
+      payload,
+    );
   }
 }

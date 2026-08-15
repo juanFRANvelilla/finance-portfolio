@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,51 +14,67 @@ class EntityBalanceRead(BaseModel):
     entity: EntityRead | None = None
 
 
-class EntityBalanceInput(BaseModel):
-    """Balance introducido por el usuario para una entidad concreta en un mes."""
+class HybridAccountRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
+    entity_id: str
+    liquid_amount: float
+    monthly_contribution: float
+    cumulative_invested: float
+    entity: EntityRead | None = None
+
+
+class EntityBalanceInput(BaseModel):
     entity_id: str
     balance_amount: float = Field(ge=0)
 
 
 class MonthlyRecordUpsert(BaseModel):
-    """Payload para crear/actualizar los balances de un mes."""
-
     balances: list[EntityBalanceInput]
 
 
-class MonthlyRecordRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class MonthlyRecordDto(BaseModel):
+    """DTO enriquecido: datos persistidos + totales calculados al vuelo."""
 
-    id: int
+    id: UUID
     year: int
     month: int
+    created_at: datetime
+    balances: list[EntityBalanceRead] = []
+    hybrid_accounts: list[HybridAccountRead] = []
     total_liquid: float
     total_invested: float
     total_net_worth: float
-    monthly_diff: float | None
     invested_percentage: float
-    created_at: datetime
-    balances: list[EntityBalanceRead] = []
+    monthly_diff: float | None = None
 
 
 class MonthlyRecordResponse(BaseModel):
-    """Respuesta enriquecida del GET, incluye si existe registro y el diff previo."""
-
     exists: bool
     year: int
     month: int
-    record: MonthlyRecordRead | None = None
+    record: MonthlyRecordDto | None = None
     previous_net_worth: float | None = None
 
 
-class ImportJsonPayload(BaseModel):
-    """Placeholder de payload para la ingesta masiva de meses historicos."""
+class SimpleBalanceImport(BaseModel):
+    entity_id: str
+    amount: float = Field(ge=0)
 
-    months: list[dict] = Field(default_factory=list)
+
+class HybridBalanceImport(BaseModel):
+    entity_id: str
+    liquid_amount: float = Field(ge=0)
+    invested_amount: float = Field(ge=0)
 
 
-class ImportJsonResponse(BaseModel):
-    status: str
-    imported_count: int
-    detail: str
+class ExpectedTotalsImport(BaseModel):
+    total_liquid: float = Field(ge=0)
+    total_invested: float = Field(ge=0)
+    total_net_worth: float = Field(ge=0)
+
+
+class ImportPayload(BaseModel):
+    simple_balances: list[SimpleBalanceImport] = Field(default_factory=list)
+    hybrid_balances: list[HybridBalanceImport] = Field(default_factory=list)
+    expected_totals: ExpectedTotalsImport

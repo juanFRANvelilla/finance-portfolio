@@ -6,6 +6,14 @@ export interface EntityBalance {
   entity?: Entity | null;
 }
 
+export interface HybridAccount {
+  entity_id: string;
+  liquid_amount: number;
+  monthly_contribution: number;
+  cumulative_invested: number;
+  entity?: Entity | null;
+}
+
 export interface EntityBalanceInput {
   entity_id: string;
   balance_amount: number;
@@ -15,17 +23,19 @@ export interface MonthlyRecordUpsert {
   balances: EntityBalanceInput[];
 }
 
+/** DTO con totales calculados al vuelo por el backend. */
 export interface MonthlyRecord {
-  id: number;
+  id: string;
   year: number;
   month: number;
+  created_at: string;
+  balances: EntityBalance[];
+  hybrid_accounts: HybridAccount[];
   total_liquid: number;
   total_invested: number;
   total_net_worth: number;
-  monthly_diff: number | null;
   invested_percentage: number;
-  created_at: string;
-  balances: EntityBalance[];
+  monthly_diff: number | null;
 }
 
 export interface MonthlyRecordResponse {
@@ -36,8 +46,25 @@ export interface MonthlyRecordResponse {
   previous_net_worth: number | null;
 }
 
-export interface ImportJsonResponse {
-  status: string;
-  imported_count: number;
-  detail: string;
+export interface SimpleBalanceImport {
+  entity_id: string;
+  amount: number;
+}
+
+export interface HybridBalanceImport {
+  entity_id: string;
+  liquid_amount: number;
+  invested_amount: number;
+}
+
+export interface ExpectedTotalsImport {
+  total_liquid: number;
+  total_invested: number;
+  total_net_worth: number;
+}
+
+export interface ImportPayload {
+  simple_balances: SimpleBalanceImport[];
+  hybrid_balances: HybridBalanceImport[];
+  expected_totals: ExpectedTotalsImport;
 }

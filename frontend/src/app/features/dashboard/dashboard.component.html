@@ -13,6 +13,16 @@
       (monthChange)="onMonthChange($event)"
     />
 
+    <div class="flex justify-end">
+      <button
+        type="button"
+        (click)="openImportDialog()"
+        class="inline-flex items-center gap-2 rounded-xl border border-dashed border-indigo-500/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/10"
+      >
+        Importar JSON del mes
+      </button>
+    </div>
+
     @if (errorMessage()) {
       <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
         {{ errorMessage() }}
@@ -63,6 +73,22 @@
               <span class="font-semibold text-white">{{ balance.balance_amount | eurCurrency }}</span>
             </li>
           }
+          @for (hybrid of recordResponse()!.record!.hybrid_accounts; track hybrid.entity_id) {
+            <li class="flex items-center justify-between py-2.5 text-sm">
+              <div>
+                <span class="text-slate-300">{{ hybrid.entity?.name ?? hybrid.entity_id }}</span>
+                <span class="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                  Híbrida
+                </span>
+              </div>
+              <div class="text-right">
+                <p class="font-semibold text-white">{{ (hybrid.liquid_amount + hybrid.cumulative_invested) | eurCurrency }}</p>
+                <p class="text-xs text-slate-500">
+                  Líq. {{ hybrid.liquid_amount | eurCurrency }} · Inv. {{ hybrid.cumulative_invested | eurCurrency }}
+                </p>
+              </div>
+            </li>
+          }
         </ul>
       </section>
     } @else {
@@ -70,7 +96,18 @@
         [entities]="entities()"
         [saving]="saving()"
         (save)="onSaveMonth($event)"
+        (importJson)="openImportDialog()"
       />
     }
   </main>
+
+  <app-json-import-dialog
+    [open]="showImportDialog()"
+    [year]="year()"
+    [month]="month()"
+    [importing]="importing()"
+    [errorMessage]="importErrorMessage()"
+    (close)="closeImportDialog()"
+    (importPayload)="onImportJson($event)"
+  />
 </div>

@@ -13,6 +13,7 @@ export class BalanceFormComponent {
   readonly entities = input.required<Entity[]>();
   readonly saving = input<boolean>(false);
   readonly save = output<EntityBalanceInput[]>();
+  readonly importJson = output<void>();
 
   /**
    * Las entidades HYBRID todavia no se gestionan (dependen de

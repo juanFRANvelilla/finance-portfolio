@@ -3,13 +3,15 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { Entity } from '../../core/models/entity.model';
-import { EntityBalanceInput, MonthlyRecordResponse } from '../../core/models/monthly-record.model';
+import { EntityBalanceInput, ImportPayload, MonthlyRecordResponse } from '../../core/models/monthly-record.model';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
+import { environment } from '../../../environments/environment';
 import { MonthNavigatorComponent } from './components/month-navigator/month-navigator.component';
 import { DonutChartComponent } from './components/donut-chart/donut-chart.component';
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
 import { BalanceFormComponent } from './components/balance-form/balance-form.component';
+import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
 
 const FIXED_DEFAULT_YEAR = 2026;
 
@@ -22,6 +24,7 @@ const FIXED_DEFAULT_YEAR = 2026;
     DonutChartComponent,
     DiffBadgeComponent,
     BalanceFormComponent,
+    JsonImportDialogComponent,
   ],
   templateUrl: './dashboard.component.html',
 })
@@ -37,6 +40,9 @@ export class DashboardComponent {
   readonly recordResponse = signal<MonthlyRecordResponse | null>(null);
   readonly loading = signal<boolean>(false);
   readonly saving = signal<boolean>(false);
+  readonly importing = signal<boolean>(false);
+  readonly showImportDialog = signal<boolean>(false);
+  readonly importErrorMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
@@ -71,7 +77,7 @@ export class DashboardComponent {
         this.recordResponse.set(null);
         this.loading.set(false);
         this.errorMessage.set(
-          'No se pudo conectar con la API. Comprueba que el backend está arrancado en http://localhost:8000.',
+          `No se pudo conectar con la API. Comprueba que el backend está arrancado en ${environment.apiUrl.replace('/api', '')}.`,
         );
       },
     });
@@ -90,5 +96,49 @@ export class DashboardComponent {
         this.errorMessage.set('No se pudo guardar el mes. Inténtalo de nuevo.');
       },
     });
+  }
+
+  openImportDialog(): void {
+    this.importErrorMessage.set(null);
+    this.showImportDialog.set(true);
+  }
+
+  closeImportDialog(): void {
+    this.showImportDialog.set(false);
+    this.importErrorMessage.set(null);
+  }
+
+  onImportJson(payload: ImportPayload): void {
+    this.importing.set(true);
+    this.importErrorMessage.set(null);
+    this.errorMessage.set(null);
+
+    this.api.importMonthlyRecord(this.year(), this.month(), payload).subscribe({
+      next: (response) => {
+        this.recordResponse.set(response);
+        this.importing.set(false);
+        this.showImportDialog.set(false);
+      },
+      error: (err) => {
+        this.importing.set(false);
+        this.importErrorMessage.set(this.extractImportError(err));
+      },
+    });
+  }
+
+  private extractImportError(err: unknown): string {
+    const httpError = err as { error?: { detail?: string | { message?: string; mismatches?: string[] } } };
+    const detail = httpError.error?.detail;
+
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    if (detail && typeof detail === 'object') {
+      const mismatches = detail.mismatches?.join(' · ');
+      return mismatches ? `${detail.message ?? 'Error de validación'}: ${mismatches}` : 'No se pudo importar el JSON.';
+    }
+
+    return 'No se pudo importar el JSON. Revisa el payload y los totales.';
   }
 }

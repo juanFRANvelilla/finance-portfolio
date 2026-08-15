@@ -1,15 +1,32 @@
+from contextlib import asynccontextmanager
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.database import check_db_connection
 from app.routers import entities, records
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        check_db_connection()
+        logger.info("Conexion a PostgreSQL OK")
+    except Exception as exc:
+        logger.warning("PostgreSQL no disponible al arrancar: %s", exc)
+    yield
+
 
 app = FastAPI(
     title="Finance Portfolio API",
     description="API REST para el seguimiento de patrimonio personal (liquido vs invertido).",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

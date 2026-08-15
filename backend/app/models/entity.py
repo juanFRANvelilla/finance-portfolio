@@ -27,3 +27,7 @@ class Entity(Base):
         back_populates="entity",
         cascade="all, delete-orphan",
     )
+    hybrid_accounts: Mapped[list["MonthlyHybridAccount"]] = relationship(
+        back_populates="entity",
+        cascade="all, delete-orphan",
+    )

@@ -51,7 +51,7 @@ app/
 | GET    | `/api/entities`                   | Listado de entidades activas                                            |
 | GET    | `/api/records/{year}/{month}`     | Totales del mes, balances por entidad y diff con el mes anterior         |
 | POST   | `/api/records/{year}/{month}`     | Guarda/actualiza balances del mes y recalcula totales derivados         |
-| POST   | `/api/records/import-json`        | Placeholder para ingesta masiva de meses históricos vía JSON (TODO)     |
+| POST   | `/api/records/{year}/{month}/import` | Importa un mes completo (simples + híbridos); valida `expected_totals` contra cálculo al vuelo |
 | GET    | `/api/health`                     | Healthcheck                                                              |
 
 Nota: los modelos SQLAlchemy están mapeados sobre tablas ya existentes (no se generan migraciones automáticas); asegúrate de que el esquema de la base de datos coincide con `app/models`.
