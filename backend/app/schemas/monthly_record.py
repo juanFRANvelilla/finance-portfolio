@@ -34,7 +34,7 @@ class MonthlyRecordUpsert(BaseModel):
 
 
 class MonthlyRecordDto(BaseModel):
-    """DTO enriquecido: datos persistidos + totales calculados al vuelo."""
+    """DTO con totales persistidos en monthly_records (+ diff y % calculados en backend)."""
 
     id: UUID
     year: int

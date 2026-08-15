@@ -10,7 +10,7 @@ from app.models.monthly_entity_balance import MonthlyEntityBalance
 from app.models.monthly_hybrid_account import MonthlyHybridAccount
 from app.models.monthly_record import MonthlyRecord
 from app.schemas.monthly_record import ImportPayload, MonthlyRecordDto, MonthlyRecordResponse, MonthlyRecordUpsert
-from app.services.record_calculator import compute_totals_from_import, compute_totals_from_record
+from app.services.record_calculator import compute_totals_from_import, compute_totals_from_simple_balances
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -47,17 +47,25 @@ def _load_entities(db: Session, entity_ids: set[str]) -> dict[str, Entity]:
     return {entity.id: entity for entity in db.scalars(stmt).all()}
 
 
-def _compute_net_worth(record: MonthlyRecord | None) -> float | None:
+def _persisted_net_worth(record: MonthlyRecord | None) -> float | None:
     if record is None:
         return None
-    return compute_totals_from_record(record)["total_net_worth"]
+    return float(record.total_net_worth)
+
+
+def _apply_persisted_totals(record: MonthlyRecord, totals: dict[str, float]) -> None:
+    record.total_liquid = totals["total_liquid"]
+    record.total_invested = totals["total_invested"]
+    record.total_net_worth = totals["total_net_worth"]
 
 
 def _to_dto(record: MonthlyRecord, previous_net_worth: float | None) -> MonthlyRecordDto:
-    totals = compute_totals_from_record(record)
-    monthly_diff = (
-        totals["total_net_worth"] - previous_net_worth if previous_net_worth is not None else None
-    )
+    total_liquid = float(record.total_liquid)
+    total_invested = float(record.total_invested)
+    total_net_worth = float(record.total_net_worth)
+    invested_percentage = (total_invested / total_net_worth * 100) if total_net_worth else 0.0
+    monthly_diff = total_net_worth - previous_net_worth if previous_net_worth is not None else None
+
     return MonthlyRecordDto(
         id=record.id,
         year=record.year,
@@ -65,10 +73,10 @@ def _to_dto(record: MonthlyRecord, previous_net_worth: float | None) -> MonthlyR
         created_at=record.created_at,
         balances=record.balances,
         hybrid_accounts=record.hybrid_accounts,
-        total_liquid=totals["total_liquid"],
-        total_invested=totals["total_invested"],
-        total_net_worth=totals["total_net_worth"],
-        invested_percentage=totals["invested_percentage"],
+        total_liquid=total_liquid,
+        total_invested=total_invested,
+        total_net_worth=total_net_worth,
+        invested_percentage=round(invested_percentage, 2),
         monthly_diff=monthly_diff,
     )
 
@@ -82,7 +90,7 @@ def _build_response(
 ) -> MonthlyRecordResponse:
     prev_year, prev_month = _previous_year_month(year, month)
     previous_record = _get_record(db, prev_year, prev_month)
-    previous_net_worth = _compute_net_worth(previous_record)
+    previous_net_worth = _persisted_net_worth(previous_record)
 
     if record is None:
         return MonthlyRecordResponse(
@@ -166,6 +174,7 @@ def _upsert_record_balances(
     month: int,
     simple_balances: list,
     hybrid_balances: list,
+    totals: dict[str, float],
 ) -> MonthlyRecord:
     record = _get_record(db, year, month)
     if record is None:
@@ -177,11 +186,12 @@ def _upsert_record_balances(
         record.hybrid_accounts.clear()
         db.flush()
 
+    _apply_persisted_totals(record, totals)
+
     for balance in simple_balances:
         amount = balance.amount if hasattr(balance, "amount") else balance.balance_amount
-        entity_id = balance.entity_id
         record.balances.append(
-            MonthlyEntityBalance(entity_id=entity_id, balance_amount=amount)
+            MonthlyEntityBalance(entity_id=balance.entity_id, balance_amount=amount)
         )
 
     for hybrid in hybrid_balances:
@@ -215,7 +225,7 @@ def upsert_monthly_record(
     payload: MonthlyRecordUpsert,
     db: Session = Depends(get_db),
 ) -> MonthlyRecordResponse:
-    """Crea o actualiza los balances simples de un mes (sin persistir totales)."""
+    """Crea o actualiza los balances simples de un mes y persiste los totales en monthly_records."""
     _validate_month(month)
 
     entity_ids = {b.entity_id for b in payload.balances}
@@ -228,12 +238,15 @@ def upsert_monthly_record(
             detail=f"Entidades desconocidas: {sorted(unknown_ids)}",
         )
 
+    totals = compute_totals_from_simple_balances(payload.balances, entities_by_id)
+
     record = _upsert_record_balances(
         db,
         year=year,
         month=month,
         simple_balances=payload.balances,
         hybrid_balances=[],
+        totals=totals,
     )
     return _build_response(year=year, month=month, record=record, db=db)
 
@@ -245,19 +258,15 @@ def import_monthly_record(
     payload: ImportPayload,
     db: Session = Depends(get_db),
 ) -> MonthlyRecordResponse:
-    """
-    Importa y persiste un mes completo desde JSON estructurado.
-
-    Solo guarda balances; valida expected_totals contra totales calculados al vuelo.
-    """
+    """Importa un mes completo, valida expected_totals y persiste balances + totales."""
     _validate_month(month)
 
     entity_ids = {b.entity_id for b in payload.simple_balances} | {h.entity_id for h in payload.hybrid_balances}
     entities_by_id = _load_entities(db, entity_ids)
     _validate_import_payload(payload, entities_by_id)
 
-    computed_totals = compute_totals_from_import(payload, entities_by_id)
-    _assert_totals_match(computed_totals, payload)
+    totals = compute_totals_from_import(payload, entities_by_id)
+    _assert_totals_match(totals, payload)
 
     record = _upsert_record_balances(
         db,
@@ -265,5 +274,6 @@ def import_monthly_record(
         month=month,
         simple_balances=payload.simple_balances,
         hybrid_balances=payload.hybrid_balances,
+        totals=totals,
     )
     return _build_response(year=year, month=month, record=record, db=db)
