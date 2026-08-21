@@ -19,6 +19,7 @@ from app.schemas.monthly_record import (
 )
 from app.services.record_calculator import compute_totals_from_import, compute_totals_from_simple_balances
 
+
 router = APIRouter(prefix="/api/records", tags=["records"])
 
 AMOUNT_TOLERANCE = Decimal("0.02")
@@ -134,6 +135,42 @@ def _build_response(
     )
 
 
+def _validate_balance_entity_types(
+    simple_balances: list,
+    hybrid_balances: list,
+    entities_by_id: dict[str, Entity],
+) -> None:
+    all_ids = [b.entity_id for b in simple_balances] + [h.entity_id for h in hybrid_balances]
+    if len(all_ids) != len(set(all_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hay entity_id duplicados en los balances simples o híbridos",
+        )
+
+    unknown_ids = set(all_ids) - set(entities_by_id.keys())
+    if unknown_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Entidades desconocidas: {sorted(unknown_ids)}",
+        )
+
+    for balance in simple_balances:
+        entity_type = entities_by_id[balance.entity_id].entity_type
+        if entity_type not in (EntityType.LIQUID, EntityType.INVESTED):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La entidad '{balance.entity_id}' debe ser LIQUID o INVESTED",
+            )
+
+    for hybrid in hybrid_balances:
+        entity_type = entities_by_id[hybrid.entity_id].entity_type
+        if entity_type != EntityType.HYBRID:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La entidad '{hybrid.entity_id}' debe ser HYBRID",
+            )
+
+
 def _assert_totals_match(computed: dict[str, float], payload: ImportPayload) -> None:
     checks = {
         "total_liquid": (computed["total_liquid"], payload.expected_totals.total_liquid),
@@ -154,35 +191,7 @@ def _assert_totals_match(computed: dict[str, float], payload: ImportPayload) -> 
 
 
 def _validate_import_payload(payload: ImportPayload, entities_by_id: dict[str, Entity]) -> None:
-    all_ids = [b.entity_id for b in payload.simple_balances] + [h.entity_id for h in payload.hybrid_balances]
-    if len(all_ids) != len(set(all_ids)):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Hay entity_id duplicados en simple_balances o hybrid_balances",
-        )
-
-    unknown_ids = set(all_ids) - set(entities_by_id.keys())
-    if unknown_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Entidades desconocidas: {sorted(unknown_ids)}",
-        )
-
-    for balance in payload.simple_balances:
-        entity_type = entities_by_id[balance.entity_id].entity_type
-        if entity_type not in (EntityType.LIQUID, EntityType.INVESTED):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La entidad '{balance.entity_id}' debe ser LIQUID o INVESTED en simple_balances",
-            )
-
-    for hybrid in payload.hybrid_balances:
-        entity_type = entities_by_id[hybrid.entity_id].entity_type
-        if entity_type != EntityType.HYBRID:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La entidad '{hybrid.entity_id}' debe ser HYBRID en hybrid_balances",
-            )
+    _validate_balance_entity_types(payload.simple_balances, payload.hybrid_balances, entities_by_id)
 
     if not payload.simple_balances and not payload.hybrid_balances:
         raise HTTPException(
@@ -278,30 +287,36 @@ def upsert_monthly_record(
     payload: MonthlyRecordUpsert,
     db: Session = Depends(get_db),
 ) -> MonthlyRecordResponse:
-    """Crea o actualiza los balances simples de un mes y persiste los totales en monthly_records."""
+    """Crea o actualiza los balances (simples + híbridos) de un mes y persiste los totales."""
     _validate_month(month)
 
-    entity_ids = {b.entity_id for b in payload.balances}
+    entity_ids = {b.entity_id for b in payload.balances} | {h.entity_id for h in payload.hybrid_balances}
     entities_by_id = _load_entities(db, entity_ids)
+    _validate_balance_entity_types(payload.balances, payload.hybrid_balances, entities_by_id)
 
-    unknown_ids = entity_ids - set(entities_by_id.keys())
-    if unknown_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Entidades desconocidas: {sorted(unknown_ids)}",
-        )
-
-    totals = compute_totals_from_simple_balances(payload.balances, entities_by_id)
+    totals = compute_totals_from_simple_balances(payload.balances, entities_by_id, payload.hybrid_balances)
 
     record = _upsert_record_balances(
         db,
         year=year,
         month=month,
         simple_balances=payload.balances,
-        hybrid_balances=[],
+        hybrid_balances=payload.hybrid_balances,
         totals=totals,
     )
     return _build_response(year=year, month=month, record=record, db=db)
+
+
+@router.delete("/{year}/{month}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_monthly_record(year: int, month: int, db: Session = Depends(get_db)) -> None:
+    """Elimina el registro de un mes concreto (balances e híbridos se borran en cascada)."""
+    _validate_month(month)
+    record = _get_record(db, year, month)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe registro para ese mes")
+
+    db.delete(record)
+    db.commit()
 
 
 @router.post("/{year}/{month}/import", response_model=MonthlyRecordResponse)

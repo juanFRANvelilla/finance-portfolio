@@ -29,8 +29,19 @@ class EntityBalanceInput(BaseModel):
     balance_amount: float = Field(ge=0)
 
 
+class HybridBalanceImport(BaseModel):
+    """Balance de una entidad híbrida: parte líquida + parte invertida."""
+
+    entity_id: str
+    liquid_amount: float = Field(ge=0)
+    invested_amount: float = Field(ge=0)
+
+
 class MonthlyRecordUpsert(BaseModel):
-    balances: list[EntityBalanceInput]
+    """Payload del formulario manual: balances simples + híbridos de un mes."""
+
+    balances: list[EntityBalanceInput] = Field(default_factory=list)
+    hybrid_balances: list[HybridBalanceImport] = Field(default_factory=list)
 
 
 class MonthlyRecordDto(BaseModel):
@@ -75,12 +86,6 @@ class TimelineResponse(BaseModel):
 class SimpleBalanceImport(BaseModel):
     entity_id: str
     amount: float = Field(ge=0)
-
-
-class HybridBalanceImport(BaseModel):
-    entity_id: str
-    liquid_amount: float = Field(ge=0)
-    invested_amount: float = Field(ge=0)
 
 
 class ExpectedTotalsImport(BaseModel):

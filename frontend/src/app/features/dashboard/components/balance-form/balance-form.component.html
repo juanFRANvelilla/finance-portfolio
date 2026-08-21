@@ -47,10 +47,58 @@
     <p class="mt-2 text-sm text-slate-500">No hay entidades activas disponibles.</p>
   }
 
+  @if (hybridEntities().length > 0) {
+    <div class="mt-6 border-t border-white/5 pt-5">
+      <h4 class="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
+        Cuentas híbridas
+        <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+          Líquido + invertido
+        </span>
+      </h4>
+      <div class="grid gap-4 sm:grid-cols-2">
+        @for (entity of hybridEntities(); track entity.id) {
+          <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
+            <p class="mb-2 text-sm font-medium text-slate-300">{{ entity.name }}</p>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-sky-300">Líquido</span>
+                <div class="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
+                    (input)="onHybridValueChange(entity.id, 'liquid', $any($event.target).value)"
+                  />
+                  <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
+                </div>
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-purple-300">Invertido</span>
+                <div class="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
+                    (input)="onHybridValueChange(entity.id, 'invested', $any($event.target).value)"
+                  />
+                  <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   <div class="mt-6 flex flex-wrap items-center gap-3">
     <button
       type="submit"
-      [disabled]="saving() || simpleEntities().length === 0"
+      [disabled]="saving() || (simpleEntities().length === 0 && hybridEntities().length === 0)"
       class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
     >
       @if (saving()) {

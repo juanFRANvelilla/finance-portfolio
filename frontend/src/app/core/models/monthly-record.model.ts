@@ -19,8 +19,15 @@ export interface EntityBalanceInput {
   balance_amount: number;
 }
 
+export interface HybridBalanceImport {
+  entity_id: string;
+  liquid_amount: number;
+  invested_amount: number;
+}
+
 export interface MonthlyRecordUpsert {
   balances: EntityBalanceInput[];
+  hybrid_balances: HybridBalanceImport[];
 }
 
 /** DTO con totales calculados al vuelo por el backend. */
@@ -64,12 +71,6 @@ export interface TimelineResponse {
 export interface SimpleBalanceImport {
   entity_id: string;
   amount: number;
-}
-
-export interface HybridBalanceImport {
-  entity_id: string;
-  liquid_amount: number;
-  invested_amount: number;
 }
 
 export interface ExpectedTotalsImport {

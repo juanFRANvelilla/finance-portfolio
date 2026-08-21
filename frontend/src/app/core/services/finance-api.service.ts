@@ -39,6 +39,10 @@ export class FinanceApiService {
     );
   }
 
+  deleteMonthlyRecord(year: number, month: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/records/${year}/${month}`);
+  }
+
   importMonthlyRecord(
     year: number,
     month: number,
