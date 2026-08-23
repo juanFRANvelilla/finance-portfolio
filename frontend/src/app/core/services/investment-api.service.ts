@@ -1,0 +1,65 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+
+import { environment } from '../../../environments/environment';
+import {
+  AssetInvestmentsUpsert,
+  AssetType,
+  AssetTypeCreate,
+  CategoryDetailResponse,
+  CategoryInvestmentsUpsert,
+  InvestmentCategory,
+  InvestmentOverviewResponse,
+} from '../models/investment.model';
+
+@Injectable({ providedIn: 'root' })
+export class InvestmentApiService {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiUrl}/investment`;
+
+  getCategories(): Observable<InvestmentCategory[]> {
+    return this.http.get<InvestmentCategory[]>(`${this.baseUrl}/categories`);
+  }
+
+  getAssetTypes(categoryId?: string): Observable<AssetType[]> {
+    const url = categoryId
+      ? `${this.baseUrl}/asset-types?category_id=${encodeURIComponent(categoryId)}`
+      : `${this.baseUrl}/asset-types`;
+    return this.http.get<AssetType[]>(url);
+  }
+
+  createAssetType(payload: AssetTypeCreate): Observable<AssetType> {
+    return this.http.post<AssetType>(`${this.baseUrl}/asset-types`, payload);
+  }
+
+  getOverview(year: number, month: number): Observable<InvestmentOverviewResponse> {
+    return this.http.get<InvestmentOverviewResponse>(`${this.baseUrl}/${year}/${month}`);
+  }
+
+  upsertCategories(
+    year: number,
+    month: number,
+    payload: CategoryInvestmentsUpsert,
+  ): Observable<InvestmentOverviewResponse> {
+    return this.http.post<InvestmentOverviewResponse>(`${this.baseUrl}/${year}/${month}/categories`, payload);
+  }
+
+  getCategoryDetail(year: number, month: number, categoryId: string): Observable<CategoryDetailResponse> {
+    return this.http.get<CategoryDetailResponse>(
+      `${this.baseUrl}/${year}/${month}/categories/${encodeURIComponent(categoryId)}`,
+    );
+  }
+
+  upsertCategoryAssets(
+    year: number,
+    month: number,
+    categoryId: string,
+    payload: AssetInvestmentsUpsert,
+  ): Observable<CategoryDetailResponse> {
+    return this.http.post<CategoryDetailResponse>(
+      `${this.baseUrl}/${year}/${month}/categories/${encodeURIComponent(categoryId)}/assets`,
+      payload,
+    );
+  }
+}

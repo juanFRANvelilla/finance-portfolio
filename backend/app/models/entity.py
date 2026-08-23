@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Boolean, Enum, String
+from sqlalchemy import Boolean, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,6 +22,9 @@ class Entity(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    default_category_id: Mapped[str | None] = mapped_column(
+        String(30), ForeignKey("investment_categories.id"), nullable=True
+    )
 
     balances: Mapped[list["MonthlyEntityBalance"]] = relationship(
         back_populates="entity",

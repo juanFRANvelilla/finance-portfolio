@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { Entity } from '../../../../core/models/entity.model';
 import { EntityBalanceInput, HybridBalanceImport } from '../../../../core/models/monthly-record.model';
+import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
 
 export interface BalanceFormSubmission {
   balances: EntityBalanceInput[];
@@ -18,7 +19,6 @@ export class BalanceFormComponent {
   readonly entities = input.required<Entity[]>();
   readonly saving = input<boolean>(false);
   readonly save = output<BalanceFormSubmission>();
-  readonly importJson = output<void>();
 
   readonly simpleEntities = computed(() =>
     this.entities().filter((e) => e.entity_type === 'LIQUID' || e.entity_type === 'INVESTED'),
@@ -30,12 +30,12 @@ export class BalanceFormComponent {
   readonly hybridValues = signal<Record<string, { liquid: number | null; invested: number | null }>>({});
 
   onValueChange(entityId: string, value: string): void {
-    const parsed = value === '' ? null : Number(value);
+    const parsed = parseDecimalInput(value);
     this.values.update((current) => ({ ...current, [entityId]: parsed }));
   }
 
   onHybridValueChange(entityId: string, field: 'liquid' | 'invested', value: string): void {
-    const parsed = value === '' ? null : Number(value);
+    const parsed = parseDecimalInput(value);
     this.hybridValues.update((current) => {
       const existing = current[entityId] ?? { liquid: null, invested: null };
       return {

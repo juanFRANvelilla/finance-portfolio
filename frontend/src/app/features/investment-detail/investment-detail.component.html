@@ -1,0 +1,320 @@
+<div class="min-h-screen bg-slate-950 pb-16 text-slate-100">
+  <header class="border-b border-white/5 bg-slate-900/60">
+    <div class="mx-auto flex max-w-5xl flex-col gap-1 px-6 py-6">
+      <a routerLink="/" class="w-fit text-xs font-semibold uppercase tracking-widest text-indigo-400 hover:text-indigo-300">
+        ← Volver al panel principal
+      </a>
+      <h1 class="text-2xl font-bold text-white">Detalle de inversión</h1>
+      <p class="text-sm text-slate-400">{{ monthLabel() }}</p>
+    </div>
+  </header>
+
+  <main class="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
+    @if (errorMessage()) {
+      <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
+        {{ errorMessage() }}
+      </div>
+    }
+
+    @if (loading()) {
+      <div class="flex items-center justify-center rounded-2xl bg-slate-800/40 py-24 text-slate-400">
+        Cargando...
+      </div>
+    } @else if (overview()) {
+      @if (!overview()!.has_month_record) {
+        <div class="rounded-2xl bg-slate-800/60 px-4 py-3 text-sm text-slate-400 ring-1 ring-white/10">
+          Este mes todavía no tiene balances guardados en el panel principal, pero puedes registrar aquí el detalle
+          de tu inversión libremente.
+        </div>
+      }
+
+      <!-- ==================== TOTAL INVERTIDO ==================== -->
+      <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Total invertido</h2>
+        <p class="mt-1 text-2xl font-bold text-white">{{ overview()!.total_invested | eurCurrency }}</p>
+        <div class="mt-4">
+          <app-segment-donut-chart
+            [segments]="categorySegments()"
+            centerLabel="Invertido"
+            [centerValue]="overview()!.total_invested"
+            [clickable]="true"
+            (segmentClick)="openPanel($event)"
+          />
+        </div>
+        <p class="mt-4 text-center text-xs text-slate-500">Pulsa una categoría para desplegar su detalle.</p>
+      </section>
+
+      <!-- ==================== CATEGORÍAS: FONDOS / ACCIONES / CRYPTO (desplegables) ==================== -->
+      <section class="flex flex-col gap-4">
+        @for (cat of overview()!.categories; track cat.category_id) {
+          <div
+            class="overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10"
+            style="border-left-width: 4px; border-left-style: solid;"
+            [style.border-left-color]="cat.color"
+          >
+            <button
+              type="button"
+              (click)="togglePanel(cat.category_id)"
+              class="flex w-full items-center justify-between p-4 text-left transition hover:bg-slate-900/40"
+            >
+              <div class="flex items-center gap-3">
+                <span class="h-2.5 w-2.5 rounded-full" [style.background-color]="cat.color"></span>
+                <div>
+                  <p class="text-sm font-medium text-slate-200">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500">{{ cat.percentage }}% del total invertido</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="font-semibold text-white">{{ cat.amount_eur | eurCurrency }}</span>
+                <svg
+                  class="h-4 w-4 text-slate-400 transition-transform"
+                  [class.rotate-180]="isPanelOpen(cat.category_id)"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+            </button>
+
+            @if (isPanelOpen(cat.category_id)) {
+              <div class="border-t border-white/5 px-4 py-4">
+                @if (panel(cat.category_id).errorMessage) {
+                  <div class="mb-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-300 ring-1 ring-rose-500/20">
+                    {{ panel(cat.category_id).errorMessage }}
+                  </div>
+                }
+
+                @if (panel(cat.category_id).loadingDetail) {
+                  <div class="py-8 text-center text-sm text-slate-500">Cargando...</div>
+                } @else if (panel(cat.category_id).detail) {
+                  @if (cat.editable) {
+                    <!-- ---- Total manual y libre (Fondos/Crypto) ---- -->
+                    <div class="mb-5">
+                      <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
+                        Total de la categoría
+                        @if (cat.entity_amount_eur > 0) {
+                          <span class="text-xs text-emerald-400">
+                            Según {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
+                          </span>
+                        } @else if (cat.previous_amount_eur !== null) {
+                          <span class="text-xs text-slate-500">Mes anterior: {{ cat.previous_amount_eur | eurCurrency }}</span>
+                        }
+                      </span>
+                      <div class="flex items-center gap-3">
+                        <div class="relative flex-1">
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
+                            [value]="panel(cat.category_id).categoryInput"
+                            (input)="onCategoryInputChange(cat.category_id, $any($event.target).value)"
+                          />
+                          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
+                        </div>
+                        <button
+                          type="button"
+                          [disabled]="panel(cat.category_id).savingTotal"
+                          (click)="saveCategoryTotal(cat.category_id)"
+                          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Guardar
+                        </button>
+                      </div>
+                      <div class="mt-2 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0"
+                          [max]="overview()!.total_invested"
+                          step="1"
+                          class="h-1.5 flex-1 cursor-pointer accent-indigo-500"
+                          [value]="categoryInputNumeric(cat.category_id)"
+                          (input)="onCategoryInputChange(cat.category_id, $any($event.target).value)"
+                        />
+                        <span class="w-14 text-right text-xs tabular-nums text-slate-400">
+                          {{ categoryInputPercentage(cat.category_id) }}%
+                        </span>
+                      </div>
+                    </div>
+                    <hr class="mb-5 border-white/5" />
+                  }
+
+                  <!-- ---- Activos de la categoría ---- -->
+                  <div class="mb-3 flex items-center justify-between">
+                    <p class="text-sm font-semibold text-slate-300">Activos</p>
+                    <button
+                      type="button"
+                      (click)="toggleAssetEditMode(cat.category_id)"
+                      class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
+                    >
+                      {{ panel(cat.category_id).assetEditMode ? 'Cancelar' : 'Editar activos' }}
+                    </button>
+                  </div>
+
+                  @if (!panel(cat.category_id).assetEditMode) {
+                    @if (assetSegmentsFor(cat.category_id).length > 0) {
+                      <app-segment-donut-chart
+                        [segments]="assetSegmentsFor(cat.category_id)"
+                        [centerLabel]="cat.name"
+                        [centerValue]="panel(cat.category_id).detail!.category_amount_eur"
+                        [clickable]="false"
+                      />
+                    } @else {
+                      <p class="py-6 text-center text-sm text-slate-500">
+                        Todavía no hay activos con importe asignado en esta categoría.
+                      </p>
+                    }
+                  } @else {
+                    <div class="flex flex-col gap-3">
+                      @for (row of panel(cat.category_id).assetRows; track row.assetTypeId) {
+                        <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
+                          <p class="mb-2 text-sm font-medium text-slate-300">
+                            {{ row.name }}
+                            <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
+                          </p>
+                          <div class="grid gap-2" [class.sm:grid-cols-2]="showUnitsFor(cat.category_id)">
+                            @if (showUnitsFor(cat.category_id)) {
+                              <label class="block">
+                                <span class="mb-1 block text-xs text-slate-400">Títulos (units)</span>
+                                <input
+                                  type="text"
+                                  inputmode="decimal"
+                                  class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                                  [value]="row.units"
+                                  (input)="onAssetUnitsChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
+                                />
+                              </label>
+                            }
+                            <label class="block">
+                              <span class="mb-1 block text-xs text-slate-400">Importe ({{ row.currency }})</span>
+                              <input
+                                type="text"
+                                inputmode="decimal"
+                                class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                                [value]="row.amount"
+                                (input)="onAssetAmountChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
+                              />
+                            </label>
+                          </div>
+                          <p class="mt-1.5 text-right text-xs text-slate-500">
+                            @if (row.currency === 'EUR') {
+                              ≈ {{ assetRowPreviewEur(row) | eurCurrency }}
+                            } @else {
+                              ≈ {{ assetRowPreviewEur(row) | eurCurrency }}
+                              <span class="text-slate-600">· conversión automática próximamente</span>
+                            }
+                          </p>
+                        </div>
+                      }
+
+                      @if (panel(cat.category_id).assetRows.length === 0) {
+                        <p class="text-center text-sm text-slate-500">
+                          Todavía no hay activos creados en esta categoría. Crea el primero abajo.
+                        </p>
+                      }
+
+                      @if (!panel(cat.category_id).showAddAsset) {
+                        <button
+                          type="button"
+                          (click)="toggleAddAsset(cat.category_id)"
+                          class="inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5"
+                        >
+                          + Añadir activo nuevo
+                        </button>
+                      } @else {
+                        <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
+                          <div class="grid gap-2 sm:grid-cols-3">
+                            <input
+                              type="text"
+                              placeholder="Nombre (p.ej. SOL)"
+                              class="rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                              [value]="panel(cat.category_id).newAssetName"
+                              (input)="onNewAssetNameChange(cat.category_id, $any($event.target).value)"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Ticker (opcional)"
+                              class="rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                              [value]="panel(cat.category_id).newAssetTicker"
+                              (input)="onNewAssetTickerChange(cat.category_id, $any($event.target).value)"
+                            />
+                            <select
+                              class="rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                              [value]="panel(cat.category_id).newAssetCurrency"
+                              (change)="onNewAssetCurrencyChange(cat.category_id, $any($event.target).value)"
+                            >
+                              <option value="EUR">EUR</option>
+                              <option value="USD">USD</option>
+                            </select>
+                          </div>
+                          <div class="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              [disabled]="panel(cat.category_id).creatingAsset || !panel(cat.category_id).newAssetName.trim()"
+                              (click)="createAsset(cat.category_id)"
+                              class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Crear activo
+                            </button>
+                            <button
+                              type="button"
+                              (click)="toggleAddAsset(cat.category_id)"
+                              class="rounded-xl px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      }
+
+                      @if (!cat.editable) {
+                        <div class="flex items-center justify-between rounded-xl bg-slate-900/40 px-4 py-3 text-sm text-slate-400 ring-1 ring-white/5">
+                          <span>Total calculado (suma de activos)</span>
+                          <span class="font-semibold text-white">{{ assetAllocatedFor(cat.category_id) | eurCurrency }}</span>
+                        </div>
+                      } @else {
+                        <div
+                          class="flex items-center justify-between rounded-xl px-4 py-3 text-sm ring-1"
+                          [class.bg-emerald-500/10]="assetOthersFor(cat.category_id) >= 0"
+                          [class.ring-emerald-500/20]="assetOthersFor(cat.category_id) >= 0"
+                          [class.text-emerald-300]="assetOthersFor(cat.category_id) >= 0"
+                          [class.bg-rose-500/10]="assetOthersFor(cat.category_id) < 0"
+                          [class.ring-rose-500/20]="assetOthersFor(cat.category_id) < 0"
+                          [class.text-rose-300]="assetOthersFor(cat.category_id) < 0"
+                        >
+                          <span>
+                            {{ assetOthersFor(cat.category_id) >= 0 ? 'Resto sin clasificar (Otros)' : 'Te has pasado del total de la categoría' }}
+                          </span>
+                          <span class="font-semibold">{{ assetOthersFor(cat.category_id) | eurCurrency }}</span>
+                        </div>
+                      }
+
+                      <button
+                        type="button"
+                        [disabled]="panel(cat.category_id).savingAssets"
+                        (click)="saveAssets(cat.category_id)"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        @if (panel(cat.category_id).savingAssets) {
+                          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                          </svg>
+                        }
+                        Guardar activos
+                      </button>
+                    </div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  </main>
+</div>

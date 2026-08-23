@@ -5,4 +5,5 @@ export interface Entity {
   name: string;
   entity_type: EntityType;
   is_active: boolean;
+  default_category_id: string | null;
 }

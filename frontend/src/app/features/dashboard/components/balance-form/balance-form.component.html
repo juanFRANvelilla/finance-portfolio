@@ -30,9 +30,8 @@
         </span>
         <div class="relative">
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputmode="decimal"
             placeholder="0,00"
             class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
             (input)="onValueChange(entity.id, $any($event.target).value)"
@@ -64,9 +63,8 @@
                 <span class="mb-1 block text-xs font-medium text-sky-300">Líquido</span>
                 <div class="relative">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputmode="decimal"
                     placeholder="0,00"
                     class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
                     (input)="onHybridValueChange(entity.id, 'liquid', $any($event.target).value)"
@@ -78,9 +76,8 @@
                 <span class="mb-1 block text-xs font-medium text-purple-300">Invertido</span>
                 <div class="relative">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputmode="decimal"
                     placeholder="0,00"
                     class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
                     (input)="onHybridValueChange(entity.id, 'invested', $any($event.target).value)"
@@ -108,14 +105,6 @@
         </svg>
       }
       Guardar mes
-    </button>
-
-    <button
-      type="button"
-      (click)="importJson.emit()"
-      class="inline-flex items-center gap-2 rounded-xl border border-dashed border-indigo-500/40 px-4 py-2.5 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/10"
-    >
-      Importar JSON del mes
     </button>
   </div>
 </form>

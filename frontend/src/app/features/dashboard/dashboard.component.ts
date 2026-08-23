@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { Entity } from '../../core/models/entity.model';
@@ -21,6 +22,7 @@ const FIXED_DEFAULT_YEAR = 2026;
   imports: [
     EurCurrencyPipe,
     DecimalPipe,
+    RouterLink,
     MonthNavigatorComponent,
     DonutChartComponent,
     DiffBadgeComponent,
@@ -52,6 +54,16 @@ export class DashboardComponent {
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
   readonly hasTimeline = computed(() => this.timelinePoints().length > 0);
+
+  /** Solo se puede importar JSON histórico para meses ya cerrados (anteriores al mes actual real). */
+  readonly isPastMonth = computed(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    return this.year() < currentYear || (this.year() === currentYear && this.month() < currentMonth);
+  });
+
+  readonly canImportJson = computed(() => this.isPastMonth() && !this.hasRecord());
 
   constructor() {
     this.loadEntities();
