@@ -91,6 +91,8 @@ export interface CategoryDetailResponse {
   /** true solo para Acciones: sus activos llevan además nº de títulos (units). */
   has_units: boolean;
   category_amount_eur: number;
+  /** Tipo USD→EUR usado para convertir activos de este mes (informativo). */
+  fx_usd_to_eur: number | null;
   assets: AssetInvestmentDetail[];
   allocated_amount_eur: number;
   others_amount_eur: number;

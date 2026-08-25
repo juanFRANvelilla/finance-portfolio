@@ -109,6 +109,8 @@ class CategoryDetailResponse(BaseModel):
     has_units: bool
     """True solo para Acciones: sus activos llevan además nº de títulos (units)."""
     category_amount_eur: float
+    fx_usd_to_eur: float | None = None
+    """Tipo de cambio USD→EUR usado para convertir activos de este mes (informativo)."""
     assets: list[AssetInvestmentDetail]
     allocated_amount_eur: float
     others_amount_eur: float

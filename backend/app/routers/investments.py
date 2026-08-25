@@ -25,7 +25,7 @@ from app.schemas.investment import (
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
 )
-from app.services.fx_converter import amount_to_eur
+from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
@@ -120,7 +120,7 @@ def _computed_category_totals(db: Session, year: int, month: int) -> dict[str, f
     )
     totals: dict[str, Decimal] = {}
     for category_id, currency, amount in db.execute(stmt).all():
-        eur = Decimal(str(amount_to_eur(float(amount), currency)))
+        eur = Decimal(str(amount_to_eur(float(amount), currency, year, month)))
         totals[category_id] = totals.get(category_id, Decimal("0")) + eur
     return {cat_id: _round2(total) for cat_id, total in totals.items()}
 
@@ -304,11 +304,12 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
 
     assets_detail: list[AssetInvestmentDetail] = []
     allocated = Decimal("0")
+    has_usd_assets = any(a.currency == "USD" for a in asset_types)
     for asset in asset_types:
         saved = saved_assets.get(asset.id)
         prev = prev_assets.get(asset.id)
         amount = float(saved.amount) if saved else 0.0
-        amount_eur = amount_to_eur(amount, asset.currency)
+        amount_eur = amount_to_eur(amount, asset.currency, year, month)
         allocated += Decimal(str(amount_eur))
         assets_detail.append(
             AssetInvestmentDetail(
@@ -323,6 +324,8 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 previous_units=float(prev.units) if prev and prev.units is not None else None,
             )
         )
+
+    fx_usd_to_eur = get_usd_to_eur_rate(year, month) if has_usd_assets else None
 
     if is_computed:
         # El total NACE del detalle: no hay valor manual que cuadrar, siempre coincide.
@@ -347,6 +350,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         is_computed=is_computed,
         has_units=has_units,
         category_amount_eur=category_amount,
+        fx_usd_to_eur=fx_usd_to_eur,
         assets=assets_detail,
         allocated_amount_eur=_round2(allocated),
         others_amount_eur=others,

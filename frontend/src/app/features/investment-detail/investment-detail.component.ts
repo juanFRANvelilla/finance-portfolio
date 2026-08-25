@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { InvestmentApiService } from '../../core/services/investment-api.service';
@@ -40,6 +41,7 @@ interface CategoryPanelState {
   savingTotal: boolean;
   assetEditMode: boolean;
   assetRows: AssetRow[];
+  fxUsdToEur: number | null;
   savingAssets: boolean;
   showAddAsset: boolean;
   newAssetName: string;
@@ -58,6 +60,7 @@ function createPanelState(): CategoryPanelState {
     savingTotal: false,
     assetEditMode: false,
     assetRows: [],
+    fxUsdToEur: null,
     savingAssets: false,
     showAddAsset: false,
     newAssetName: '',
@@ -69,7 +72,7 @@ function createPanelState(): CategoryPanelState {
 
 @Component({
   selector: 'app-investment-detail',
-  imports: [RouterLink, EurCurrencyPipe, SegmentDonutChartComponent],
+  imports: [RouterLink, DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent],
   templateUrl: './investment-detail.component.html',
 })
 export class InvestmentDetailComponent {
@@ -186,6 +189,7 @@ export class InvestmentDetailComponent {
       detail,
       assetEditMode: detail.allocated_amount_eur <= 0,
       assetRows: this.buildAssetRows(detail),
+      fxUsdToEur: detail.fx_usd_to_eur,
       categoryInput,
     });
   }
@@ -270,15 +274,18 @@ export class InvestmentDetailComponent {
   }
 
   assetAllocatedFor(categoryId: string): number {
-    return this.panel(categoryId).assetRows.reduce((sum, row) => sum + this.assetRowPreviewEur(row), 0);
+    return this.panel(categoryId).assetRows.reduce(
+      (sum, row) => sum + this.assetRowPreviewEur(categoryId, row),
+      0,
+    );
   }
 
-  /** Vista previa en EUR mientras se edita (placeholder hasta integrar API de FX). */
-  assetRowPreviewEur(row: AssetRow): number {
+  /** Equivalente en EUR usando el tipo de cambio del backend para el mes activo. */
+  assetRowPreviewEur(categoryId: string, row: AssetRow): number {
     const value = parseDecimalInput(row.amount) ?? 0;
     if (row.currency === 'EUR') return value;
-    // Placeholder 1:1; el backend aplicará la misma lógica hasta conectar Frankfurter u otra API.
-    return value;
+    const rate = this.panel(categoryId).fxUsdToEur ?? 1;
+    return Math.round(value * rate * 100) / 100;
   }
 
   assetOthersFor(categoryId: string): number {
@@ -289,6 +296,13 @@ export class InvestmentDetailComponent {
 
   showUnitsFor(categoryId: string): boolean {
     return this.panel(categoryId).detail?.has_units ?? false;
+  }
+
+  assetGridCols(categoryId: string, currency: string): string {
+    const hasUnits = this.showUnitsFor(categoryId);
+    if (hasUnits && currency === 'USD') return 'sm:grid-cols-3';
+    if (hasUnits || currency === 'USD') return 'sm:grid-cols-2';
+    return '';
   }
 
   onAssetAmountChange(categoryId: string, assetTypeId: string, value: string): void {
@@ -333,6 +347,7 @@ export class InvestmentDetailComponent {
           savingAssets: false,
           assetEditMode: false,
           assetRows: this.buildAssetRows(response),
+          fxUsdToEur: response.fx_usd_to_eur,
         });
         this.loadOverview();
       },

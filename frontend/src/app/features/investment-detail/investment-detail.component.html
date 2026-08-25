@@ -163,6 +163,50 @@
                         [centerValue]="panel(cat.category_id).detail!.category_amount_eur"
                         [clickable]="false"
                       />
+                      <div class="mt-4 overflow-hidden rounded-xl ring-1 ring-white/5">
+                        <table class="w-full text-sm">
+                          <thead>
+                            <tr class="bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
+                              <th class="px-3 py-2 font-medium">Activo</th>
+                              @if (showUnitsFor(cat.category_id)) {
+                                <th class="px-3 py-2 font-medium text-right">Títulos</th>
+                              }
+                              <th class="px-3 py-2 font-medium text-right">Importe</th>
+                              <th class="px-3 py-2 font-medium text-right">Valor EUR</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (asset of panel(cat.category_id).detail!.assets; track asset.asset_type_id) {
+                              @if (asset.amount_eur > 0 || asset.units) {
+                                <tr class="border-t border-white/5">
+                                  <td class="px-3 py-2 text-slate-300">
+                                    {{ asset.name }}
+                                    @if (asset.ticker) {
+                                      <span class="ml-1 text-xs text-slate-500">({{ asset.ticker }})</span>
+                                    }
+                                  </td>
+                                  @if (showUnitsFor(cat.category_id)) {
+                                    <td class="px-3 py-2 text-right tabular-nums text-slate-400">
+                                      {{ asset.units ?? '—' }}
+                                    </td>
+                                  }
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-300">
+                                    {{ asset.amount | number:'1.2-2' }} {{ asset.currency }}
+                                  </td>
+                                  <td class="px-3 py-2 text-right tabular-nums font-medium text-white">
+                                    {{ asset.amount_eur | eurCurrency }}
+                                  </td>
+                                </tr>
+                              }
+                            }
+                          </tbody>
+                        </table>
+                        @if (panel(cat.category_id).fxUsdToEur) {
+                          <p class="border-t border-white/5 px-3 py-2 text-xs text-slate-500">
+                            Tipo USD→EUR del mes: {{ panel(cat.category_id).fxUsdToEur | number:'1.4-4' }}
+                          </p>
+                        }
+                      </div>
                     } @else {
                       <p class="py-6 text-center text-sm text-slate-500">
                         Todavía no hay activos con importe asignado en esta categoría.
@@ -176,10 +220,10 @@
                             {{ row.name }}
                             <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
                           </p>
-                          <div class="grid gap-2" [class.sm:grid-cols-2]="showUnitsFor(cat.category_id)">
+                          <div class="grid gap-2" [class]="assetGridCols(cat.category_id, row.currency)">
                             @if (showUnitsFor(cat.category_id)) {
                               <label class="block">
-                                <span class="mb-1 block text-xs text-slate-400">Títulos (units)</span>
+                                <span class="mb-1 block text-xs text-slate-400">Títulos</span>
                                 <input
                                   type="text"
                                   inputmode="decimal"
@@ -199,15 +243,22 @@
                                 (input)="onAssetAmountChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
                               />
                             </label>
-                          </div>
-                          <p class="mt-1.5 text-right text-xs text-slate-500">
-                            @if (row.currency === 'EUR') {
-                              ≈ {{ assetRowPreviewEur(row) | eurCurrency }}
-                            } @else {
-                              ≈ {{ assetRowPreviewEur(row) | eurCurrency }}
-                              <span class="text-slate-600">· conversión automática próximamente</span>
+                            @if (row.currency === 'USD') {
+                              <div class="block">
+                                <span class="mb-1 block text-xs text-slate-400">Valor EUR</span>
+                                <div
+                                  class="flex h-[38px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-medium tabular-nums text-emerald-300 ring-1 ring-white/5"
+                                >
+                                  {{ assetRowPreviewEur(cat.category_id, row) | eurCurrency }}
+                                </div>
+                              </div>
                             }
-                          </p>
+                          </div>
+                          @if (row.currency === 'EUR') {
+                            <p class="mt-1.5 text-right text-xs text-slate-500">
+                              Valor: {{ assetRowPreviewEur(cat.category_id, row) | eurCurrency }}
+                            </p>
+                          }
                         </div>
                       }
 
