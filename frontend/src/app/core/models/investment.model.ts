@@ -50,7 +50,7 @@ export interface InvestmentOverviewResponse {
   year: number;
   month: number;
   total_invested: number;
-  /** Indica si el mes tiene balances guardados en el panel principal. */
+  /** Suma de categorías del detalle; puede diferir del panel principal. */
   has_month_record: boolean;
   categories: CategoryOverview[];
   previous_year: number;

@@ -173,15 +173,13 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
 
     entity_breakdown = _entity_category_breakdown(db, record)
 
-    computed_sum = sum(computed.values())
-    saved_sum = sum(saved.values())
-    total_invested = float(record.total_invested) if record is not None else round(computed_sum + saved_sum, 2)
-
     category_overviews: list[CategoryOverview] = []
+    total_invested = Decimal("0")
     for cat in categories:
         is_computed = cat.id in COMPUTED_CATEGORY_IDS
         amount = computed.get(cat.id, 0.0) if is_computed else saved.get(cat.id, 0.0)
         previous_amount = prev_computed.get(cat.id) if is_computed else prev_saved.get(cat.id)
+        total_invested += Decimal(str(amount))
 
         category_overviews.append(
             CategoryOverview(
@@ -189,7 +187,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
                 name=cat.name,
                 color=cat.color,
                 amount_eur=amount,
-                percentage=round((amount / total_invested * 100), 2) if total_invested else 0.0,
+                percentage=0.0,  # se recalcula abajo con el total del detalle
                 previous_amount_eur=previous_amount,
                 entity_amount_eur=entity_breakdown.get(cat.id, {}).get("amount", 0.0),
                 entity_names=entity_breakdown.get(cat.id, {}).get("names", []),
@@ -198,10 +196,16 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
             )
         )
 
+    total_invested_f = _round2(total_invested)
+    for overview in category_overviews:
+        overview.percentage = (
+            round((overview.amount_eur / total_invested_f * 100), 2) if total_invested_f else 0.0
+        )
+
     return InvestmentOverviewResponse(
         year=year,
         month=month,
-        total_invested=total_invested,
+        total_invested=total_invested_f,
         has_month_record=record is not None,
         categories=category_overviews,
         previous_year=prev_year,
@@ -211,9 +215,11 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
 
 @router.get("/{year}/{month}", response_model=InvestmentOverviewResponse)
 def get_investment_overview(year: int, month: int, db: Session = Depends(get_db)) -> InvestmentOverviewResponse:
-    """Resumen de inversión de un mes. No depende de que exista monthly_records: si no hay
-    balances guardados en el panel principal, total_invested se estima con lo ya registrado
-    aquí, pero se puede seguir registrando el detalle de inversión con total libertad."""
+    """Resumen de inversión de un mes.
+
+    `total_invested` es la suma de las categorías registradas aquí (Fondos + Crypto + Acciones),
+    independiente del total invertido del panel principal (monthly_records).
+    """
     return _build_overview(db, year, month)
 
 

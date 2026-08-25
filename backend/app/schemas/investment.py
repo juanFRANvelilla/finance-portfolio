@@ -68,6 +68,7 @@ class InvestmentOverviewResponse(BaseModel):
     year: int
     month: int
     total_invested: float
+    """Suma de todas las categorías del detalle de inversión (puede diferir del panel principal)."""
     has_month_record: bool
     """Indica si el mes tiene balances guardados en el panel principal (monthly_records)."""
     categories: list[CategoryOverview]
