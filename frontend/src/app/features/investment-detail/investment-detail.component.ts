@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { InvestmentApiService } from '../../core/services/investment-api.service';
+import { PeriodStorageService } from '../../core/services/period-storage.service';
 import {
   AssetType,
   CategoryDetailResponse,
@@ -78,11 +79,13 @@ function createPanelState(): CategoryPanelState {
 export class InvestmentDetailComponent {
   private readonly api = inject(InvestmentApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly periodStorage = inject(PeriodStorageService);
 
   readonly monthNames = MONTH_NAMES;
 
-  readonly year = signal<number>(new Date().getFullYear());
-  readonly month = signal<number>(new Date().getMonth() + 1);
+  private readonly storedPeriod = this.periodStorage.read();
+  readonly year = signal<number>(this.storedPeriod.year);
+  readonly month = signal<number>(this.storedPeriod.month);
 
   readonly loading = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
@@ -105,12 +108,17 @@ export class InvestmentDetailComponent {
 
   constructor() {
     this.route.queryParamMap.subscribe((params) => {
-      const year = Number(params.get('year')) || new Date().getFullYear();
-      const month = Number(params.get('month')) || new Date().getMonth() + 1;
+      const yearParam = params.get('year');
+      const monthParam = params.get('month');
+
+      const stored = this.periodStorage.read();
+      const year = yearParam ? Number(yearParam) : stored.year;
+      const month = monthParam ? Number(monthParam) : stored.month;
 
       const monthChanged = year !== this.year() || month !== this.month();
       this.year.set(year);
       this.month.set(month);
+      this.periodStorage.save(year, month);
 
       if (monthChanged || !this.overview()) {
         this.panels.set({});

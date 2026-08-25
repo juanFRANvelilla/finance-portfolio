@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
+import { PeriodStorageService } from '../../core/services/period-storage.service';
 import { Entity } from '../../core/models/entity.model';
 import { ImportPayload, MonthlyRecordResponse, TimelinePoint } from '../../core/models/monthly-record.model';
 import { MONTH_NAMES } from '../../core/models/month-names';
@@ -14,8 +15,6 @@ import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component
 import { BalanceFormComponent, BalanceFormSubmission } from './components/balance-form/balance-form.component';
 import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
 import { TimelineChartComponent } from './components/timeline-chart/timeline-chart.component';
-
-const FIXED_DEFAULT_YEAR = 2026;
 
 @Component({
   selector: 'app-dashboard',
@@ -34,11 +33,13 @@ const FIXED_DEFAULT_YEAR = 2026;
 })
 export class DashboardComponent {
   private readonly api = inject(FinanceApiService);
+  private readonly periodStorage = inject(PeriodStorageService);
+  private readonly storedPeriod = this.periodStorage.read();
 
   readonly monthNames = MONTH_NAMES;
 
-  readonly year = signal<number>(FIXED_DEFAULT_YEAR);
-  readonly month = signal<number>(new Date().getMonth() + 1);
+  readonly year = signal<number>(this.storedPeriod.year);
+  readonly month = signal<number>(this.storedPeriod.month);
 
   readonly entities = signal<Entity[]>([]);
   readonly recordResponse = signal<MonthlyRecordResponse | null>(null);
@@ -74,6 +75,7 @@ export class DashboardComponent {
   onMonthChange(next: { year: number; month: number }): void {
     this.year.set(next.year);
     this.month.set(next.month);
+    this.periodStorage.save(next.year, next.month);
     this.loadRecord();
   }
 
