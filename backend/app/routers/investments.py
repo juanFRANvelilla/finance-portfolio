@@ -19,6 +19,7 @@ from app.schemas.investment import (
     AssetInvestmentsUpsert,
     AssetTypeCreate,
     AssetTypeRead,
+    AssetTypeUpdate,
     CategoryDetailResponse,
     CategoryInvestmentsUpsert,
     CategoryOverview,
@@ -125,6 +126,44 @@ def _computed_category_totals(db: Session, year: int, month: int) -> dict[str, f
     return {cat_id: _round2(total) for cat_id, total in totals.items()}
 
 
+def _category_monthly_contributions_eur(db: Session, category_id: str, year: int, month: int) -> float:
+    """Suma en EUR las aportaciones mensuales fijas de los activos activos de una categoría."""
+    assets = list(
+        db.scalars(
+            select(AssetType).where(
+                AssetType.category_id == category_id,
+                AssetType.is_active.is_(True),
+                AssetType.monthly_contribution.is_not(None),
+            )
+        ).all()
+    )
+    total = Decimal("0")
+    for asset in assets:
+        contribution = float(asset.monthly_contribution or 0)
+        if contribution <= 0:
+            continue
+        total += Decimal(str(amount_to_eur(contribution, asset.currency, year, month)))
+    return _round2(total)
+
+
+def _asset_suggested_amount(previous_amount: float | None, monthly_contribution: float | None) -> float:
+    base = Decimal(str(previous_amount if previous_amount is not None else 0))
+    contribution = Decimal(str(monthly_contribution if monthly_contribution is not None else 0))
+    return _round2(base + contribution)
+
+
+def _category_suggested_amount_eur(
+    *,
+    previous_amount_eur: float | None,
+    entity_amount_eur: float,
+    contributions_eur: float,
+) -> float:
+    if entity_amount_eur > 0:
+        return entity_amount_eur
+    base = Decimal(str(previous_amount_eur if previous_amount_eur is not None else 0))
+    return _round2(base + Decimal(str(contributions_eur)))
+
+
 @router.get("/categories", response_model=list[InvestmentCategoryRead])
 def list_investment_categories(db: Session = Depends(get_db)) -> list[InvestmentCategory]:
     return _get_categories(db)
@@ -153,8 +192,22 @@ def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -
         name=payload.name,
         ticker=payload.ticker,
         currency=payload.currency,
+        monthly_contribution=payload.monthly_contribution,
     )
     db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+@router.patch("/asset-types/{asset_type_id}", response_model=AssetTypeRead)
+def update_asset_type(
+    asset_type_id: UUID, payload: AssetTypeUpdate, db: Session = Depends(get_db)
+) -> AssetType:
+    asset = db.get(AssetType, asset_type_id)
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
+    asset.monthly_contribution = payload.monthly_contribution
     db.commit()
     db.refresh(asset)
     return asset
@@ -181,6 +234,14 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         previous_amount = prev_computed.get(cat.id) if is_computed else prev_saved.get(cat.id)
         total_invested += Decimal(str(amount))
 
+        entity_amount = entity_breakdown.get(cat.id, {}).get("amount", 0.0)
+        contributions_eur = _category_monthly_contributions_eur(db, cat.id, year, month)
+        suggested_amount_eur = _category_suggested_amount_eur(
+            previous_amount_eur=previous_amount,
+            entity_amount_eur=entity_amount,
+            contributions_eur=contributions_eur,
+        )
+
         category_overviews.append(
             CategoryOverview(
                 category_id=cat.id,
@@ -189,10 +250,12 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
                 amount_eur=amount,
                 percentage=0.0,  # se recalcula abajo con el total del detalle
                 previous_amount_eur=previous_amount,
-                entity_amount_eur=entity_breakdown.get(cat.id, {}).get("amount", 0.0),
+                entity_amount_eur=entity_amount,
                 entity_names=entity_breakdown.get(cat.id, {}).get("names", []),
                 editable=not is_computed,
                 saved_this_month=cat.id in saved,
+                suggested_amount_eur=suggested_amount_eur,
+                monthly_contributions_eur=contributions_eur,
             )
         )
 
@@ -317,6 +380,9 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         amount = float(saved.amount) if saved else 0.0
         amount_eur = amount_to_eur(amount, asset.currency, year, month)
         allocated += Decimal(str(amount_eur))
+        prev_amount = float(prev.amount) if prev else None
+        monthly_contribution = float(asset.monthly_contribution) if asset.monthly_contribution is not None else None
+        suggested_amount = _asset_suggested_amount(prev_amount, monthly_contribution)
         assets_detail.append(
             AssetInvestmentDetail(
                 asset_type_id=asset.id,
@@ -326,8 +392,10 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 amount=amount,
                 amount_eur=amount_eur,
                 units=float(saved.units) if saved and saved.units is not None else None,
-                previous_amount=float(prev.amount) if prev else None,
+                previous_amount=prev_amount,
                 previous_units=float(prev.units) if prev and prev.units is not None else None,
+                monthly_contribution=monthly_contribution,
+                suggested_amount=suggested_amount,
             )
         )
 

@@ -90,8 +90,18 @@
                         <span class="text-xs text-emerald-400">
                           Según {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
                         </span>
-                      } @else if (cat.previous_amount_eur !== null) {
-                        <span class="text-xs text-slate-500">Mes anterior: {{ cat.previous_amount_eur | eurCurrency }}</span>
+                      } @else {
+                        <span class="text-xs text-slate-500">
+                          Previsión:
+                          {{ suggestedAmount(cat) | eurCurrency }}
+                          @if (cat.monthly_contributions_eur > 0) {
+                            <span class="text-indigo-300/80">
+                              (ant. {{ cat.previous_amount_eur | eurCurrency }} + {{ cat.monthly_contributions_eur | eurCurrency }} aport.)
+                            </span>
+                          } @else if (cat.previous_amount_eur !== null) {
+                            <span>(mes anterior: {{ cat.previous_amount_eur | eurCurrency }})</span>
+                          }
+                        </span>
                       }
                     </span>
                     <div class="flex items-center gap-3">
@@ -107,10 +117,16 @@
                       </div>
                       <button
                         type="button"
-                        [disabled]="panel(cat.category_id).savingTotal"
+                        [disabled]="panel(cat.category_id).savingTotal || panel(cat.category_id).savingAssets"
                         (click)="saveCategoryTotal(cat.category_id)"
                         class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
+                        @if (panel(cat.category_id).savingTotal || panel(cat.category_id).savingAssets) {
+                          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                          </svg>
+                        }
                         Guardar
                       </button>
                     </div>
@@ -173,6 +189,9 @@
                                   @if (asset.ticker) {
                                     <span class="ml-1 text-xs text-slate-500">({{ asset.ticker }})</span>
                                   }
+                                  @if (formatMonthlyContribution(asset.monthly_contribution, asset.currency); as contributionLabel) {
+                                    <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
+                                  }
                                 </td>
                                 @if (showUnitsFor(cat.category_id)) {
                                   <td class="px-3 py-2 text-right tabular-nums text-slate-400">
@@ -208,6 +227,9 @@
                         <p class="mb-2 text-sm font-medium text-slate-300">
                           {{ row.name }}
                           <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
+                          @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
+                            <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
+                          }
                         </p>
                         <div class="grid gap-2" [class]="assetGridCols(cat.category_id, row.currency)">
                           @if (showUnitsFor(cat.category_id)) {
@@ -333,20 +355,22 @@
                       </div>
                     }
 
-                    <button
-                      type="button"
-                      [disabled]="panel(cat.category_id).savingAssets"
-                      (click)="saveAssets(cat.category_id)"
-                      class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      @if (panel(cat.category_id).savingAssets) {
-                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-                        </svg>
-                      }
-                      Guardar activos
-                    </button>
+                    @if (!cat.editable) {
+                      <button
+                        type="button"
+                        [disabled]="panel(cat.category_id).savingAssets"
+                        (click)="saveAssets(cat.category_id)"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        @if (panel(cat.category_id).savingAssets) {
+                          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                          </svg>
+                        }
+                        Guardar
+                      </button>
+                    }
                   </div>
                 }
               }

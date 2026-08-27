@@ -31,6 +31,7 @@ interface AssetRow {
   currency: string;
   amount: string;
   units: string;
+  monthlyContribution: number | null;
 }
 
 interface CategoryPanelState {
@@ -203,12 +204,16 @@ export class InvestmentDetailComponent {
   }
 
   /**
-   * Valor sugerido para precargar el total manual: prioriza el importe ya conocido de las
-   * entidades vinculadas a esta categoría (p.ej. KuCoin → Crypto) sobre el mes anterior,
-   * ya que refleja el saldo real de este mes en vez de un dato desactualizado.
+   * Previsión del total manual: entidades vinculadas > mes anterior + aportaciones mensuales de activos.
    */
   suggestedAmount(cat: CategoryOverview): number {
-    return cat.entity_amount_eur > 0 ? cat.entity_amount_eur : (cat.previous_amount_eur ?? 0);
+    if (cat.entity_amount_eur > 0) {
+      return cat.entity_amount_eur;
+    }
+    if (cat.suggested_amount_eur !== null && cat.suggested_amount_eur !== undefined) {
+      return cat.suggested_amount_eur;
+    }
+    return cat.previous_amount_eur ?? 0;
   }
 
   onCategoryInputChange(categoryId: string, value: string): void {
@@ -227,6 +232,14 @@ export class InvestmentDetailComponent {
     return ((value / total) * 100).toFixed(1);
   }
 
+  formatMonthlyContribution(value: number | null, currency: string): string | null {
+    if (value === null || value <= 0) {
+      return null;
+    }
+    const formatted = String(value).replace('.', ',');
+    return `+${formatted} ${currency}/mes`;
+  }
+
   saveCategoryTotal(categoryId: string): void {
     const p = this.panel(categoryId);
     this.updatePanel(categoryId, { savingTotal: true, errorMessage: null });
@@ -237,9 +250,13 @@ export class InvestmentDetailComponent {
         this.overview.set(response);
         const updatedCat = response.categories.find((c) => c.category_id === categoryId);
         this.updatePanel(categoryId, {
-          savingTotal: false,
           categoryInput: updatedCat ? toInputString(updatedCat.amount_eur) : p.categoryInput,
         });
+        if (p.assetEditMode && p.detail) {
+          this.saveAssets(categoryId, { afterCategorySave: true });
+        } else {
+          this.updatePanel(categoryId, { savingTotal: false });
+        }
       },
       error: (err) => {
         this.updatePanel(categoryId, {
@@ -253,13 +270,15 @@ export class InvestmentDetailComponent {
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
     return detail.assets.map((asset) => {
       const hasSaved = asset.amount > 0 || asset.units !== null;
+      const fallbackAmount = asset.suggested_amount ?? asset.previous_amount ?? 0;
       return {
         assetTypeId: asset.asset_type_id,
         name: asset.name,
         ticker: asset.ticker,
         currency: asset.currency,
-        amount: toInputString(hasSaved ? asset.amount : (asset.previous_amount ?? 0)),
+        amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
         units: toInputString(hasSaved ? asset.units : (asset.previous_units ?? null)),
+        monthlyContribution: asset.monthly_contribution,
       };
     });
   }
@@ -336,11 +355,13 @@ export class InvestmentDetailComponent {
     });
   }
 
-  saveAssets(categoryId: string): void {
+  saveAssets(categoryId: string, options?: { afterCategorySave?: boolean }): void {
     const p = this.panel(categoryId);
     if (!p.detail) return;
 
-    this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
+    if (!options?.afterCategorySave) {
+      this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
+    }
     const payload = {
       assets: p.assetRows.map((row) => ({
         asset_type_id: row.assetTypeId,
@@ -352,6 +373,7 @@ export class InvestmentDetailComponent {
       next: (response) => {
         this.updatePanel(categoryId, {
           detail: response,
+          savingTotal: false,
           savingAssets: false,
           assetEditMode: false,
           assetRows: this.buildAssetRows(response),
@@ -361,6 +383,7 @@ export class InvestmentDetailComponent {
       },
       error: (err) => {
         this.updatePanel(categoryId, {
+          savingTotal: false,
           savingAssets: false,
           errorMessage: this.extractError(err, 'No se pudo guardar el reparto de activos.'),
         });
@@ -414,6 +437,7 @@ export class InvestmentDetailComponent {
               currency: asset.currency,
               amount: '0',
               units: '',
+              monthlyContribution: asset.monthly_contribution,
             },
           ];
           this.updatePanel(categoryId, { creatingAsset: false, showAddAsset: false, assetRows: rows });

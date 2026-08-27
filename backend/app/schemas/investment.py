@@ -24,6 +24,7 @@ class AssetTypeRead(BaseModel):
     currency: str
     is_active: bool
     display_order: int
+    monthly_contribution: float | None = None
 
 
 class AssetTypeCreate(BaseModel):
@@ -31,6 +32,7 @@ class AssetTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     ticker: str | None = None
     currency: str = "EUR"
+    monthly_contribution: float | None = Field(default=None, ge=0)
 
     @field_validator("currency")
     @classmethod
@@ -38,6 +40,10 @@ class AssetTypeCreate(BaseModel):
         if value not in ALLOWED_CURRENCIES:
             raise ValueError(f"La divisa debe ser una de {ALLOWED_CURRENCIES}")
         return value
+
+
+class AssetTypeUpdate(BaseModel):
+    monthly_contribution: float | None = Field(default=None, ge=0)
 
 
 class CategoryInvestmentInput(BaseModel):
@@ -62,6 +68,10 @@ class CategoryOverview(BaseModel):
     """False para categorías cuyo total se calcula solo a partir de sus activos (Acciones)."""
     saved_this_month: bool = False
     """True si ya hay un valor manual guardado para este mes concreto (solo aplica a editables)."""
+    suggested_amount_eur: float | None = None
+    """Previsión: mes anterior + aportaciones mensuales de sus activos (salvo prioridad entity_amount)."""
+    monthly_contributions_eur: float = 0.0
+    """Suma en EUR de las aportaciones mensuales configuradas en los activos de la categoría."""
 
 
 class InvestmentOverviewResponse(BaseModel):
@@ -98,6 +108,10 @@ class AssetInvestmentDetail(BaseModel):
     units: float | None = None
     previous_amount: float | None = None
     previous_units: float | None = None
+    monthly_contribution: float | None = None
+    """Aportación mensual fija del catálogo (divisa nativa del activo)."""
+    suggested_amount: float | None = None
+    """Previsión del mes: importe del mes anterior + monthly_contribution."""
 
 
 class CategoryDetailResponse(BaseModel):

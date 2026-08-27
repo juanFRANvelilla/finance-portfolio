@@ -13,6 +13,7 @@ export interface AssetType {
   currency: string;
   is_active: boolean;
   display_order: number;
+  monthly_contribution: number | null;
 }
 
 export interface AssetTypeCreate {
@@ -20,6 +21,11 @@ export interface AssetTypeCreate {
   name: string;
   ticker?: string | null;
   currency: string;
+  monthly_contribution?: number | null;
+}
+
+export interface AssetTypeUpdate {
+  monthly_contribution: number | null;
 }
 
 export interface CategoryInvestmentInput {
@@ -44,6 +50,10 @@ export interface CategoryOverview {
   editable: boolean;
   /** true si ya hay un valor manual guardado para este mes concreto (solo aplica a editables). */
   saved_this_month: boolean;
+  /** Previsión: mes anterior + aportaciones mensuales de sus activos. */
+  suggested_amount_eur: number | null;
+  /** Suma en EUR de las aportaciones mensuales de los activos de la categoría. */
+  monthly_contributions_eur: number;
 }
 
 export interface InvestmentOverviewResponse {
@@ -79,6 +89,8 @@ export interface AssetInvestmentDetail {
   units: number | null;
   previous_amount: number | null;
   previous_units: number | null;
+  monthly_contribution: number | null;
+  suggested_amount: number | null;
 }
 
 export interface CategoryDetailResponse {
