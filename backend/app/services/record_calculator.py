@@ -58,7 +58,7 @@ def compute_totals_from_simple_balances(
 
     for hybrid in hybrid_balances or []:
         total_liquid += Decimal(str(hybrid.liquid_amount))
-        total_invested += Decimal(str(hybrid.invested_amount))
+        total_invested += Decimal(str(hybrid.invested_amount or 0))
 
     total_net_worth = total_liquid + total_invested
     invested_percentage = (
@@ -88,7 +88,7 @@ def compute_totals_from_import(payload: ImportPayload, entities_by_id: dict[str,
 
     for hybrid in payload.hybrid_balances:
         total_liquid += Decimal(str(hybrid.liquid_amount))
-        total_invested += Decimal(str(hybrid.invested_amount))
+        total_invested += Decimal(str(hybrid.invested_amount or 0))
 
     total_net_worth = total_liquid + total_invested
     invested_percentage = (

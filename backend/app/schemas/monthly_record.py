@@ -19,7 +19,6 @@ class HybridAccountRead(BaseModel):
 
     entity_id: str
     liquid_amount: float
-    monthly_contribution: float
     cumulative_invested: float
     entity: EntityRead | None = None
 
@@ -30,11 +29,12 @@ class EntityBalanceInput(BaseModel):
 
 
 class HybridBalanceImport(BaseModel):
-    """Balance de una entidad híbrida: parte líquida + parte invertida."""
+    """Balance de una entidad híbrida: solo líquido; el invertido se calcula vía aportaciones."""
 
     entity_id: str
     liquid_amount: float = Field(ge=0)
-    invested_amount: float = Field(ge=0)
+    invested_amount: float | None = Field(default=None, ge=0)
+    """Opcional: ignorado para híbridas con libro de aportaciones (se calcula en backend)."""
 
 
 class MonthlyRecordUpsert(BaseModel):
@@ -42,6 +42,12 @@ class MonthlyRecordUpsert(BaseModel):
 
     balances: list[EntityBalanceInput] = Field(default_factory=list)
     hybrid_balances: list[HybridBalanceImport] = Field(default_factory=list)
+
+
+class HybridBalancesPatch(BaseModel):
+    """Actualiza solo cuentas híbridas (líquido + invertido recalculado) y refresca totales del mes."""
+
+    hybrid_balances: list[HybridBalanceImport] = Field(min_length=1)
 
 
 class MonthlyRecordDto(BaseModel):

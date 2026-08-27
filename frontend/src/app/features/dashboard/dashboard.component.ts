@@ -11,7 +11,7 @@ import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { environment } from '../../../environments/environment';
 import { DonutChartComponent } from './components/donut-chart/donut-chart.component';
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
-import { BalanceFormComponent, BalanceFormSubmission } from './components/balance-form/balance-form.component';
+import { BalanceFormComponent, BalanceFormSubmission, HybridFormSubmission } from './components/balance-form/balance-form.component';
 import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
 import { TimelineChartComponent } from './components/timeline-chart/timeline-chart.component';
 
@@ -42,6 +42,7 @@ export class DashboardComponent {
   readonly recordResponse = signal<MonthlyRecordResponse | null>(null);
   readonly loading = signal<boolean>(false);
   readonly saving = signal<boolean>(false);
+  readonly updating = signal<boolean>(false);
   readonly deleting = signal<boolean>(false);
   readonly showDeleteConfirm = signal<boolean>(false);
   readonly importing = signal<boolean>(false);
@@ -49,8 +50,22 @@ export class DashboardComponent {
   readonly importErrorMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly timelinePoints = signal<TimelinePoint[]>([]);
+  readonly editing = signal<boolean>(false);
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
+  readonly hasFullRecord = computed(() => {
+    const record = this.recordResponse()?.record;
+    if (!record) {
+      return false;
+    }
+    const simpleCount = this.entities().filter(
+      (entity) => entity.entity_type === 'LIQUID' || entity.entity_type === 'INVESTED',
+    ).length;
+    if (simpleCount === 0) {
+      return record.hybrid_accounts.length > 0;
+    }
+    return record.balances.length > 0;
+  });
   readonly hasTimeline = computed(() => this.timelinePoints().length > 0);
 
   readonly isPastMonth = computed(() => {
@@ -60,7 +75,7 @@ export class DashboardComponent {
     return this.year() < currentYear || (this.year() === currentYear && this.month() < currentMonth);
   });
 
-  readonly canImportJson = computed(() => this.isPastMonth() && !this.hasRecord());
+  readonly canImportJson = computed(() => this.isPastMonth() && !this.hasFullRecord());
 
   constructor() {
     // Reacciona a cambios de query params (navegación desde el shell global)
@@ -73,6 +88,7 @@ export class DashboardComponent {
       this.year.set(year);
       this.month.set(month);
       this.periodStorage.save(year, month);
+      this.editing.set(false);
 
       if (periodChanged || !this.recordResponse()) {
         this.loadRecord();
@@ -131,6 +147,7 @@ export class DashboardComponent {
         next: (response) => {
           this.recordResponse.set(response);
           this.saving.set(false);
+          this.editing.set(false);
           this.refreshAfterSave();
         },
         error: () => {
@@ -138,6 +155,30 @@ export class DashboardComponent {
           this.errorMessage.set('No se pudo guardar el mes. Inténtalo de nuevo.');
         },
       });
+  }
+
+  onUpdateHybrids(submission: HybridFormSubmission): void {
+    this.updating.set(true);
+    this.errorMessage.set(null);
+    this.api.patchHybridBalances(this.year(), this.month(), submission.hybridBalances).subscribe({
+      next: (response) => {
+        this.recordResponse.set(response);
+        this.updating.set(false);
+      },
+      error: () => {
+        this.updating.set(false);
+        this.errorMessage.set('No se pudieron guardar las híbridas. Inténtalo de nuevo.');
+      },
+    });
+  }
+
+  openEditMode(): void {
+    this.editing.set(true);
+    this.errorMessage.set(null);
+  }
+
+  closeEditMode(): void {
+    this.editing.set(false);
   }
 
   openDeleteConfirm(): void {

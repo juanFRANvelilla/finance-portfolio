@@ -9,7 +9,6 @@ export interface EntityBalance {
 export interface HybridAccount {
   entity_id: string;
   liquid_amount: number;
-  monthly_contribution: number;
   cumulative_invested: number;
   entity?: Entity | null;
 }
@@ -22,7 +21,7 @@ export interface EntityBalanceInput {
 export interface HybridBalanceImport {
   entity_id: string;
   liquid_amount: number;
-  invested_amount: number;
+  invested_amount?: number;
 }
 
 export interface MonthlyRecordUpsert {

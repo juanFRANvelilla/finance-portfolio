@@ -6,10 +6,15 @@
       </svg>
     </div>
     <div>
-      <h3 class="text-lg font-semibold text-white">Todavía no hay datos para este mes</h3>
-      <p class="text-sm text-slate-400">
-        Introduce el saldo de cada entidad para calcular automáticamente el patrimonio del mes.
-      </p>
+      @if (editMode()) {
+        <h3 class="text-lg font-semibold text-white">Editar datos del mes</h3>
+        <p class="text-sm text-slate-400">Modifica los importes y guarda para sobrescribir el registro del mes.</p>
+      } @else {
+        <h3 class="text-lg font-semibold text-white">Todavía no hay datos para este mes</h3>
+        <p class="text-sm text-slate-400">
+          Primero guarda las híbridas con Actualizar. Luego introduce el resto y pulsa Guardar mes.
+        </p>
+      }
     </div>
   </div>
 
@@ -33,6 +38,7 @@
             type="text"
             inputmode="decimal"
             placeholder="0,00"
+            [value]="displayAmount(values()[entity.id])"
             class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
             (input)="onValueChange(entity.id, $any($event.target).value)"
           />
@@ -43,7 +49,7 @@
   </div>
 
   @if (simpleEntities().length === 0) {
-    <p class="mt-2 text-sm text-slate-500">No hay entidades activas disponibles.</p>
+    <p class="mt-2 text-sm text-slate-500">No hay entidades simples activas.</p>
   }
 
   @if (hybridEntities().length > 0) {
@@ -51,13 +57,22 @@
       <h4 class="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
         Cuentas híbridas
         <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-          Líquido + invertido
+          Líquido manual · invertido calculado
         </span>
       </h4>
       <div class="grid gap-4 sm:grid-cols-2">
         @for (entity of hybridEntities(); track entity.id) {
           <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
-            <p class="mb-2 text-sm font-medium text-slate-300">{{ entity.name }}</p>
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <p class="text-sm font-medium text-slate-300">{{ entity.name }}</p>
+              <button
+                type="button"
+                (click)="openContributionsDialog(entity)"
+                class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
+              >
+                Gestionar aportaciones
+              </button>
+            </div>
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
                 <span class="mb-1 block text-xs font-medium text-sky-300">Líquido</span>
@@ -66,26 +81,28 @@
                     type="text"
                     inputmode="decimal"
                     placeholder="0,00"
+                    [value]="displayAmount(hybridLiquid()[entity.id])"
                     class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
-                    (input)="onHybridValueChange(entity.id, 'liquid', $any($event.target).value)"
+                    (input)="onHybridLiquidChange(entity.id, $any($event.target).value)"
                   />
                   <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
                 </div>
               </label>
-              <label class="block">
-                <span class="mb-1 block text-xs font-medium text-purple-300">Invertido</span>
-                <div class="relative">
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="0,00"
-                    class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
-                    (input)="onHybridValueChange(entity.id, 'invested', $any($event.target).value)"
-                  />
-                  <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
+              <div class="block">
+                <span class="mb-1 block text-xs font-medium text-purple-300">Invertido (calc.)</span>
+                <div
+                  class="flex h-[38px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-medium tabular-nums text-purple-300 ring-1 ring-white/5"
+                >
+                  {{ hybridInvestedPreview(entity.id) | eurCurrency }}
                 </div>
-              </label>
+              </div>
             </div>
+            @if (hybridLedger()[entity.id]; as ledger) {
+              <p class="mt-2 text-xs text-slate-500">
+                Ant. {{ ledger.previousStaticTotal | eurCurrency }} + aport. {{ ledger.contributionsTotal | eurCurrency }}
+                − líq.
+              </p>
+            }
           </div>
         }
       </div>
@@ -93,6 +110,23 @@
   }
 
   <div class="mt-6 flex flex-wrap items-center gap-3">
+    @if (hybridEntities().length > 0 && !editMode()) {
+      <button
+        type="button"
+        [disabled]="updating()"
+        (click)="onUpdateHybridsClick()"
+        class="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 py-2.5 text-sm font-semibold text-indigo-200 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        @if (updating()) {
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+          </svg>
+        }
+        Actualizar
+      </button>
+    }
+
     <button
       type="submit"
       [disabled]="saving() || (simpleEntities().length === 0 && hybridEntities().length === 0)"
@@ -104,7 +138,30 @@
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
         </svg>
       }
-      Guardar mes
+      {{ editMode() ? 'Guardar cambios' : 'Guardar mes' }}
     </button>
+
+    @if (editMode()) {
+      <button
+        type="button"
+        (click)="cancelEdit.emit()"
+        class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+      >
+        Cancelar
+      </button>
+    }
   </div>
 </form>
+
+@if (contributionsDialogOpen() && contributionsEntityId()) {
+  <app-contributions-dialog
+    [open]="contributionsDialogOpen()"
+    [year]="year()"
+    [month]="month()"
+    [entityId]="activeContributionsEntityId()"
+    [entityName]="contributionsEntityName()"
+    [liquidAmount]="activeContributionsLiquid()"
+    (close)="closeContributionsDialog()"
+    (changed)="onContributionsChanged(contributionsEntityId()!, $event)"
+  />
+}

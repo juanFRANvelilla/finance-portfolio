@@ -2,7 +2,14 @@
 
   <!-- Botones de acción del mes -->
   <div class="flex justify-end gap-3">
-    @if (hasRecord()) {
+    @if (hasFullRecord() && !editing()) {
+      <button
+        type="button"
+        (click)="openEditMode()"
+        class="inline-flex items-center gap-2 rounded-xl border border-dashed border-indigo-500/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/10"
+      >
+        Editar datos
+      </button>
       <button
         type="button"
         (click)="openDeleteConfirm()"
@@ -32,7 +39,7 @@
     <div class="flex items-center justify-center rounded-2xl bg-slate-800/40 py-24 text-slate-400">
       Cargando datos de {{ monthNames[month() - 1] }} {{ year() }}...
     </div>
-  } @else if (hasRecord() && recordResponse()?.record) {
+  } @else if (hasFullRecord() && !editing() && recordResponse()?.record) {
     <section class="grid gap-6 md:grid-cols-3">
       <div class="flex flex-col items-center justify-center rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
         <app-donut-chart
@@ -94,8 +101,15 @@
   } @else {
     <app-balance-form
       [entities]="entities()"
+      [year]="year()"
+      [month]="month()"
       [saving]="saving()"
+      [updating]="updating()"
+      [editMode]="editing()"
+      [initialRecord]="recordResponse()?.record ?? null"
       (save)="onSaveMonth($event)"
+      (updateHybrids)="onUpdateHybrids($event)"
+      (cancelEdit)="closeEditMode()"
     />
   }
 

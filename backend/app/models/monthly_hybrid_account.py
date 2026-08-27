@@ -17,7 +17,6 @@ class MonthlyHybridAccount(Base):
     )
     entity_id: Mapped[str] = mapped_column(String(30), ForeignKey("entities.id"), nullable=False)
     liquid_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
-    monthly_contribution: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     cumulative_invested: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
 
     record: Mapped["MonthlyRecord"] = relationship(back_populates="hybrid_accounts")
