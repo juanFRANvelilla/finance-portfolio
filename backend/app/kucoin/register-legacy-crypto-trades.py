@@ -67,40 +67,28 @@ def cargar_activos_desde_bd(db: Session) -> dict[str, str]:
     return mapa
 
 
-def cargar_transacciones_existentes(db: Session) -> set[tuple]:
+def insertar_transacciones_en_lote(db: Session, fills: list[dict]) -> tuple[int, int]:
     """
-    Idempotencia – carga en memoria las transacciones ya existentes.
+    Inserta los fills usando ON CONFLICT (exchange_trade_id) DO NOTHING.
 
-    Devuelve un Set de tuplas:
-        (str(asset_type_id), str(transaction_date), round(asset_amount, 6))
+    La idempotencia queda delegada completamente a PostgreSQL:
+    si el exchange_trade_id ya existe, el registro se ignora silenciosamente.
 
-    Cargarlo una sola vez evita una consulta SELECT por cada fill.
+    Devuelve (insertados, omitidos_por_conflicto).
     """
-    filas = db.execute(
-        text("SELECT asset_type_id, transaction_date, asset_amount FROM public.asset_transactions")
-    ).fetchall()
+    insertados = 0
+    omitidos = 0
 
-    existentes: set[tuple] = {
-        (str(row.asset_type_id), str(row.transaction_date), round(float(row.asset_amount), 6))
-        for row in filas
-    }
-    print(f"[DB] {len(existentes)} transacciones existentes cargadas en memoria.")
-    return existentes
-
-
-def insertar_transacciones_en_lote(db: Session, fills: list[dict]) -> None:
-    """
-    Inserta todos los fills de la lista en una única transacción de BD.
-    """
     for fill in fills:
-        db.execute(
+        resultado = db.execute(
             text("""
                 INSERT INTO public.asset_transactions
                     (id, asset_type_id, transaction_date, invested_amount,
-                     asset_amount, execution_price, fee_amount)
+                     asset_amount, execution_price, fee_amount, exchange_trade_id)
                 VALUES
                     (:id, :asset_type_id, :transaction_date, :invested_amount,
-                     :asset_amount, :execution_price, :fee_amount)
+                     :asset_amount, :execution_price, :fee_amount, :exchange_trade_id)
+                ON CONFLICT (exchange_trade_id) DO NOTHING
             """),
             {
                 "id": str(uuid.uuid4()),
@@ -110,9 +98,18 @@ def insertar_transacciones_en_lote(db: Session, fills: list[dict]) -> None:
                 "asset_amount": fill["asset_amount"],
                 "execution_price": fill["execution_price"],
                 "fee_amount": fill["fee_amount"],
+                "exchange_trade_id": fill["exchange_trade_id"],
             },
         )
+        # rowcount == 0 cuando DO NOTHING se activa (conflicto de clave única)
+        if resultado.rowcount == 0:
+            print(f"  [SKIP] Skipped duplicate trade_id: {fill['exchange_trade_id']}")
+            omitidos += 1
+        else:
+            insertados += 1
+
     db.commit()
+    return insertados, omitidos
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +222,6 @@ def calcular_tasa_usdt_eur(raw_fills: list[dict]) -> float:
 def transformar_fills(
     raw_fills: list[dict],
     mapa_activos: dict[str, str],
-    existentes: set[tuple],
     usdt_eur_rate: float,
 ) -> list[dict]:
     """
@@ -235,16 +231,15 @@ def transformar_fills(
         – Solo compras (side == 'BUY')
         – Ignora el par puente USDT-EUR (ya procesado para calcular la tasa)
         – Mapea símbolo → asset_type_id; omite si no existe en BD
-        – Convierte invested_amount a EUR según la divisa cotización del par:
+        – Convierte invested_amount a EUR según la divisa de cotización del par:
               Par en EUR  → invested_amount = funds (directo)
               Par en USDT → invested_amount = funds * usdt_eur_rate
         – execution_price siempre en EUR: invested_amount / size
-        – Idempotencia en memoria: omite fills cuya clave ya está en `existentes`
+        – Mapea fill['tradeId'] a exchange_trade_id (clave única para idempotencia en PG)
     """
     procesados: list[dict] = []
     omitidos_fiat = 0
     omitidos_sin_activo = 0
-    omitidos_duplicados = 0
 
     for fill in raw_fills:
         symbol: str = fill.get("symbol", "")
@@ -277,6 +272,13 @@ def transformar_fills(
             omitidos_sin_activo += 1
             continue
 
+        # ID único del fill en KuCoin → clave para la idempotencia delegada a PostgreSQL
+        exchange_trade_id: str | None = fill.get("tradeId") or fill.get("id")
+        if not exchange_trade_id:
+            print(f"  [WARN] Fill sin tradeId/id para {symbol}. Omitido para evitar duplicados.")
+            omitidos_sin_activo += 1
+            continue
+
         # Mapeo de campos raw
         created_at_ms = int(fill.get("createdAt", 0))
         transaction_date: date = datetime.utcfromtimestamp(created_at_ms / 1000).date()
@@ -284,13 +286,12 @@ def transformar_fills(
         size = float(fill.get("size", 0))
         fee = float(fill.get("fee", 0))
 
-        # ── Regla 3: Conversión a EUR ─────────────────────────────────────────
+        # ── Conversión a EUR ──────────────────────────────────────────────────
         if quote_currency == "EUR":
             invested_amount_eur = funds
         elif quote_currency == "USDT":
             invested_amount_eur = funds * usdt_eur_rate
         else:
-            # Divisa de cotización desconocida: loguear y omitir
             print(
                 f"  [WARN] Divisa de cotización desconocida '{quote_currency}' "
                 f"en par {symbol}. Operación omitida."
@@ -301,21 +302,9 @@ def transformar_fills(
         # execution_price siempre en EUR
         execution_price_eur = invested_amount_eur / size if size > 0 else 0.0
 
-        # ── Regla 4: Idempotencia en memoria ──────────────────────────────────
-        clave = (str(asset_type_id), str(transaction_date), round(size, 6))
-        if clave in existentes:
-            print(
-                f"  [SKIP] Duplicado en memoria: {transaction_date} | "
-                f"{symbol} | cantidad={round(size, 6)}"
-            )
-            omitidos_duplicados += 1
-            continue
-
-        # Marcar como procesado en el Set para evitar duplicados dentro del mismo lote
-        existentes.add(clave)
-
         procesados.append({
             "symbol": symbol,
+            "exchange_trade_id": exchange_trade_id,
             "asset_type_id": asset_type_id,
             "transaction_date": transaction_date,
             "invested_amount": Decimal(str(round(invested_amount_eur, 8))),
@@ -329,7 +318,6 @@ def transformar_fills(
         f"\n  - Fills listos para insertar : {len(procesados)}"
         f"\n  - Omitidos (puente fiat)      : {omitidos_fiat}"
         f"\n  - Omitidos (activo no en BD)  : {omitidos_sin_activo}"
-        f"\n  - Omitidos (duplicados)       : {omitidos_duplicados}"
     )
     return procesados
 
@@ -360,42 +348,39 @@ def main() -> None:
             print("[ERROR] No se pudieron cargar activos desde la BD. Abortando.")
             return
 
-        # Cargar transacciones existentes en memoria (idempotencia O(1))
-        existentes = cargar_transacciones_existentes(db)
-
         # ── Paso 4: Transformar y filtrar fills ───────────────────────────────
-        fills_a_insertar = transformar_fills(raw_fills, mapa_activos, existentes, usdt_eur_rate)
+        # La idempotencia ya no requiere carga previa en memoria:
+        # PostgreSQL la gestiona via ON CONFLICT (exchange_trade_id) DO NOTHING.
+        fills_a_insertar = transformar_fills(raw_fills, mapa_activos, usdt_eur_rate)
 
         if not fills_a_insertar:
-            print("\nNo hay operaciones nuevas para insertar. Fin.")
+            print("\nNo hay operaciones válidas para insertar. Fin.")
             return
 
-        # ── Paso 5: Insertar en lote ──────────────────────────────────────────
-        print(f"\nInsertando {len(fills_a_insertar)} operaciones en asset_transactions...\n")
+        # ── Paso 5: Insertar en lote con idempotencia delegada a PostgreSQL ───
+        print(f"\nProcesando {len(fills_a_insertar)} operaciones en asset_transactions...\n")
         for fill in fills_a_insertar:
             print(
-                f"  [OK] {fill['transaction_date']} | {fill['symbol']} | "
+                f"  --> {fill['transaction_date']} | {fill['symbol']} | "
+                f"trade_id={fill['exchange_trade_id']} | "
                 f"invertido={fill['invested_amount']} EUR | "
                 f"precio={fill['execution_price']} EUR | "
                 f"cantidad={fill['asset_amount']}"
             )
 
         try:
-            insertar_transacciones_en_lote(db, fills_a_insertar)
+            insertados, omitidos_conflicto = insertar_transacciones_en_lote(db, fills_a_insertar)
         except Exception as exc:
             print(f"\n[ERROR CRÍTICO] Fallo durante la inserción en BD: {exc}")
             raise
 
-    omitidos_total = (
-        len([f for f in raw_fills if f.get("side", "").upper() == "BUY"])
-        - len(fills_a_insertar)
-    )
     print(
         f"\n{'='*52}"
         f"\nPROCESO FINALIZADO"
-        f"\n  Tasa USDT→EUR utilizada : {usdt_eur_rate:.6f}"
-        f"\n  Insertados              : {len(fills_a_insertar)}"
-        f"\n  No insertados (total)   : {omitidos_total}"
+        f"\n  Tasa USDT→EUR utilizada  : {usdt_eur_rate:.6f}"
+        f"\n  Candidatos procesados    : {len(fills_a_insertar)}"
+        f"\n  Insertados               : {insertados}"
+        f"\n  Skipped (ya existían)    : {omitidos_conflicto}"
         f"\n{'='*52}"
     )
 
