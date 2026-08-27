@@ -277,7 +277,7 @@ export class InvestmentDetailComponent {
         ticker: asset.ticker,
         currency: asset.currency,
         amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
-        units: toInputString(hasSaved ? asset.units : (asset.previous_units ?? null)),
+        units: toInputString(hasSaved ? asset.units : (asset.suggested_units ?? asset.previous_units ?? null)),
         monthlyContribution: asset.monthly_contribution,
       };
     });

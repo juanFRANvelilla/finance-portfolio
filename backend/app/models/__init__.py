@@ -8,6 +8,7 @@ from app.models.entity_contribution import EntityContribution
 from app.models.fiat_deposit import FiatDeposit
 from app.models.monthly_hybrid_account import MonthlyHybridAccount
 from app.models.monthly_record import MonthlyRecord
+from app.models.asset_transaction import AssetTransaction
 
 __all__ = [
     "AssetType",
@@ -19,6 +20,7 @@ __all__ = [
     "MonthlyEntityBalance",
     "EntityContribution",
     "FiatDeposit",
+    "AssetTransaction",
     "MonthlyHybridAccount",
     "MonthlyRecord",
 ]

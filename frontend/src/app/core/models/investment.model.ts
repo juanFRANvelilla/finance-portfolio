@@ -91,6 +91,7 @@ export interface AssetInvestmentDetail {
   previous_units: number | null;
   monthly_contribution: number | null;
   suggested_amount: number | null;
+  suggested_units: number | null;
 }
 
 export interface CategoryDetailResponse {

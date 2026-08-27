@@ -25,8 +25,9 @@ from app.schemas.investment import (
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
 )
+from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
-from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
+from app.services.fx_converter import amount_to_eur, eur_to_native, get_usd_to_eur_rate
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
@@ -187,6 +188,25 @@ def _asset_suggested_amount(previous_amount: float | None, monthly_contribution:
     base = Decimal(str(previous_amount if previous_amount is not None else 0))
     contribution = Decimal(str(monthly_contribution if monthly_contribution is not None else 0))
     return _round2(base + contribution)
+
+
+def _asset_preview_from_transactions(
+    *,
+    tx_totals: dict[str, float] | None,
+    previous_amount: float | None,
+    monthly_contribution: float | None,
+    currency: str,
+    year: int,
+    month: int,
+    include_units: bool,
+) -> tuple[float, float | None]:
+    """P1: suma de asset_transactions; P2: mes anterior + aportación mensual."""
+    if tx_totals and tx_totals.get("invested_amount_eur", 0) > 0:
+        suggested_amount = eur_to_native(tx_totals["invested_amount_eur"], currency, year, month)
+        suggested_units = tx_totals.get("asset_amount") if include_units else None
+        return suggested_amount, suggested_units
+
+    return _asset_suggested_amount(previous_amount, monthly_contribution), None
 
 
 def _category_suggested_amount_eur(
@@ -407,6 +427,8 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
             ).all()
         }
 
+    tx_totals_by_asset = transaction_totals_by_asset_type(db, asset_type_ids)
+
     assets_detail: list[AssetInvestmentDetail] = []
     allocated = Decimal("0")
     has_usd_assets = any(a.currency == "USD" for a in asset_types)
@@ -418,7 +440,15 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         allocated += Decimal(str(amount_eur))
         prev_amount = float(prev.amount) if prev else None
         monthly_contribution = float(asset.monthly_contribution) if asset.monthly_contribution is not None else None
-        suggested_amount = _asset_suggested_amount(prev_amount, monthly_contribution)
+        suggested_amount, suggested_units = _asset_preview_from_transactions(
+            tx_totals=tx_totals_by_asset.get(asset.id),
+            previous_amount=prev_amount,
+            monthly_contribution=monthly_contribution,
+            currency=asset.currency,
+            year=year,
+            month=month,
+            include_units=has_units,
+        )
         assets_detail.append(
             AssetInvestmentDetail(
                 asset_type_id=asset.id,
@@ -432,6 +462,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 previous_units=float(prev.units) if prev and prev.units is not None else None,
                 monthly_contribution=monthly_contribution,
                 suggested_amount=suggested_amount,
+                suggested_units=suggested_units,
             )
         )
 

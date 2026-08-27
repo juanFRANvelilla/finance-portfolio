@@ -109,7 +109,9 @@ class AssetInvestmentDetail(BaseModel):
     monthly_contribution: float | None = None
     """Aportación mensual fija del catálogo (divisa nativa del activo)."""
     suggested_amount: float | None = None
-    """Previsión del mes: importe del mes anterior + monthly_contribution."""
+    """Previsión: suma asset_transactions (P1) o mes anterior + monthly_contribution (P2)."""
+    suggested_units: float | None = None
+    """Previsión de títulos desde asset_transactions cuando aplica."""
 
 
 class CategoryDetailResponse(BaseModel):

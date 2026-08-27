@@ -67,3 +67,16 @@ def amount_to_eur(amount: float, currency: str, year: int, month: int) -> float:
         rate = Decimal(str(get_usd_to_eur_rate(year, month)))
         return float((value * rate).quantize(Decimal("0.01")))
     return float(value.quantize(Decimal("0.01")))
+
+
+def eur_to_native(amount_eur: float, currency: str, year: int, month: int) -> float:
+    """Convierte un importe en EUR a la divisa nativa del activo."""
+    value = Decimal(str(amount_eur))
+    if currency == "EUR":
+        return float(value.quantize(Decimal("0.01")))
+    if currency == "USD":
+        rate = Decimal(str(get_usd_to_eur_rate(year, month)))
+        if rate == 0:
+            return float(value.quantize(Decimal("0.01")))
+        return float((value / rate).quantize(Decimal("0.01")))
+    return float(value.quantize(Decimal("0.01")))
