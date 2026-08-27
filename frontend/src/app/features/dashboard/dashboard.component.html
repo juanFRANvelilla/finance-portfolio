@@ -107,6 +107,7 @@
       [updating]="updating()"
       [editMode]="editing()"
       [initialRecord]="recordResponse()?.record ?? null"
+      [entityBalancePreviews]="recordResponse()?.entity_balance_previews ?? {}"
       (save)="onSaveMonth($event)"
       (updateHybrids)="onUpdateHybrids($event)"
       (cancelEdit)="closeEditMode()"

@@ -40,6 +40,7 @@ export class BalanceFormComponent {
   readonly updating = input<boolean>(false);
   readonly editMode = input<boolean>(false);
   readonly initialRecord = input<MonthlyRecord | null>(null);
+  readonly entityBalancePreviews = input<Record<string, number>>({});
   readonly save = output<BalanceFormSubmission>();
   readonly updateHybrids = output<HybridFormSubmission>();
   readonly cancelEdit = output<void>();
@@ -67,6 +68,34 @@ export class BalanceFormComponent {
 
   constructor() {
     effect(() => {
+      this.year();
+      this.month();
+      this.values.set({});
+      this.hybridLiquid.set({});
+    });
+
+    effect(() => {
+      const previews = this.entityBalancePreviews();
+      this.values.update((current) => {
+        if (Object.keys(current).length > 0) {
+          const next = { ...current };
+          for (const entity of this.simpleEntities()) {
+            if (!(entity.id in next)) {
+              next[entity.id] = previews[entity.id] ?? 0;
+            }
+          }
+          return next;
+        }
+
+        const next: Record<string, number | null> = {};
+        for (const entity of this.simpleEntities()) {
+          next[entity.id] = previews[entity.id] ?? 0;
+        }
+        return next;
+      });
+    });
+
+    effect(() => {
       const record = this.initialRecord();
       if (!record) {
         return;
@@ -78,11 +107,13 @@ export class BalanceFormComponent {
       }
       this.hybridLiquid.set(liquid);
 
-      const values: Record<string, number | null> = {};
-      for (const balance of record.balances) {
-        values[balance.entity_id] = balance.balance_amount;
-      }
-      this.values.set(values);
+      this.values.update((current) => {
+        const next = { ...current };
+        for (const balance of record.balances) {
+          next[balance.entity_id] = balance.balance_amount;
+        }
+        return next;
+      });
     });
 
     effect(() => {

@@ -2,17 +2,16 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.asset_type import AssetType
 from app.models.entity import Entity, EntityType
+from app.models.fiat_deposit import FiatDeposit
 from app.models.investment_category import InvestmentCategory
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
 from app.models.monthly_category_investment import MonthlyCategoryInvestment
-from app.models.monthly_entity_balance import MonthlyEntityBalance
-from app.models.monthly_hybrid_account import MonthlyHybridAccount
 from app.models.monthly_record import MonthlyRecord
 from app.schemas.investment import (
     AssetInvestmentDetail,
@@ -26,11 +25,13 @@ from app.schemas.investment import (
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
 )
+from app.services.fiat_deposits import fiat_deposit_total_for_entity
 from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
-# Categorías cuyo total NO se introduce a mano: se calcula sumando sus activos.
+# Categoría que recibe la previsión estática por depósitos fiat (p. ej. KuCoin → Crypto).
+FIAT_DEPOSIT_PREVIEW_CATEGORY_ID = "crypto"
 # Fondos y Crypto son libres (total manual + reparto por activos que debe cuadrar con ese total).
 COMPUTED_CATEGORY_IDS = {"acciones"}
 
@@ -49,7 +50,16 @@ def _previous_year_month(year: int, month: int) -> tuple[int, int]:
 
 
 def _find_record(db: Session, year: int, month: int) -> MonthlyRecord | None:
-    stmt = select(MonthlyRecord).where(MonthlyRecord.year == year, MonthlyRecord.month == month)
+    from sqlalchemy.orm import selectinload
+
+    stmt = (
+        select(MonthlyRecord)
+        .options(
+            selectinload(MonthlyRecord.balances),
+            selectinload(MonthlyRecord.hybrid_accounts),
+        )
+        .where(MonthlyRecord.year == year, MonthlyRecord.month == month)
+    )
     return db.scalars(stmt).first()
 
 
@@ -65,39 +75,66 @@ def _get_category_or_404(db: Session, category_id: str) -> InvestmentCategory:
     return category
 
 
-def _entity_category_breakdown(db: Session, record: MonthlyRecord | None) -> dict[str, dict]:
-    """Suma, por categoría, el importe ya conocido de las entidades con default_category_id
-    fijado (p.ej. KuCoin → crypto), para usarlo como valor sugerido al repartir el mes."""
+def _previous_entity_balance(db: Session, entity_id: str, year: int, month: int) -> float | None:
+    """Saldo estático de la entidad en el mes anterior (panel principal)."""
+    prev_year, prev_month = _previous_year_month(year, month)
+    record = _find_record(db, prev_year, prev_month)
     if record is None:
-        return {}
+        return None
+
+    entity = db.get(Entity, entity_id)
+    if entity is None:
+        return None
+
+    if entity.entity_type == EntityType.HYBRID:
+        hybrid = next((h for h in record.hybrid_accounts if h.entity_id == entity_id), None)
+        if hybrid is None:
+            return None
+        total = Decimal(str(hybrid.liquid_amount)) + Decimal(str(hybrid.cumulative_invested))
+        return _round2(total)
+
+    balance = next((b for b in record.balances if b.entity_id == entity_id), None)
+    if balance is None:
+        return None
+    return _round2(Decimal(str(balance.balance_amount)))
+
+
+def _entity_deposit_preview(db: Session, entity_id: str, year: int, month: int) -> float | None:
+    """Previsión estática por entidad: P1 suma fiat_deposits, P2 saldo mes anterior."""
+    fiat_total = fiat_deposit_total_for_entity(db, entity_id)
+    if fiat_total is not None:
+        return fiat_total
+
+    return _previous_entity_balance(db, entity_id, year, month)
+
+
+def _fiat_deposit_category_breakdown(db: Session, year: int, month: int) -> dict[str, dict]:
+    """Previsión Crypto desde entidades INVESTED con filas en fiat_deposits."""
+    entities = list(
+        db.scalars(
+            select(Entity).where(Entity.is_active.is_(True), Entity.entity_type == EntityType.INVESTED)
+        ).all()
+    )
 
     totals: dict[str, Decimal] = {}
     names: dict[str, list[str]] = {}
 
-    simple_stmt = (
-        select(Entity.default_category_id, Entity.name, MonthlyEntityBalance.balance_amount)
-        .join(MonthlyEntityBalance, MonthlyEntityBalance.entity_id == Entity.id)
-        .where(
-            MonthlyEntityBalance.record_id == record.id,
-            Entity.default_category_id.is_not(None),
-            Entity.entity_type == EntityType.INVESTED,
+    for entity in entities:
+        has_deposits = db.scalar(
+            select(func.count())
+            .select_from(FiatDeposit)
+            .where(FiatDeposit.entity_id == entity.id)
         )
-    )
-    for category_id, name, amount in db.execute(simple_stmt).all():
-        totals[category_id] = totals.get(category_id, Decimal("0")) + Decimal(str(amount))
-        names.setdefault(category_id, []).append(name)
+        if not has_deposits:
+            continue
 
-    hybrid_stmt = (
-        select(Entity.default_category_id, Entity.name, MonthlyHybridAccount.cumulative_invested)
-        .join(MonthlyHybridAccount, MonthlyHybridAccount.entity_id == Entity.id)
-        .where(
-            MonthlyHybridAccount.record_id == record.id,
-            Entity.default_category_id.is_not(None),
-        )
-    )
-    for category_id, name, amount in db.execute(hybrid_stmt).all():
-        totals[category_id] = totals.get(category_id, Decimal("0")) + Decimal(str(amount))
-        names.setdefault(category_id, []).append(name)
+        preview = _entity_deposit_preview(db, entity.id, year, month)
+        if preview is None or preview <= 0:
+            continue
+
+        category_id = FIAT_DEPOSIT_PREVIEW_CATEGORY_ID
+        totals[category_id] = totals.get(category_id, Decimal("0")) + Decimal(str(preview))
+        names.setdefault(category_id, []).append(entity.name)
 
     return {
         cat_id: {"amount": _round2(total), "names": names.get(cat_id, [])} for cat_id, total in totals.items()
@@ -215,7 +252,6 @@ def update_asset_type(
 
 def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewResponse:
     categories = _get_categories(db)
-    record = _find_record(db, year, month)
 
     saved = _category_totals(db, year, month)
     computed = _computed_category_totals(db, year, month)
@@ -224,7 +260,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
     prev_saved = _category_totals(db, prev_year, prev_month)
     prev_computed = _computed_category_totals(db, prev_year, prev_month)
 
-    entity_breakdown = _entity_category_breakdown(db, record)
+    deposit_breakdown = _fiat_deposit_category_breakdown(db, year, month)
 
     category_overviews: list[CategoryOverview] = []
     total_invested = Decimal("0")
@@ -234,7 +270,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         previous_amount = prev_computed.get(cat.id) if is_computed else prev_saved.get(cat.id)
         total_invested += Decimal(str(amount))
 
-        entity_amount = entity_breakdown.get(cat.id, {}).get("amount", 0.0)
+        entity_amount = deposit_breakdown.get(cat.id, {}).get("amount", 0.0)
         contributions_eur = _category_monthly_contributions_eur(db, cat.id, year, month)
         suggested_amount_eur = _category_suggested_amount_eur(
             previous_amount_eur=previous_amount,
@@ -251,7 +287,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
                 percentage=0.0,  # se recalcula abajo con el total del detalle
                 previous_amount_eur=previous_amount,
                 entity_amount_eur=entity_amount,
-                entity_names=entity_breakdown.get(cat.id, {}).get("names", []),
+                entity_names=deposit_breakdown.get(cat.id, {}).get("names", []),
                 editable=not is_computed,
                 saved_this_month=cat.id in saved,
                 suggested_amount_eur=suggested_amount_eur,
@@ -269,7 +305,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         year=year,
         month=month,
         total_invested=total_invested_f,
-        has_month_record=record is not None,
+        has_month_record=_find_record(db, year, month) is not None,
         categories=category_overviews,
         previous_year=prev_year,
         previous_month=prev_month,

@@ -88,7 +88,7 @@
                       Total de la categoría
                       @if (cat.entity_amount_eur > 0) {
                         <span class="text-xs text-emerald-400">
-                          Según {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
+                          Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
                         </span>
                       } @else {
                         <span class="text-xs text-slate-500">

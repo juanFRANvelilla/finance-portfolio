@@ -52,6 +52,7 @@ export interface MonthlyRecordResponse {
   record: MonthlyRecord | null;
   previous_net_worth: number | null;
   previous_total_invested: number | null;
+  entity_balance_previews: Record<string, number>;
 }
 
 export interface TimelinePoint {

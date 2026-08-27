@@ -64,14 +64,12 @@ class CategoryOverview(BaseModel):
     previous_amount_eur: float | None = None
     entity_amount_eur: float = 0.0
     entity_names: list[str] = Field(default_factory=list)
+    """Entidades con depósitos fiat (p. ej. KuCoin) cuya previsión alimenta la categoría."""
     editable: bool = True
-    """False para categorías cuyo total se calcula solo a partir de sus activos (Acciones)."""
     saved_this_month: bool = False
-    """True si ya hay un valor manual guardado para este mes concreto (solo aplica a editables)."""
     suggested_amount_eur: float | None = None
-    """Previsión: mes anterior + aportaciones mensuales de sus activos (salvo prioridad entity_amount)."""
+    """Previsión: depósitos fiat / mes anterior entidad (P1) o mes anterior + aportaciones activos."""
     monthly_contributions_eur: float = 0.0
-    """Suma en EUR de las aportaciones mensuales configuradas en los activos de la categoría."""
 
 
 class InvestmentOverviewResponse(BaseModel):

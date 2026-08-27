@@ -22,9 +22,6 @@ class Entity(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    default_category_id: Mapped[str | None] = mapped_column(
-        String(30), ForeignKey("investment_categories.id"), nullable=True
-    )
 
     balances: Mapped[list["MonthlyEntityBalance"]] = relationship(
         back_populates="entity",

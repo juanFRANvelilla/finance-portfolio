@@ -10,4 +10,3 @@ class EntityRead(BaseModel):
     name: str
     entity_type: EntityType
     is_active: bool
-    default_category_id: str | None = None
