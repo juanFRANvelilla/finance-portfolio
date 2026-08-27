@@ -34,16 +34,29 @@ from app.core.database import SessionLocal
 
 
 # ---------------------------------------------------------------------------
+# CONFIGURACIÓN GLOBAL
+# ---------------------------------------------------------------------------
+
+# ── Regla 1: Fecha de inicio configurable ────────────────────────────────────
+# Modifica esta variable para cambiar el rango histórico a procesar.
+START_DATE = datetime(2025, 11, 20)
+
+# ── Regla 2: Tasa de fallback USDT→EUR ───────────────────────────────────────
+# Si no hay operaciones USDT-EUR en el rango, se usa este valor histórico.
+USDT_EUR_FALLBACK_RATE = 0.8535
+
+
+# ---------------------------------------------------------------------------
 # CAPA DE BASE DE DATOS
 # ---------------------------------------------------------------------------
 
 def cargar_activos_desde_bd(db: Session) -> dict[str, str]:
     """
-    Regla 1 – Carga dinámica de activos.
+    Carga dinámica de activos.
 
-    Consulta `asset_types` y devuelve un diccionario
-    { exchange_ticker -> asset_type_id (str) }
-    solo para los registros que tengan exchange_ticker informado.
+    Consulta `asset_types` y devuelve:
+        { exchange_ticker (upper) -> asset_type_id (str) }
+    Solo para registros con exchange_ticker informado.
     """
     resultado = db.execute(
         text("SELECT id, exchange_ticker FROM public.asset_types WHERE exchange_ticker IS NOT NULL")
@@ -54,108 +67,52 @@ def cargar_activos_desde_bd(db: Session) -> dict[str, str]:
     return mapa
 
 
-def ya_existe_transaccion(
-    db: Session,
-    asset_type_id: str,
-    transaction_date: date,
-    asset_amount: Decimal,
-) -> bool:
+def cargar_transacciones_existentes(db: Session) -> set[tuple]:
     """
-    Regla 6 – Idempotencia.
+    Idempotencia – carga en memoria las transacciones ya existentes.
 
-    Comprueba si ya existe una fila en `asset_transactions` con la misma
-    combinación de (asset_type_id, transaction_date, asset_amount).
+    Devuelve un Set de tuplas:
+        (str(asset_type_id), str(transaction_date), round(asset_amount, 6))
+
+    Cargarlo una sola vez evita una consulta SELECT por cada fill.
     """
-    fila = db.execute(
-        text("""
-            SELECT 1
-            FROM public.asset_transactions
-            WHERE asset_type_id = :asset_type_id
-              AND transaction_date = :transaction_date
-              AND asset_amount = :asset_amount
-            LIMIT 1
-        """),
-        {
-            "asset_type_id": asset_type_id,
-            "transaction_date": transaction_date,
-            "asset_amount": asset_amount,
-        },
-    ).fetchone()
-    return fila is not None
+    filas = db.execute(
+        text("SELECT asset_type_id, transaction_date, asset_amount FROM public.asset_transactions")
+    ).fetchall()
+
+    existentes: set[tuple] = {
+        (str(row.asset_type_id), str(row.transaction_date), round(float(row.asset_amount), 6))
+        for row in filas
+    }
+    print(f"[DB] {len(existentes)} transacciones existentes cargadas en memoria.")
+    return existentes
 
 
-def insertar_transaccion(
-    db: Session,
-    asset_type_id: str,
-    transaction_date: date,
-    invested_amount: Decimal,
-    asset_amount: Decimal,
-    execution_price: Decimal,
-    fee_amount: Decimal,
-) -> None:
-    """Inserta una única fila en `asset_transactions`."""
-    db.execute(
-        text("""
-            INSERT INTO public.asset_transactions
-                (id, asset_type_id, transaction_date, invested_amount,
-                 asset_amount, execution_price, fee_amount)
-            VALUES
-                (:id, :asset_type_id, :transaction_date, :invested_amount,
-                 :asset_amount, :execution_price, :fee_amount)
-        """),
-        {
-            "id": str(uuid.uuid4()),
-            "asset_type_id": asset_type_id,
-            "transaction_date": transaction_date,
-            "invested_amount": invested_amount,
-            "asset_amount": asset_amount,
-            "execution_price": execution_price,
-            "fee_amount": fee_amount,
-        },
-    )
-
-
-def persistir_fills(db: Session, fills_procesados: list[dict]) -> tuple[int, int]:
+def insertar_transacciones_en_lote(db: Session, fills: list[dict]) -> None:
     """
-    Itera la lista de fills ya filtrados y mapeados e intenta insertar cada uno.
-
-    Devuelve (insertados, omitidos_duplicados).
+    Inserta todos los fills de la lista en una única transacción de BD.
     """
-    insertados = 0
-    omitidos = 0
-
-    for fill in fills_procesados:
-        if ya_existe_transaccion(
-            db,
-            fill["asset_type_id"],
-            fill["transaction_date"],
-            fill["asset_amount"],
-        ):
-            print(
-                f"  [SKIP] Ya existe: {fill['transaction_date']} | "
-                f"{fill['symbol']} | cantidad={fill['asset_amount']}"
-            )
-            omitidos += 1
-            continue
-
-        insertar_transaccion(
-            db,
-            asset_type_id=fill["asset_type_id"],
-            transaction_date=fill["transaction_date"],
-            invested_amount=fill["invested_amount"],
-            asset_amount=fill["asset_amount"],
-            execution_price=fill["execution_price"],
-            fee_amount=fill["fee_amount"],
+    for fill in fills:
+        db.execute(
+            text("""
+                INSERT INTO public.asset_transactions
+                    (id, asset_type_id, transaction_date, invested_amount,
+                     asset_amount, execution_price, fee_amount)
+                VALUES
+                    (:id, :asset_type_id, :transaction_date, :invested_amount,
+                     :asset_amount, :execution_price, :fee_amount)
+            """),
+            {
+                "id": str(uuid.uuid4()),
+                "asset_type_id": fill["asset_type_id"],
+                "transaction_date": fill["transaction_date"],
+                "invested_amount": fill["invested_amount"],
+                "asset_amount": fill["asset_amount"],
+                "execution_price": fill["execution_price"],
+                "fee_amount": fill["fee_amount"],
+            },
         )
-        print(
-            f"  [OK]   Insertado: {fill['transaction_date']} | "
-            f"{fill['symbol']} | precio={fill['execution_price']} | "
-            f"cantidad={fill['asset_amount']}"
-        )
-        insertados += 1
-
     db.commit()
-    return insertados, omitidos
 
 
 # ---------------------------------------------------------------------------
@@ -164,8 +121,8 @@ def persistir_fills(db: Session, fills_procesados: list[dict]) -> tuple[int, int
 
 def extraer_fills_de_kucoin() -> list[dict]:
     """
-    Conecta con la API de KuCoin y extrae todos los Fills semana a semana.
-    Devuelve la lista raw de items tal como los devuelve la API.
+    Conecta con la API de KuCoin y extrae todos los Fills semana a semana
+    desde START_DATE hasta hoy. Devuelve la lista raw de items de la API.
     """
     api_key = os.getenv("KUCOIN_API_KEY")
     secret = os.getenv("KUCOIN_SECRET")
@@ -173,8 +130,8 @@ def extraer_fills_de_kucoin() -> list[dict]:
 
     if not api_key or not secret or not passphrase:
         raise ValueError(
-            f"Faltan credenciales de KuCoin en las variables de entorno / {ENV_FILE}. "
-            f"Asegúrate de definir KUCOIN_API_KEY, KUCOIN_SECRET y KUCOIN_PASSPHRASE."
+            f"Faltan credenciales de KuCoin en {ENV_FILE}. "
+            f"Define KUCOIN_API_KEY, KUCOIN_SECRET y KUCOIN_PASSPHRASE."
         )
 
     exchange = ccxt.kucoin({
@@ -184,13 +141,11 @@ def extraer_fills_de_kucoin() -> list[dict]:
         "enableRateLimit": True,
     })
 
-    print("Iniciando escaneo de ejecuciones (Fills) semana a semana...")
+    print(f"Iniciando escaneo desde {START_DATE.strftime('%Y-%m-%d')} hasta hoy...")
 
-    start_date = datetime(2025, 11, 1)
     end_date = datetime.now()
-
     all_fills: list[dict] = []
-    current_start = start_date
+    current_start = START_DATE
 
     while current_start < end_date:
         # Ventanas de 6 días para respetar el límite de KuCoin
@@ -225,41 +180,94 @@ def extraer_fills_de_kucoin() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# CAPA DE TRANSFORMACIÓN
+# CAPA DE CÁLCULO: Tasa de cambio USDT → EUR
 # ---------------------------------------------------------------------------
 
-def transformar_fills(raw_fills: list[dict], mapa_activos: dict[str, str]) -> list[dict]:
+def calcular_tasa_usdt_eur(raw_fills: list[dict]) -> float:
     """
-    Aplica las reglas de negocio de filtrado y mapeo sobre los fills crudos.
+    Regla 2 – Cálculo del tipo de cambio puente EUR→USDT.
 
-    Reglas aplicadas:
-        2 – Solo compras (side == 'buy' / 'BUY')
-        3 – Ignorar puentes fiat (par USDT-EUR o moneda base USDT)
-        4 – Mapear símbolo a asset_type_id; omitir si no existe en la BD
-        5 – Mapear campos al esquema de la tabla
+    Busca todas las compras del par USDT-EUR y calcula la tasa media:
+        usdt_eur_rate = total_EUR_gastado / total_USDT_recibido
+
+    Si no hay operaciones USDT-EUR en el rango, usa USDT_EUR_FALLBACK_RATE.
     """
-    procesados: list[dict] = []
-    omitidos_fiat = 0
-    omitidos_sin_activo = 0
+    total_eur_gastado = 0.0
+    total_usdt_recibido = 0.0
 
     for fill in raw_fills:
         symbol: str = fill.get("symbol", "")
         side: str = fill.get("side", "").upper()
 
-        # Regla 2 – Solo compras
+        if symbol.upper() == "USDT-EUR" and side == "BUY":
+            total_eur_gastado += float(fill.get("funds", 0))
+            total_usdt_recibido += float(fill.get("size", 0))
+
+    if total_usdt_recibido > 0:
+        rate = total_eur_gastado / total_usdt_recibido
+        print(
+            f"[RATE] Tasa USDT→EUR calculada desde fills: {rate:.6f} "
+            f"({total_eur_gastado:.2f} EUR / {total_usdt_recibido:.2f} USDT)"
+        )
+        return rate
+
+    print(
+        f"[RATE] No hay operaciones USDT-EUR en el rango. "
+        f"Usando tasa de fallback: {USDT_EUR_FALLBACK_RATE}"
+    )
+    return USDT_EUR_FALLBACK_RATE
+
+
+# ---------------------------------------------------------------------------
+# CAPA DE TRANSFORMACIÓN
+# ---------------------------------------------------------------------------
+
+def transformar_fills(
+    raw_fills: list[dict],
+    mapa_activos: dict[str, str],
+    existentes: set[tuple],
+    usdt_eur_rate: float,
+) -> list[dict]:
+    """
+    Aplica las reglas de negocio de filtrado y mapeo sobre los fills crudos.
+
+    Reglas aplicadas:
+        – Solo compras (side == 'BUY')
+        – Ignora el par puente USDT-EUR (ya procesado para calcular la tasa)
+        – Mapea símbolo → asset_type_id; omite si no existe en BD
+        – Convierte invested_amount a EUR según la divisa cotización del par:
+              Par en EUR  → invested_amount = funds (directo)
+              Par en USDT → invested_amount = funds * usdt_eur_rate
+        – execution_price siempre en EUR: invested_amount / size
+        – Idempotencia en memoria: omite fills cuya clave ya está en `existentes`
+    """
+    procesados: list[dict] = []
+    omitidos_fiat = 0
+    omitidos_sin_activo = 0
+    omitidos_duplicados = 0
+
+    for fill in raw_fills:
+        symbol: str = fill.get("symbol", "")
+        side: str = fill.get("side", "").upper()
+
+        # Solo compras
         if side != "BUY":
             continue
 
-        # Extraer moneda base del par (ej. 'BTC-EUR' -> 'BTC')
-        partes = symbol.split("-")
-        base_currency = partes[0].upper() if partes else ""
+        # Extraer moneda base y de cotización (ej: 'SOL-USDT' → base='SOL', quote='USDT')
+        partes = symbol.upper().split("-")
+        if len(partes) != 2:
+            print(f"  [WARN] Símbolo con formato inesperado: '{symbol}'. Omitido.")
+            continue
 
-        # Regla 3 – Ignorar puentes fiat/stablecoin (USDT-EUR, USDT-*)
+        base_currency, quote_currency = partes
+
+        # Ignorar el par puente fiat (USDT-EUR ya se usó para calcular la tasa)
         if base_currency == "USDT":
             omitidos_fiat += 1
             continue
 
-        # Regla 4 – Buscar en el mapa dinámico de activos
+        # Buscar UUID del activo en el mapa dinámico
         asset_type_id = mapa_activos.get(base_currency)
         if asset_type_id is None:
             print(
@@ -269,18 +277,51 @@ def transformar_fills(raw_fills: list[dict], mapa_activos: dict[str, str]) -> li
             omitidos_sin_activo += 1
             continue
 
-        # Regla 5 – Mapeo de campos
+        # Mapeo de campos raw
         created_at_ms = int(fill.get("createdAt", 0))
-        transaction_date = datetime.utcfromtimestamp(created_at_ms / 1000).date()
+        transaction_date: date = datetime.utcfromtimestamp(created_at_ms / 1000).date()
+        funds = float(fill.get("funds", 0))
+        size = float(fill.get("size", 0))
+        fee = float(fill.get("fee", 0))
+
+        # ── Regla 3: Conversión a EUR ─────────────────────────────────────────
+        if quote_currency == "EUR":
+            invested_amount_eur = funds
+        elif quote_currency == "USDT":
+            invested_amount_eur = funds * usdt_eur_rate
+        else:
+            # Divisa de cotización desconocida: loguear y omitir
+            print(
+                f"  [WARN] Divisa de cotización desconocida '{quote_currency}' "
+                f"en par {symbol}. Operación omitida."
+            )
+            omitidos_sin_activo += 1
+            continue
+
+        # execution_price siempre en EUR
+        execution_price_eur = invested_amount_eur / size if size > 0 else 0.0
+
+        # ── Regla 4: Idempotencia en memoria ──────────────────────────────────
+        clave = (str(asset_type_id), str(transaction_date), round(size, 6))
+        if clave in existentes:
+            print(
+                f"  [SKIP] Duplicado en memoria: {transaction_date} | "
+                f"{symbol} | cantidad={round(size, 6)}"
+            )
+            omitidos_duplicados += 1
+            continue
+
+        # Marcar como procesado en el Set para evitar duplicados dentro del mismo lote
+        existentes.add(clave)
 
         procesados.append({
             "symbol": symbol,
             "asset_type_id": asset_type_id,
             "transaction_date": transaction_date,
-            "invested_amount": Decimal(str(fill.get("funds", 0))),
-            "asset_amount": Decimal(str(fill.get("size", 0))),
-            "execution_price": Decimal(str(fill.get("price", 0))),
-            "fee_amount": Decimal(str(fill.get("fee", 0))),
+            "invested_amount": Decimal(str(round(invested_amount_eur, 8))),
+            "asset_amount": Decimal(str(size)),
+            "execution_price": Decimal(str(round(execution_price_eur, 8))),
+            "fee_amount": Decimal(str(fee)),
         })
 
     print(
@@ -288,6 +329,7 @@ def transformar_fills(raw_fills: list[dict], mapa_activos: dict[str, str]) -> li
         f"\n  - Fills listos para insertar : {len(procesados)}"
         f"\n  - Omitidos (puente fiat)      : {omitidos_fiat}"
         f"\n  - Omitidos (activo no en BD)  : {omitidos_sin_activo}"
+        f"\n  - Omitidos (duplicados)       : {omitidos_duplicados}"
     )
     return procesados
 
@@ -297,7 +339,7 @@ def transformar_fills(raw_fills: list[dict], mapa_activos: dict[str, str]) -> li
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    # 1. Extraer fills desde KuCoin
+    # ── Paso 1: Extraer todos los fills desde KuCoin ──────────────────────────
     raw_fills = extraer_fills_de_kucoin()
 
     if not raw_fills:
@@ -308,31 +350,53 @@ def main() -> None:
         )
         return
 
-    # 2. Abrir sesión de BD y cargar mapa de activos
+    # ── Paso 2: Calcular tasa de cambio USDT→EUR desde los propios fills ──────
+    usdt_eur_rate = calcular_tasa_usdt_eur(raw_fills)
+
+    # ── Paso 3: Abrir sesión de BD ─────────────────────────────────────────────
     with SessionLocal() as db:
         mapa_activos = cargar_activos_desde_bd(db)
-
         if not mapa_activos:
             print("[ERROR] No se pudieron cargar activos desde la BD. Abortando.")
             return
 
-        # 3. Transformar/filtrar fills aplicando reglas de negocio
-        fills_procesados = transformar_fills(raw_fills, mapa_activos)
+        # Cargar transacciones existentes en memoria (idempotencia O(1))
+        existentes = cargar_transacciones_existentes(db)
 
-        if not fills_procesados:
-            print("\nNo hay operaciones válidas para insertar. Fin.")
+        # ── Paso 4: Transformar y filtrar fills ───────────────────────────────
+        fills_a_insertar = transformar_fills(raw_fills, mapa_activos, existentes, usdt_eur_rate)
+
+        if not fills_a_insertar:
+            print("\nNo hay operaciones nuevas para insertar. Fin.")
             return
 
-        # 4. Persistir en PostgreSQL con control de idempotencia
-        print(f"\nInsertando {len(fills_procesados)} operaciones en asset_transactions...\n")
-        insertados, omitidos = persistir_fills(db, fills_procesados)
+        # ── Paso 5: Insertar en lote ──────────────────────────────────────────
+        print(f"\nInsertando {len(fills_a_insertar)} operaciones en asset_transactions...\n")
+        for fill in fills_a_insertar:
+            print(
+                f"  [OK] {fill['transaction_date']} | {fill['symbol']} | "
+                f"invertido={fill['invested_amount']} EUR | "
+                f"precio={fill['execution_price']} EUR | "
+                f"cantidad={fill['asset_amount']}"
+            )
 
+        try:
+            insertar_transacciones_en_lote(db, fills_a_insertar)
+        except Exception as exc:
+            print(f"\n[ERROR CRÍTICO] Fallo durante la inserción en BD: {exc}")
+            raise
+
+    omitidos_total = (
+        len([f for f in raw_fills if f.get("side", "").upper() == "BUY"])
+        - len(fills_a_insertar)
+    )
     print(
-        f"\n{'='*50}"
+        f"\n{'='*52}"
         f"\nPROCESO FINALIZADO"
-        f"\n  Insertados  : {insertados}"
-        f"\n  Duplicados  : {omitidos}"
-        f"\n{'='*50}"
+        f"\n  Tasa USDT→EUR utilizada : {usdt_eur_rate:.6f}"
+        f"\n  Insertados              : {len(fills_a_insertar)}"
+        f"\n  No insertados (total)   : {omitidos_total}"
+        f"\n{'='*52}"
     )
 
 
