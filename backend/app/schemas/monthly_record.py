@@ -50,6 +50,12 @@ class HybridBalancesPatch(BaseModel):
     hybrid_balances: list[HybridBalanceImport] = Field(min_length=1)
 
 
+class EntityBalancesPatch(BaseModel):
+    """Actualiza solo balances LIQUID/INVESTED y refresca totales del mes."""
+
+    balances: list[EntityBalanceInput] = Field(min_length=1)
+
+
 class MonthlyRecordDto(BaseModel):
     """DTO con totales persistidos en monthly_records (+ diff y % calculados en backend)."""
 

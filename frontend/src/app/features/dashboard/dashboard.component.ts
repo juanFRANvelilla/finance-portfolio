@@ -1,11 +1,18 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { forkJoin, Observable } from 'rxjs';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
 import { Entity } from '../../core/models/entity.model';
-import { ImportPayload, MonthlyRecordResponse, TimelinePoint } from '../../core/models/monthly-record.model';
+import {
+  EntityBalanceInput,
+  HybridBalanceImport,
+  ImportPayload,
+  MonthlyRecordResponse,
+  TimelinePoint,
+} from '../../core/models/monthly-record.model';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { environment } from '../../../environments/environment';
@@ -136,25 +143,73 @@ export class DashboardComponent {
   }
 
   onSaveMonth(submission: BalanceFormSubmission): void {
+    this.applyPartialSave(submission, this.editing());
+  }
+
+  private applyPartialSave(submission: BalanceFormSubmission, editMode: boolean): void {
+    const initial = this.recordResponse()?.record;
+    const year = this.year();
+    const month = this.month();
+
+    let balancesToPatch = submission.balances;
+    let hybridsToPatch = submission.hybridBalances;
+
+    if (editMode && initial) {
+      balancesToPatch = submission.balances.filter((balance) => {
+        const previous = initial.balances.find((row) => row.entity_id === balance.entity_id);
+        return previous === undefined || previous.balance_amount !== balance.balance_amount;
+      });
+      hybridsToPatch = submission.hybridBalances.filter((hybrid) => {
+        const previous = initial.hybrid_accounts.find((row) => row.entity_id === hybrid.entity_id);
+        return previous === undefined || previous.liquid_amount !== hybrid.liquid_amount;
+      });
+    } else if (initial?.hybrid_accounts.length) {
+      hybridsToPatch = submission.hybridBalances.filter((hybrid) => {
+        const previous = initial.hybrid_accounts.find((row) => row.entity_id === hybrid.entity_id);
+        return previous === undefined || previous.liquid_amount !== hybrid.liquid_amount;
+      });
+    }
+
+    if (balancesToPatch.length === 0 && hybridsToPatch.length === 0) {
+      this.editing.set(false);
+      return;
+    }
+
     this.saving.set(true);
     this.errorMessage.set(null);
-    this.api
-      .upsertMonthlyRecord(this.year(), this.month(), {
-        balances: submission.balances,
-        hybrid_balances: submission.hybridBalances,
-      })
-      .subscribe({
-        next: (response) => {
-          this.recordResponse.set(response);
-          this.saving.set(false);
-          this.editing.set(false);
-          this.refreshAfterSave();
-        },
-        error: () => {
-          this.saving.set(false);
-          this.errorMessage.set('No se pudo guardar el mes. Inténtalo de nuevo.');
-        },
-      });
+
+    const calls: Observable<MonthlyRecordResponse>[] = [];
+    if (balancesToPatch.length > 0) {
+      calls.push(this.api.patchEntityBalances(year, month, balancesToPatch));
+    }
+    if (hybridsToPatch.length > 0) {
+      calls.push(this.api.patchHybridBalances(year, month, hybridsToPatch));
+    }
+
+    const request: Observable<MonthlyRecordResponse | MonthlyRecordResponse[]> =
+      calls.length === 1 ? calls[0] : forkJoin(calls);
+
+    request.subscribe({
+      next: (response: MonthlyRecordResponse | MonthlyRecordResponse[]) => {
+        const latest = Array.isArray(response) ? response[response.length - 1] : response;
+        this.recordResponse.set(latest);
+        this.saving.set(false);
+        this.editing.set(false);
+        this.refreshAfterSave();
+      },
+      error: (err: unknown) => {
+        this.saving.set(false);
+        this.errorMessage.set(this.extractSaveError(err));
+      },
+    });
+  }
+
+  private extractSaveError(err: unknown): string {
+    const httpError = err as { error?: { detail?: string } };
+    if (typeof httpError.error?.detail === 'string') {
+      return httpError.error.detail;
+    }
+    return 'No se pudo guardar los cambios. Inténtalo de nuevo.';
   }
 
   onUpdateHybrids(submission: HybridFormSubmission): void {

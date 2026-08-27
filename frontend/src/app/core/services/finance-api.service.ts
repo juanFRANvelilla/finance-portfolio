@@ -5,9 +5,9 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Entity } from '../models/entity.model';
 import {
+  EntityBalanceInput,
   ImportPayload,
   HybridBalanceImport,
-  MonthlyRecord,
   MonthlyRecordResponse,
   MonthlyRecordUpsert,
   TimelineResponse,
@@ -54,6 +54,17 @@ export class FinanceApiService {
     return this.http.patch<MonthlyRecordResponse>(
       `${this.baseUrl}/records/${year}/${month}/hybrids`,
       { hybrid_balances: hybridBalances },
+    );
+  }
+
+  patchEntityBalances(
+    year: number,
+    month: number,
+    balances: EntityBalanceInput[],
+  ): Observable<MonthlyRecordResponse> {
+    return this.http.patch<MonthlyRecordResponse>(
+      `${this.baseUrl}/records/${year}/${month}/balances`,
+      { balances },
     );
   }
 

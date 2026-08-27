@@ -43,8 +43,9 @@ def compute_totals_from_simple_balances(
     balances: list[EntityBalanceInput],
     entities_by_id: dict[str, Entity],
     hybrid_balances: list[HybridBalanceImport] | None = None,
+    resolved_hybrids: list[tuple[str, float, float]] | None = None,
 ) -> dict[str, float]:
-    """Calcula totales a partir de balances simples y, opcionalmente, híbridos (formulario manual)."""
+    """Calcula totales a partir de balances simples y híbridos (import o tuplas resueltas)."""
     total_liquid = Decimal("0")
     total_invested = Decimal("0")
 
@@ -56,9 +57,14 @@ def compute_totals_from_simple_balances(
         elif entity.entity_type == EntityType.INVESTED:
             total_invested += amount
 
-    for hybrid in hybrid_balances or []:
-        total_liquid += Decimal(str(hybrid.liquid_amount))
-        total_invested += Decimal(str(hybrid.invested_amount or 0))
+    if resolved_hybrids is not None:
+        for _entity_id, liquid, invested in resolved_hybrids:
+            total_liquid += Decimal(str(liquid))
+            total_invested += Decimal(str(invested))
+    else:
+        for hybrid in hybrid_balances or []:
+            total_liquid += Decimal(str(hybrid.liquid_amount))
+            total_invested += Decimal(str(hybrid.invested_amount or 0))
 
     total_net_worth = total_liquid + total_invested
     invested_percentage = (
