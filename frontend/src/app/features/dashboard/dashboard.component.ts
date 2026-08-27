@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
@@ -9,7 +9,6 @@ import { ImportPayload, MonthlyRecordResponse, TimelinePoint } from '../../core/
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { environment } from '../../../environments/environment';
-import { MonthNavigatorComponent } from './components/month-navigator/month-navigator.component';
 import { DonutChartComponent } from './components/donut-chart/donut-chart.component';
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
 import { BalanceFormComponent, BalanceFormSubmission } from './components/balance-form/balance-form.component';
@@ -21,8 +20,6 @@ import { TimelineChartComponent } from './components/timeline-chart/timeline-cha
   imports: [
     EurCurrencyPipe,
     DecimalPipe,
-    RouterLink,
-    MonthNavigatorComponent,
     DonutChartComponent,
     DiffBadgeComponent,
     BalanceFormComponent,
@@ -33,13 +30,13 @@ import { TimelineChartComponent } from './components/timeline-chart/timeline-cha
 })
 export class DashboardComponent {
   private readonly api = inject(FinanceApiService);
+  private readonly route = inject(ActivatedRoute);
   private readonly periodStorage = inject(PeriodStorageService);
-  private readonly storedPeriod = this.periodStorage.read();
 
   readonly monthNames = MONTH_NAMES;
 
-  readonly year = signal<number>(this.storedPeriod.year);
-  readonly month = signal<number>(this.storedPeriod.month);
+  readonly year = signal<number>(this.periodStorage.read().year);
+  readonly month = signal<number>(this.periodStorage.read().month);
 
   readonly entities = signal<Entity[]>([]);
   readonly recordResponse = signal<MonthlyRecordResponse | null>(null);
@@ -56,7 +53,6 @@ export class DashboardComponent {
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
   readonly hasTimeline = computed(() => this.timelinePoints().length > 0);
 
-  /** Solo se puede importar JSON histórico para meses ya cerrados (anteriores al mes actual real). */
   readonly isPastMonth = computed(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -67,16 +63,24 @@ export class DashboardComponent {
   readonly canImportJson = computed(() => this.isPastMonth() && !this.hasRecord());
 
   constructor() {
-    this.loadEntities();
-    this.loadRecord();
-    this.loadTimeline();
-  }
+    // Reacciona a cambios de query params (navegación desde el shell global)
+    this.route.queryParamMap.subscribe((params) => {
+      const stored = this.periodStorage.read();
+      const year = params.get('year') ? Number(params.get('year')) : stored.year;
+      const month = params.get('month') ? Number(params.get('month')) : stored.month;
 
-  onMonthChange(next: { year: number; month: number }): void {
-    this.year.set(next.year);
-    this.month.set(next.month);
-    this.periodStorage.save(next.year, next.month);
-    this.loadRecord();
+      const periodChanged = year !== this.year() || month !== this.month();
+      this.year.set(year);
+      this.month.set(month);
+      this.periodStorage.save(year, month);
+
+      if (periodChanged || !this.recordResponse()) {
+        this.loadRecord();
+      }
+    });
+
+    this.loadEntities();
+    this.loadTimeline();
   }
 
   private loadEntities(): void {

@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { InvestmentApiService } from '../../core/services/investment-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
@@ -73,7 +73,7 @@ function createPanelState(): CategoryPanelState {
 
 @Component({
   selector: 'app-investment-detail',
-  imports: [RouterLink, DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent],
+  imports: [DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent],
   templateUrl: './investment-detail.component.html',
 })
 export class InvestmentDetailComponent {

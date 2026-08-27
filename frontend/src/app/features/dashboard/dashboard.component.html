@@ -1,187 +1,167 @@
-<div class="min-h-screen bg-slate-950 pb-16 text-slate-100">
-  <header class="border-b border-white/5 bg-slate-900/60">
-    <div class="mx-auto flex max-w-5xl flex-col gap-1 px-6 py-6">
-      <span class="text-xs font-semibold uppercase tracking-widest text-indigo-400">Finance Portfolio</span>
-      <h1 class="text-2xl font-bold text-white">Panel de patrimonio personal</h1>
-    </div>
-  </header>
+<main class="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 pb-16">
 
-  <main class="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
-    <app-month-navigator
-      [year]="year()"
-      [month]="month()"
-      (monthChange)="onMonthChange($event)"
-    />
-
-    <div class="flex justify-end gap-3">
-      <a
-        [routerLink]="['/investment-detail']"
-        [queryParams]="{ year: year(), month: month() }"
-        class="inline-flex items-center gap-2 rounded-xl border border-dashed border-amber-500/40 px-4 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/10"
+  <!-- Botones de acción del mes -->
+  <div class="flex justify-end gap-3">
+    @if (hasRecord()) {
+      <button
+        type="button"
+        (click)="openDeleteConfirm()"
+        class="inline-flex items-center gap-2 rounded-xl border border-dashed border-rose-500/40 px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/10"
       >
-        Detalle de inversión
-      </a>
-      @if (hasRecord()) {
-        <button
-          type="button"
-          (click)="openDeleteConfirm()"
-          class="inline-flex items-center gap-2 rounded-xl border border-dashed border-rose-500/40 px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/10"
-        >
-          Eliminar mes
-        </button>
-      }
-      @if (canImportJson()) {
-        <button
-          type="button"
-          (click)="openImportDialog()"
-          class="inline-flex items-center gap-2 rounded-xl border border-dashed border-indigo-500/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/10"
-        >
-          Importar JSON del mes
-        </button>
-      }
-    </div>
-
-    @if (errorMessage()) {
-      <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
-        {{ errorMessage() }}
-      </div>
+        Eliminar mes
+      </button>
     }
-
-    @if (loading()) {
-      <div class="flex items-center justify-center rounded-2xl bg-slate-800/40 py-24 text-slate-400">
-        Cargando datos de {{ monthNames[month() - 1] }} {{ year() }}...
-      </div>
-    } @else if (hasRecord() && recordResponse()?.record) {
-      <section class="grid gap-6 md:grid-cols-3">
-        <div class="flex flex-col items-center justify-center rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
-          <app-donut-chart
-            [totalLiquid]="recordResponse()!.record!.total_liquid"
-            [totalInvested]="recordResponse()!.record!.total_invested"
-            [totalNetWorth]="recordResponse()!.record!.total_net_worth"
-          />
-        </div>
-
-        <app-diff-badge
-          [diff]="recordResponse()!.record!.monthly_diff"
-          [investedDiff]="recordResponse()!.record!.invested_diff"
-          [previousNetWorth]="recordResponse()!.previous_net_worth"
-        />
-      </section>
-
-      <section class="grid gap-4 sm:grid-cols-3">
-        <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total líquido</p>
-          <p class="mt-1 text-xl font-bold text-sky-300">{{ recordResponse()!.record!.total_liquid | eurCurrency }}</p>
-        </div>
-        <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total invertido</p>
-          <p class="mt-1 text-xl font-bold text-purple-300">{{ recordResponse()!.record!.total_invested | eurCurrency }}</p>
-        </div>
-        <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-400">% Invertido</p>
-          <p class="mt-1 text-xl font-bold text-white">{{ recordResponse()!.record!.invested_percentage | number: '1.1-1' }}%</p>
-        </div>
-      </section>
-
-      <section class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
-        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Detalle por entidad</h2>
-        <ul class="divide-y divide-white/5">
-          @for (balance of recordResponse()!.record!.balances; track balance.entity_id) {
-            <li class="flex items-center justify-between py-2.5 text-sm">
-              <span class="text-slate-300">{{ balance.entity?.name ?? balance.entity_id }}</span>
-              <span class="font-semibold text-white">{{ balance.balance_amount | eurCurrency }}</span>
-            </li>
-          }
-          @for (hybrid of recordResponse()!.record!.hybrid_accounts; track hybrid.entity_id) {
-            <li class="flex items-center justify-between py-2.5 text-sm">
-              <div>
-                <span class="text-slate-300">{{ hybrid.entity?.name ?? hybrid.entity_id }}</span>
-                <span class="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                  Híbrida
-                </span>
-              </div>
-              <div class="text-right">
-                <p class="font-semibold text-white">{{ (hybrid.liquid_amount + hybrid.cumulative_invested) | eurCurrency }}</p>
-                <p class="text-xs text-slate-500">
-                  Líq. {{ hybrid.liquid_amount | eurCurrency }} · Inv. {{ hybrid.cumulative_invested | eurCurrency }}
-                </p>
-              </div>
-            </li>
-          }
-        </ul>
-      </section>
-    } @else {
-      <app-balance-form
-        [entities]="entities()"
-        [saving]="saving()"
-        (save)="onSaveMonth($event)"
-      />
+    @if (canImportJson()) {
+      <button
+        type="button"
+        (click)="openImportDialog()"
+        class="inline-flex items-center gap-2 rounded-xl border border-dashed border-indigo-500/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-500/10"
+      >
+        Importar JSON del mes
+      </button>
     }
+  </div>
 
-    @if (hasTimeline()) {
-      <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Evolución mensual</h2>
-            <p class="mt-1 text-xs text-slate-500">Progreso del patrimonio neto e invertido mes a mes</p>
-          </div>
-          <div class="flex items-center gap-4 text-xs text-slate-400">
-            <span class="flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-full bg-orange-500"></span>
-              Patrimonio
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-full bg-purple-500"></span>
-              Invertido
-            </span>
-          </div>
-        </div>
-        <app-timeline-chart [points]="timelinePoints()" />
-      </section>
-    }
-  </main>
-
-  <app-json-import-dialog
-    [open]="showImportDialog()"
-    [year]="year()"
-    [month]="month()"
-    [importing]="importing()"
-    [errorMessage]="importErrorMessage()"
-    (close)="closeImportDialog()"
-    (importPayload)="onImportJson($event)"
-  />
-
-  @if (showDeleteConfirm()) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
-      <div class="w-full max-w-md rounded-2xl bg-slate-900 p-6 ring-1 ring-white/10 shadow-2xl">
-        <h3 class="text-lg font-semibold text-white">¿Eliminar {{ monthNames[month() - 1] }} {{ year() }}?</h3>
-        <p class="mt-2 text-sm text-slate-400">
-          Se borrarán todos los balances y cuentas híbridas de ese mes. Esta acción no se puede deshacer.
-        </p>
-        <div class="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            (click)="closeDeleteConfirm()"
-            class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            [disabled]="deleting()"
-            (click)="confirmDeleteMonth()"
-            class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            @if (deleting()) {
-              <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-              </svg>
-            }
-            Eliminar
-          </button>
-        </div>
-      </div>
+  @if (errorMessage()) {
+    <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
+      {{ errorMessage() }}
     </div>
   }
-</div>
+
+  @if (loading()) {
+    <div class="flex items-center justify-center rounded-2xl bg-slate-800/40 py-24 text-slate-400">
+      Cargando datos de {{ monthNames[month() - 1] }} {{ year() }}...
+    </div>
+  } @else if (hasRecord() && recordResponse()?.record) {
+    <section class="grid gap-6 md:grid-cols-3">
+      <div class="flex flex-col items-center justify-center rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
+        <app-donut-chart
+          [totalLiquid]="recordResponse()!.record!.total_liquid"
+          [totalInvested]="recordResponse()!.record!.total_invested"
+          [totalNetWorth]="recordResponse()!.record!.total_net_worth"
+        />
+      </div>
+
+      <app-diff-badge
+        [diff]="recordResponse()!.record!.monthly_diff"
+        [investedDiff]="recordResponse()!.record!.invested_diff"
+        [previousNetWorth]="recordResponse()!.previous_net_worth"
+      />
+    </section>
+
+    <section class="grid gap-4 sm:grid-cols-3">
+      <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total líquido</p>
+        <p class="mt-1 text-xl font-bold text-sky-300">{{ recordResponse()!.record!.total_liquid | eurCurrency }}</p>
+      </div>
+      <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total invertido</p>
+        <p class="mt-1 text-xl font-bold text-purple-300">{{ recordResponse()!.record!.total_invested | eurCurrency }}</p>
+      </div>
+      <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">% Invertido</p>
+        <p class="mt-1 text-xl font-bold text-white">{{ recordResponse()!.record!.invested_percentage | number: '1.1-1' }}%</p>
+      </div>
+    </section>
+
+    <section class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Detalle por entidad</h2>
+      <ul class="divide-y divide-white/5">
+        @for (balance of recordResponse()!.record!.balances; track balance.entity_id) {
+          <li class="flex items-center justify-between py-2.5 text-sm">
+            <span class="text-slate-300">{{ balance.entity?.name ?? balance.entity_id }}</span>
+            <span class="font-semibold text-white">{{ balance.balance_amount | eurCurrency }}</span>
+          </li>
+        }
+        @for (hybrid of recordResponse()!.record!.hybrid_accounts; track hybrid.entity_id) {
+          <li class="flex items-center justify-between py-2.5 text-sm">
+            <div>
+              <span class="text-slate-300">{{ hybrid.entity?.name ?? hybrid.entity_id }}</span>
+              <span class="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                Híbrida
+              </span>
+            </div>
+            <div class="text-right">
+              <p class="font-semibold text-white">{{ (hybrid.liquid_amount + hybrid.cumulative_invested) | eurCurrency }}</p>
+              <p class="text-xs text-slate-500">
+                Líq. {{ hybrid.liquid_amount | eurCurrency }} · Inv. {{ hybrid.cumulative_invested | eurCurrency }}
+              </p>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  } @else {
+    <app-balance-form
+      [entities]="entities()"
+      [saving]="saving()"
+      (save)="onSaveMonth($event)"
+    />
+  }
+
+  @if (hasTimeline()) {
+    <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Evolución mensual</h2>
+          <p class="mt-1 text-xs text-slate-500">Progreso del patrimonio neto e invertido mes a mes</p>
+        </div>
+        <div class="flex items-center gap-4 text-xs text-slate-400">
+          <span class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-orange-500"></span>
+            Patrimonio
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-purple-500"></span>
+            Invertido
+          </span>
+        </div>
+      </div>
+      <app-timeline-chart [points]="timelinePoints()" />
+    </section>
+  }
+</main>
+
+<app-json-import-dialog
+  [open]="showImportDialog()"
+  [year]="year()"
+  [month]="month()"
+  [importing]="importing()"
+  [errorMessage]="importErrorMessage()"
+  (close)="closeImportDialog()"
+  (importPayload)="onImportJson($event)"
+/>
+
+@if (showDeleteConfirm()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
+    <div class="w-full max-w-md rounded-2xl bg-slate-900 p-6 ring-1 ring-white/10 shadow-2xl">
+      <h3 class="text-lg font-semibold text-white">¿Eliminar {{ monthNames[month() - 1] }} {{ year() }}?</h3>
+      <p class="mt-2 text-sm text-slate-400">
+        Se borrarán todos los balances y cuentas híbridas de ese mes. Esta acción no se puede deshacer.
+      </p>
+      <div class="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          (click)="closeDeleteConfirm()"
+          class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          [disabled]="deleting()"
+          (click)="confirmDeleteMonth()"
+          class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          @if (deleting()) {
+            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+            </svg>
+          }
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+}
