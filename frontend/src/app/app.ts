@@ -4,7 +4,6 @@ import { filter } from 'rxjs';
 
 import { MonthNavigatorComponent } from './features/dashboard/components/month-navigator/month-navigator.component';
 import { PeriodStorageService } from './core/services/period-storage.service';
-import { MONTH_NAMES } from './core/models/month-names';
 
 type ActiveView = 'dashboard' | 'investment-detail';
 
@@ -18,14 +17,9 @@ type ActiveView = 'dashboard' | 'investment-detail';
         <div class="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-4">
 
           <!-- Branding -->
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400">Finance Portfolio</span>
-              <h1 class="text-xl font-bold leading-tight text-white">Panel de patrimonio personal</h1>
-            </div>
-            <span class="hidden rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-400 ring-1 ring-white/10 sm:block">
-              {{ monthNames[month() - 1] }} · {{ year() }}
-            </span>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400">Finance Portfolio</span>
+            <h1 class="text-xl font-bold leading-tight text-white">Panel de patrimonio personal</h1>
           </div>
 
           <!-- Navegador de mes -->
@@ -82,8 +76,6 @@ type ActiveView = 'dashboard' | 'investment-detail';
 export class App implements OnInit {
   private readonly router = inject(Router);
   private readonly periodStorage = inject(PeriodStorageService);
-
-  readonly monthNames = MONTH_NAMES;
 
   private readonly stored = this.periodStorage.read();
   readonly year = signal<number>(this.stored.year);
