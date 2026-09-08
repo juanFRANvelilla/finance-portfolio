@@ -30,6 +30,7 @@ interface HybridLedgerState {
   selector: 'app-balance-form',
   imports: [FormsModule, EurCurrencyPipe, ContributionsDialogComponent],
   templateUrl: './balance-form.component.html',
+  styleUrl: './balance-form.component.scss',
 })
 export class BalanceFormComponent {
   private readonly api = inject(FinanceApiService);
@@ -52,6 +53,16 @@ export class BalanceFormComponent {
   );
 
   readonly hybridEntities = computed(() => this.entities().filter((e) => e.entity_type === 'HYBRID'));
+
+  /** Híbridas con libro de aportaciones primero (ocupan más ancho en la fila). */
+  readonly hybridEntitiesOrdered = computed(() =>
+    [...this.hybridEntities()].sort((a, b) => {
+      if (a.uses_contribution_ledger === b.uses_contribution_ledger) {
+        return 0;
+      }
+      return a.uses_contribution_ledger ? -1 : 1;
+    }),
+  );
 
   usesContributionLedger(entityId: string): boolean {
     return this.entities().find((entity) => entity.id === entityId)?.uses_contribution_ledger ?? false;
