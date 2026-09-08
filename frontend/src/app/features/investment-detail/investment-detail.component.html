@@ -81,91 +81,67 @@
               @if (panel(cat.category_id).loadingDetail) {
                 <div class="py-8 text-center text-sm text-slate-500">Cargando...</div>
               } @else if (panel(cat.category_id).detail) {
-                @if (cat.editable) {
-                  <!-- ---- Total manual y libre (Fondos/Crypto) ---- -->
-                  <div class="mb-5">
-                    <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
-                      Total de la categoría
+                <!-- ---- Total de categoría (solo lectura; en edición se actualiza con la suma de activos) ---- -->
+                <div class="mb-5">
+                  <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
+                    Total de la categoría
+                    @if (!panel(cat.category_id).assetEditMode) {
                       @if (cat.entity_amount_eur > 0) {
                         <span class="text-xs text-emerald-400">
                           Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
                         </span>
-                      } @else {
+                      } @else if (cat.monthly_contributions_eur > 0 || cat.previous_amount_eur !== null) {
                         <span class="text-xs text-slate-500">
-                          Previsión:
-                          {{ suggestedAmount(cat) | eurCurrency }}
-                          @if (cat.monthly_contributions_eur > 0) {
-                            <span class="text-indigo-300/80">
-                              (ant. {{ cat.previous_amount_eur | eurCurrency }} + {{ cat.monthly_contributions_eur | eurCurrency }} aport.)
-                            </span>
-                          } @else if (cat.previous_amount_eur !== null) {
-                            <span>(mes anterior: {{ cat.previous_amount_eur | eurCurrency }})</span>
-                          }
+                          Previsión: {{ suggestedAmount(cat) | eurCurrency }}
                         </span>
                       }
-                    </span>
-                    <div class="flex items-center gap-3">
-                      <div class="relative flex-1">
-                        <input
-                          type="text"
-                          inputmode="decimal"
-                          class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
-                          [value]="panel(cat.category_id).categoryInput"
-                          (input)="onCategoryInputChange(cat.category_id, $any($event.target).value)"
-                        />
-                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
-                      </div>
-                      <button
-                        type="button"
-                        [disabled]="panel(cat.category_id).savingTotal || panel(cat.category_id).savingAssets"
-                        (click)="saveCategoryTotal(cat.category_id)"
-                        class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        @if (panel(cat.category_id).savingTotal || panel(cat.category_id).savingAssets) {
-                          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-                          </svg>
-                        }
-                        Guardar
-                      </button>
-                    </div>
-                    <div class="mt-2 flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0"
-                        [max]="overview()!.total_invested"
-                        step="1"
-                        class="h-1.5 flex-1 cursor-pointer accent-indigo-500"
-                        [value]="categoryInputNumeric(cat.category_id)"
-                        (input)="onCategoryInputChange(cat.category_id, $any($event.target).value)"
-                      />
-                      <span class="w-14 text-right text-xs tabular-nums text-slate-400">
-                        {{ categoryInputPercentage(cat.category_id) }}%
-                      </span>
-                    </div>
+                    } @else {
+                      <span class="text-xs text-indigo-300/80">Suma automática de activos</span>
+                    }
+                  </span>
+                  <div class="relative">
+                    <input
+                      type="text"
+                      readonly
+                      tabindex="-1"
+                      class="w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10"
+                      [value]="categoryTotalInputDisplay(cat.category_id)"
+                    />
+                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
                   </div>
-                  <hr class="mb-5 border-white/5" />
-                }
-
-                <!-- ---- Activos de la categoría ---- -->
-                <div class="mb-3 flex items-center justify-between">
-                  <p class="text-sm font-semibold text-slate-300">Activos</p>
-                  <button
-                    type="button"
-                    (click)="toggleAssetEditMode(cat.category_id)"
-                    class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
-                  >
-                    {{ panel(cat.category_id).assetEditMode ? 'Cancelar' : 'Editar activos' }}
-                  </button>
+                  <div class="mt-2 flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0"
+                      [max]="overview()!.total_invested || categoryTotalDisplay(cat.category_id) || 1"
+                      step="1"
+                      disabled
+                      class="h-1.5 flex-1 cursor-default accent-indigo-500 opacity-80"
+                      [value]="categoryTotalDisplay(cat.category_id)"
+                    />
+                    <span class="w-14 text-right text-xs tabular-nums text-slate-400">
+                      {{ categoryInputPercentage(cat.category_id) }}%
+                    </span>
+                  </div>
                 </div>
 
+                <!-- ---- Modo vista: gráfico ---- -->
                 @if (!panel(cat.category_id).assetEditMode) {
+                  <div class="mb-3 flex items-center justify-end">
+                    <button
+                      type="button"
+                      (click)="toggleAssetEditMode(cat.category_id)"
+                      class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
+                    >
+                      Editar activos
+                    </button>
+                  </div>
+
                   @if (assetSegmentsFor(cat.category_id).length > 0) {
                     <app-segment-donut-chart
                       [segments]="assetSegmentsFor(cat.category_id)"
                       [centerLabel]="cat.name"
-                      [centerValue]="panel(cat.category_id).detail!.category_amount_eur"
+                      [centerValue]="categoryTotalDisplay(cat.category_id)"
                       [clickable]="false"
                     />
                     <div class="mt-4 overflow-hidden rounded-xl ring-1 ring-white/5">
@@ -221,6 +197,18 @@
                     </p>
                   }
                 } @else {
+                  <!-- ---- Modo edición: formulario de activos ---- -->
+                  <div class="mb-3 flex items-center justify-between">
+                    <p class="text-sm font-semibold text-slate-300">Activos</p>
+                    <button
+                      type="button"
+                      (click)="toggleAssetEditMode(cat.category_id)"
+                      class="text-xs font-medium text-slate-400 transition hover:text-slate-300"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+
                   <div class="flex flex-col gap-3">
                     @for (row of panel(cat.category_id).assetRows; track row.assetTypeId) {
                       <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
@@ -333,44 +321,20 @@
                       </div>
                     }
 
-                    @if (!cat.editable) {
-                      <div class="flex items-center justify-between rounded-xl bg-slate-900/40 px-4 py-3 text-sm text-slate-400 ring-1 ring-white/5">
-                        <span>Total calculado (suma de activos)</span>
-                        <span class="font-semibold text-white">{{ assetAllocatedFor(cat.category_id) | eurCurrency }}</span>
-                      </div>
-                    } @else {
-                      <div
-                        class="flex items-center justify-between rounded-xl px-4 py-3 text-sm ring-1"
-                        [class.bg-emerald-500/10]="assetOthersFor(cat.category_id) >= 0"
-                        [class.ring-emerald-500/20]="assetOthersFor(cat.category_id) >= 0"
-                        [class.text-emerald-300]="assetOthersFor(cat.category_id) >= 0"
-                        [class.bg-rose-500/10]="assetOthersFor(cat.category_id) < 0"
-                        [class.ring-rose-500/20]="assetOthersFor(cat.category_id) < 0"
-                        [class.text-rose-300]="assetOthersFor(cat.category_id) < 0"
-                      >
-                        <span>
-                          {{ assetOthersFor(cat.category_id) >= 0 ? 'Resto sin clasificar (Otros)' : 'Te has pasado del total de la categoría' }}
-                        </span>
-                        <span class="font-semibold">{{ assetOthersFor(cat.category_id) | eurCurrency }}</span>
-                      </div>
-                    }
-
-                    @if (!cat.editable) {
-                      <button
-                        type="button"
-                        [disabled]="panel(cat.category_id).savingAssets"
-                        (click)="saveAssets(cat.category_id)"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        @if (panel(cat.category_id).savingAssets) {
-                          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-                          </svg>
-                        }
-                        Guardar
-                      </button>
-                    }
+                    <button
+                      type="button"
+                      [disabled]="panel(cat.category_id).savingAssets"
+                      (click)="saveAssets(cat.category_id)"
+                      class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      @if (panel(cat.category_id).savingAssets) {
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                        </svg>
+                      }
+                      Guardar
+                    </button>
                   </div>
                 }
               }

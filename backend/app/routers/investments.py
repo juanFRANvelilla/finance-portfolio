@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/investment", tags=["investment"])
 
 # Categoría que recibe la previsión estática por depósitos fiat (p. ej. KuCoin → Crypto).
 FIAT_DEPOSIT_PREVIEW_CATEGORY_ID = "crypto"
-# Fondos y Crypto son libres (total manual + reparto por activos que debe cuadrar con ese total).
+# Acciones: el total de categoría se calcula solo a partir de sus activos.
 COMPUTED_CATEGORY_IDS = {"acciones"}
 
 # Categorías cuyos activos llevan además nº de títulos (units).
@@ -547,6 +547,29 @@ def upsert_category_assets(
                     units=item.units,
                 )
             )
+
+    if category.id not in COMPUTED_CATEGORY_IDS:
+        allocated_eur = Decimal("0")
+        for item in payload.assets:
+            asset = asset_types_by_id[item.asset_type_id]
+            allocated_eur += Decimal(str(amount_to_eur(item.amount, asset.currency, year, month)))
+        category_row = db.scalars(
+            select(MonthlyCategoryInvestment).where(
+                MonthlyCategoryInvestment.year == year,
+                MonthlyCategoryInvestment.month == month,
+                MonthlyCategoryInvestment.category_id == category.id,
+            )
+        ).first()
+        total_eur = _round2(allocated_eur)
+        if category_row is not None:
+            category_row.amount_eur = total_eur
+        else:
+            db.add(
+                MonthlyCategoryInvestment(
+                    year=year, month=month, category_id=category.id, amount_eur=total_eur
+                )
+            )
+
     db.commit()
 
     return _build_category_detail(db, year, month, category)

@@ -39,8 +39,6 @@ interface CategoryPanelState {
   loadingDetail: boolean;
   detail: CategoryDetailResponse | null;
   errorMessage: string | null;
-  categoryInput: string;
-  savingTotal: boolean;
   assetEditMode: boolean;
   assetRows: AssetRow[];
   fxUsdToEur: number | null;
@@ -58,8 +56,6 @@ function createPanelState(): CategoryPanelState {
     loadingDetail: false,
     detail: null,
     errorMessage: null,
-    categoryInput: '',
-    savingTotal: false,
     assetEditMode: false,
     assetRows: [],
     fxUsdToEur: null,
@@ -188,18 +184,12 @@ export class InvestmentDetailComponent {
   }
 
   private applyDetail(categoryId: string, detail: CategoryDetailResponse): void {
-    const catOverview = this.overview()?.categories.find((c) => c.category_id === categoryId) ?? null;
-    const categoryInput = toInputString(
-      catOverview ? (catOverview.saved_this_month ? catOverview.amount_eur : this.suggestedAmount(catOverview)) : null,
-    );
-
     this.updatePanel(categoryId, {
       loadingDetail: false,
       detail,
       assetEditMode: detail.allocated_amount_eur <= 0,
       assetRows: this.buildAssetRows(detail),
       fxUsdToEur: detail.fx_usd_to_eur,
-      categoryInput,
     });
   }
 
@@ -216,20 +206,11 @@ export class InvestmentDetailComponent {
     return cat.previous_amount_eur ?? 0;
   }
 
-  onCategoryInputChange(categoryId: string, value: string): void {
-    this.updatePanel(categoryId, { categoryInput: value });
-  }
-
-  /** Valor numérico del input de categoría, para usarlo en el slider y en cálculos. */
-  categoryInputNumeric(categoryId: string): number {
-    return parseDecimalInput(this.panel(categoryId).categoryInput) ?? 0;
-  }
-
-  categoryInputPercentage(categoryId: string): string {
-    const total = this.overview()?.total_invested ?? 0;
-    if (!total) return '0.0';
-    const value = this.categoryInputNumeric(categoryId);
-    return ((value / total) * 100).toFixed(1);
+  onAssetAmountChange(categoryId: string, assetTypeId: string, value: string): void {
+    const rows = this.panel(categoryId).assetRows.map((r) =>
+      r.assetTypeId === assetTypeId ? { ...r, amount: value } : r,
+    );
+    this.updatePanel(categoryId, { assetRows: rows });
   }
 
   formatMonthlyContribution(value: number | null, currency: string): string | null {
@@ -240,31 +221,24 @@ export class InvestmentDetailComponent {
     return `+${formatted} ${currency}/mes`;
   }
 
-  saveCategoryTotal(categoryId: string): void {
+  categoryInputPercentage(categoryId: string): string {
+    const total = this.overview()?.total_invested ?? 0;
+    if (!total) return '0.0';
+    const value = this.categoryTotalDisplay(categoryId);
+    return ((value / total) * 100).toFixed(1);
+  }
+
+  /** Total de categoría: en edición suma activos en vivo; en vista el valor guardado. */
+  categoryTotalDisplay(categoryId: string): number {
     const p = this.panel(categoryId);
-    this.updatePanel(categoryId, { savingTotal: true, errorMessage: null });
-    const amount = parseDecimalInput(p.categoryInput) ?? 0;
-    const payload = { categories: [{ category_id: categoryId, amount_eur: amount }] };
-    this.api.upsertCategories(this.year(), this.month(), payload).subscribe({
-      next: (response) => {
-        this.overview.set(response);
-        const updatedCat = response.categories.find((c) => c.category_id === categoryId);
-        this.updatePanel(categoryId, {
-          categoryInput: updatedCat ? toInputString(updatedCat.amount_eur) : p.categoryInput,
-        });
-        if (p.assetEditMode && p.detail) {
-          this.saveAssets(categoryId, { afterCategorySave: true });
-        } else {
-          this.updatePanel(categoryId, { savingTotal: false });
-        }
-      },
-      error: (err) => {
-        this.updatePanel(categoryId, {
-          savingTotal: false,
-          errorMessage: this.extractError(err, 'No se pudo guardar el total.'),
-        });
-      },
-    });
+    if (p.assetEditMode) {
+      return this.assetAllocatedFor(categoryId);
+    }
+    return p.detail?.category_amount_eur ?? 0;
+  }
+
+  categoryTotalInputDisplay(categoryId: string): string {
+    return String(this.categoryTotalDisplay(categoryId)).replace('.', ',');
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
@@ -315,12 +289,6 @@ export class InvestmentDetailComponent {
     return Math.round(value * rate * 100) / 100;
   }
 
-  assetOthersFor(categoryId: string): number {
-    const detail = this.panel(categoryId).detail;
-    if (!detail) return 0;
-    return Math.round((detail.category_amount_eur - this.assetAllocatedFor(categoryId)) * 100) / 100;
-  }
-
   showUnitsFor(categoryId: string): boolean {
     return this.panel(categoryId).detail?.has_units ?? false;
   }
@@ -330,13 +298,6 @@ export class InvestmentDetailComponent {
     if (hasUnits && currency === 'USD') return 'sm:grid-cols-3';
     if (hasUnits || currency === 'USD') return 'sm:grid-cols-2';
     return '';
-  }
-
-  onAssetAmountChange(categoryId: string, assetTypeId: string, value: string): void {
-    const rows = this.panel(categoryId).assetRows.map((r) =>
-      r.assetTypeId === assetTypeId ? { ...r, amount: value } : r,
-    );
-    this.updatePanel(categoryId, { assetRows: rows });
   }
 
   onAssetUnitsChange(categoryId: string, assetTypeId: string, value: string): void {
@@ -355,13 +316,11 @@ export class InvestmentDetailComponent {
     });
   }
 
-  saveAssets(categoryId: string, options?: { afterCategorySave?: boolean }): void {
+  saveAssets(categoryId: string): void {
     const p = this.panel(categoryId);
     if (!p.detail) return;
 
-    if (!options?.afterCategorySave) {
-      this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
-    }
+    this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
     const payload = {
       assets: p.assetRows.map((row) => ({
         asset_type_id: row.assetTypeId,
@@ -373,7 +332,6 @@ export class InvestmentDetailComponent {
       next: (response) => {
         this.updatePanel(categoryId, {
           detail: response,
-          savingTotal: false,
           savingAssets: false,
           assetEditMode: false,
           assetRows: this.buildAssetRows(response),
@@ -383,7 +341,6 @@ export class InvestmentDetailComponent {
       },
       error: (err) => {
         this.updatePanel(categoryId, {
-          savingTotal: false,
           savingAssets: false,
           errorMessage: this.extractError(err, 'No se pudo guardar el reparto de activos.'),
         });
