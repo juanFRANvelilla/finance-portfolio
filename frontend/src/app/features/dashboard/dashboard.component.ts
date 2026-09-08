@@ -146,6 +146,17 @@ export class DashboardComponent {
     this.applyPartialSave(submission, this.editing());
   }
 
+  private hybridChanged(
+    hybrid: HybridBalanceImport,
+    previous: { liquid_amount: number; cumulative_invested: number } | undefined,
+  ): boolean {
+    if (previous === undefined) {
+      return true;
+    }
+    const invested = hybrid.invested_amount ?? 0;
+    return previous.liquid_amount !== hybrid.liquid_amount || previous.cumulative_invested !== invested;
+  }
+
   private applyPartialSave(submission: BalanceFormSubmission, editMode: boolean): void {
     const initial = this.recordResponse()?.record;
     const year = this.year();
@@ -161,12 +172,12 @@ export class DashboardComponent {
       });
       hybridsToPatch = submission.hybridBalances.filter((hybrid) => {
         const previous = initial.hybrid_accounts.find((row) => row.entity_id === hybrid.entity_id);
-        return previous === undefined || previous.liquid_amount !== hybrid.liquid_amount;
+        return this.hybridChanged(hybrid, previous);
       });
     } else if (initial?.hybrid_accounts.length) {
       hybridsToPatch = submission.hybridBalances.filter((hybrid) => {
         const previous = initial.hybrid_accounts.find((row) => row.entity_id === hybrid.entity_id);
-        return previous === undefined || previous.liquid_amount !== hybrid.liquid_amount;
+        return this.hybridChanged(hybrid, previous);
       });
     }
 

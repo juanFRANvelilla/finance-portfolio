@@ -29,12 +29,12 @@ class EntityBalanceInput(BaseModel):
 
 
 class HybridBalanceImport(BaseModel):
-    """Balance de una entidad híbrida: solo líquido; el invertido se calcula vía aportaciones."""
+    """Balance de una entidad híbrida: líquido manual + invertido (manual o calculado por aportaciones)."""
 
     entity_id: str
     liquid_amount: float = Field(ge=0)
     invested_amount: float | None = Field(default=None, ge=0)
-    """Opcional: ignorado para híbridas con libro de aportaciones (se calcula en backend)."""
+    """Si se envía, se persiste tal cual. Si no, se calcula vía aportaciones cuando aplica."""
 
 
 class MonthlyRecordUpsert(BaseModel):

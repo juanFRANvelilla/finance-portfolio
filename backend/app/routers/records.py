@@ -226,7 +226,9 @@ def _resolve_hybrid_invested(
     for hybrid in hybrid_balances:
         entity = entities_by_id[hybrid.entity_id]
         liquid = float(hybrid.liquid_amount)
-        if uses_ledger(entity):
+        if hybrid.invested_amount is not None:
+            invested = float(hybrid.invested_amount)
+        elif uses_ledger(entity):
             invested = compute_cumulative_invested(db, hybrid.entity_id, year, month, liquid)
             if invested < 0:
                 raise HTTPException(
@@ -237,7 +239,7 @@ def _resolve_hybrid_invested(
                     ),
                 )
         else:
-            invested = float(hybrid.invested_amount or 0)
+            invested = 0.0
         resolved.append((hybrid.entity_id, liquid, invested))
     return resolved
 

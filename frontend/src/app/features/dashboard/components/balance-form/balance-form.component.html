@@ -57,7 +57,7 @@
       <h4 class="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
         Cuentas híbridas
         <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-          Líquido manual · invertido calculado
+          Líquido manual · invertido editable
         </span>
       </h4>
       <div class="grid gap-4 sm:grid-cols-2">
@@ -65,15 +65,21 @@
           <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
             <div class="mb-2 flex items-center justify-between gap-2">
               <p class="text-sm font-medium text-slate-300">{{ entity.name }}</p>
-              <button
-                type="button"
-                (click)="openContributionsDialog(entity)"
-                class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
-              >
-                Gestionar aportaciones
-              </button>
+              @if (entity.uses_contribution_ledger) {
+                <button
+                  type="button"
+                  (click)="openContributionsDialog(entity)"
+                  class="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
+                >
+                  Gestionar aportaciones
+                </button>
+              }
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            <div
+              class="grid gap-2"
+              [class.grid-cols-2]="!entity.uses_contribution_ledger"
+              [class.grid-cols-3]="entity.uses_contribution_ledger"
+            >
               <label class="block">
                 <span class="mb-1 block text-xs font-medium text-sky-300">Líquido</span>
                 <div class="relative">
@@ -88,16 +94,32 @@
                   <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
                 </div>
               </label>
-              <div class="block">
-                <span class="mb-1 block text-xs font-medium text-purple-300">Invertido (calc.)</span>
-                <div
-                  class="flex h-[38px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-medium tabular-nums text-purple-300 ring-1 ring-white/5"
-                >
-                  {{ hybridInvestedPreview(entity.id) | eurCurrency }}
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-purple-300">Invertido</span>
+                <div class="relative">
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="0,00"
+                    [value]="displayAmount(hybridInvested()[entity.id] ?? (entity.uses_contribution_ledger ? hybridInvestedPreview(entity.id) : null))"
+                    class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 pr-8 text-sm text-white outline-none ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500"
+                    (input)="onHybridInvestedChange(entity.id, $any($event.target).value)"
+                  />
+                  <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-slate-500">€</span>
                 </div>
-              </div>
+              </label>
+              @if (entity.uses_contribution_ledger) {
+                <div class="block">
+                  <span class="mb-1 block text-xs font-medium text-slate-400">Preview calc.</span>
+                  <div
+                    class="flex h-[38px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-medium tabular-nums text-indigo-300 ring-1 ring-white/5"
+                  >
+                    {{ hybridInvestedPreview(entity.id) | eurCurrency }}
+                  </div>
+                </div>
+              }
             </div>
-            @if (hybridLedger()[entity.id]; as ledger) {
+            @if (entity.uses_contribution_ledger && hybridLedger()[entity.id]; as ledger) {
               <p class="mt-2 text-xs text-slate-500">
                 Ant. {{ ledger.previousStaticTotal | eurCurrency }} + aport. {{ ledger.contributionsTotal | eurCurrency }}
                 − líq.
@@ -129,7 +151,7 @@
 
     <button
       type="submit"
-      [disabled]="saving() || (simpleEntities().length === 0 && hybridEntities().length === 0)"
+      [disabled]="!canSubmit()"
       class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
     >
       @if (saving()) {

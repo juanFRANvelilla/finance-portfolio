@@ -31,8 +31,8 @@ def _month_date_range(year: int, month: int) -> tuple[date, date]:
 
 
 def uses_ledger(entity: Entity) -> bool:
-    """True si la entidad usa el libro de aportaciones (todas las HYBRID de momento)."""
-    return entity.entity_type == EntityType.HYBRID
+    """True si la híbrida gestiona el preview de invertido vía aportaciones."""
+    return entity.entity_type == EntityType.HYBRID and bool(entity.uses_contribution_ledger)
 
 
 def get_previous_static_total(db: Session, entity_id: str, year: int, month: int) -> float:

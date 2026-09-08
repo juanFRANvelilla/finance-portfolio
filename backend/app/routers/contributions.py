@@ -42,6 +42,16 @@ def _assert_date_in_month(contribution_date, year: int, month: int) -> None:
         )
 
 
+def _get_contribution_managed_hybrid_or_404(db: Session, entity_id: str) -> Entity:
+    entity = _get_hybrid_entity_or_404(db, entity_id)
+    if not entity.uses_contribution_ledger:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La entidad '{entity_id}' no gestiona invertido por aportaciones",
+        )
+    return entity
+
+
 @router.get("/{year}/{month}/{entity_id}", response_model=EntityContributionsResponse)
 def list_entity_contributions(
     year: int,
@@ -52,7 +62,7 @@ def list_entity_contributions(
 ) -> EntityContributionsResponse:
     """Aportaciones del mes para una entidad híbrida y resumen para calcular invertido."""
     _validate_month(month)
-    _get_hybrid_entity_or_404(db, entity_id)
+    _get_contribution_managed_hybrid_or_404(db, entity_id)
 
     start, end = _month_date_range(year, month)
     contributions = list(
@@ -94,7 +104,7 @@ def create_entity_contribution(
     db: Session = Depends(get_db),
 ) -> EntityContribution:
     _validate_month(month)
-    _get_hybrid_entity_or_404(db, entity_id)
+    _get_contribution_managed_hybrid_or_404(db, entity_id)
     _assert_date_in_month(payload.contribution_date, year, month)
 
     row = EntityContribution(

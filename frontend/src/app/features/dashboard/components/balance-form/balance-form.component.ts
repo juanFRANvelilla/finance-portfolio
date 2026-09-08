@@ -51,8 +51,14 @@ export class BalanceFormComponent {
 
   readonly hybridEntities = computed(() => this.entities().filter((e) => e.entity_type === 'HYBRID'));
 
+  usesContributionLedger(entityId: string): boolean {
+    return this.entities().find((entity) => entity.id === entityId)?.uses_contribution_ledger ?? false;
+  }
+
   readonly values = signal<Record<string, number | null>>({});
   readonly hybridLiquid = signal<Record<string, number | null>>({});
+  readonly hybridInvested = signal<Record<string, number | null>>({});
+  readonly hybridInvestedOverridden = signal<Record<string, boolean>>({});
   readonly hybridLedger = signal<Record<string, HybridLedgerState>>({});
 
   readonly contributionsDialogOpen = signal(false);
@@ -66,12 +72,65 @@ export class BalanceFormComponent {
     return this.hybridLiquid()[id] ?? 0;
   });
 
+  /** En modo edición, true solo si algún campo difiere del registro cargado. */
+  readonly hasPendingChanges = computed(() => {
+    if (!this.editMode()) {
+      return true;
+    }
+
+    const record = this.initialRecord();
+    if (!record) {
+      return false;
+    }
+
+    for (const entity of this.simpleEntities()) {
+      const current = this.values()[entity.id] ?? 0;
+      const previous = record.balances.find((row) => row.entity_id === entity.id);
+      const previousAmount = previous?.balance_amount ?? 0;
+      if (current !== previousAmount) {
+        return true;
+      }
+    }
+
+    for (const entity of this.hybridEntities()) {
+      const currentLiquid = this.hybridLiquid()[entity.id] ?? 0;
+      const currentInvested = this.resolveHybridInvested(entity.id);
+      const previous = record.hybrid_accounts.find((row) => row.entity_id === entity.id);
+      if (!previous) {
+        if (currentLiquid !== 0 || currentInvested !== 0) {
+          return true;
+        }
+        continue;
+      }
+      if (currentLiquid !== previous.liquid_amount || currentInvested !== previous.cumulative_invested) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  readonly canSubmit = computed(() => {
+    if (this.saving()) {
+      return false;
+    }
+    if (this.simpleEntities().length === 0 && this.hybridEntities().length === 0) {
+      return false;
+    }
+    if (this.editMode()) {
+      return this.hasPendingChanges();
+    }
+    return true;
+  });
+
   constructor() {
     effect(() => {
       this.year();
       this.month();
       this.values.set({});
       this.hybridLiquid.set({});
+      this.hybridInvested.set({});
+      this.hybridInvestedOverridden.set({});
     });
 
     effect(() => {
@@ -102,10 +161,16 @@ export class BalanceFormComponent {
       }
 
       const liquid: Record<string, number | null> = {};
+      const invested: Record<string, number | null> = {};
+      const overridden: Record<string, boolean> = {};
       for (const hybrid of record.hybrid_accounts) {
         liquid[hybrid.entity_id] = hybrid.liquid_amount;
+        invested[hybrid.entity_id] = hybrid.cumulative_invested;
+        overridden[hybrid.entity_id] = true;
       }
       this.hybridLiquid.set(liquid);
+      this.hybridInvested.set(invested);
+      this.hybridInvestedOverridden.set(overridden);
 
       this.values.update((current) => {
         const next = { ...current };
@@ -121,7 +186,9 @@ export class BalanceFormComponent {
       this.year();
       this.month();
       for (const entity of hybrids) {
-        this.refreshHybridLedger(entity.id);
+        if (this.usesContributionLedger(entity.id)) {
+          this.refreshHybridLedger(entity.id);
+        }
       }
     });
   }
@@ -141,7 +208,15 @@ export class BalanceFormComponent {
   onHybridLiquidChange(entityId: string, value: string): void {
     const parsed = parseDecimalInput(value);
     this.hybridLiquid.update((current) => ({ ...current, [entityId]: parsed }));
-    this.refreshHybridLedger(entityId);
+    if (this.usesContributionLedger(entityId)) {
+      this.refreshHybridLedger(entityId);
+    }
+  }
+
+  onHybridInvestedChange(entityId: string, value: string): void {
+    const parsed = parseDecimalInput(value);
+    this.hybridInvested.update((current) => ({ ...current, [entityId]: parsed }));
+    this.hybridInvestedOverridden.update((current) => ({ ...current, [entityId]: true }));
   }
 
   hybridInvestedPreview(entityId: string): number {
@@ -169,9 +244,20 @@ export class BalanceFormComponent {
         cumulativeInvested: summary.cumulative_invested_preview,
       },
     }));
+
+    if (!this.hybridInvestedOverridden()[entityId]) {
+      this.hybridInvested.update((current) => ({
+        ...current,
+        [entityId]: summary.cumulative_invested_preview,
+      }));
+    }
   }
 
   private refreshHybridLedger(entityId: string): void {
+    if (!this.usesContributionLedger(entityId)) {
+      return;
+    }
+
     const liquid = this.hybridLiquid()[entityId] ?? 0;
     this.api.getEntityContributions(this.year(), this.month(), entityId, liquid).subscribe({
       next: (summary) => this.onContributionsChanged(entityId, summary),
@@ -189,19 +275,35 @@ export class BalanceFormComponent {
     });
   }
 
-  onUpdateHybridsClick(): void {
-    const hybridBalances: HybridBalanceImport[] = this.hybridEntities().map((entity) => ({
+  private resolveHybridInvested(entityId: string): number {
+    const manual = this.hybridInvested()[entityId];
+    if (manual !== null && manual !== undefined) {
+      return manual;
+    }
+    if (this.usesContributionLedger(entityId)) {
+      return this.hybridInvestedPreview(entityId);
+    }
+    return 0;
+  }
+
+  private buildHybridBalances(): HybridBalanceImport[] {
+    return this.hybridEntities().map((entity) => ({
       entity_id: entity.id,
       liquid_amount: this.hybridLiquid()[entity.id] ?? 0,
+      invested_amount: this.resolveHybridInvested(entity.id),
     }));
-    this.updateHybrids.emit({ hybridBalances });
+  }
+
+  onUpdateHybridsClick(): void {
+    this.updateHybrids.emit({ hybridBalances: this.buildHybridBalances() });
   }
 
   onSubmit(): void {
-    const hybridBalances: HybridBalanceImport[] = this.hybridEntities().map((entity) => ({
-      entity_id: entity.id,
-      liquid_amount: this.hybridLiquid()[entity.id] ?? 0,
-    }));
+    if (this.editMode() && !this.hasPendingChanges()) {
+      return;
+    }
+
+    const hybridBalances = this.buildHybridBalances();
 
     const balances: EntityBalanceInput[] = this.simpleEntities().map((entity) => ({
       entity_id: entity.id,

@@ -10,3 +10,4 @@ class EntityRead(BaseModel):
     name: str
     entity_type: EntityType
     is_active: bool
+    uses_contribution_ledger: bool = False
