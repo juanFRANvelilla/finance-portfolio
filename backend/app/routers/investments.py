@@ -24,10 +24,12 @@ from app.schemas.investment import (
     CategoryOverview,
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
+    LinkedInvestedTotalResponse,
 )
 from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
 from app.services.fx_converter import amount_to_eur, eur_to_native, get_usd_to_eur_rate
+from app.services.linked_asset_investments import sum_linked_asset_investments_eur
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
@@ -221,6 +223,19 @@ def _category_suggested_amount_eur(
     return _round2(base + Decimal(str(contributions_eur)))
 
 
+def _get_entity_or_404(db: Session, entity_id: str) -> Entity:
+    entity = db.get(Entity, entity_id)
+    if entity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Entidad '{entity_id}' no encontrada")
+    return entity
+
+
+def _validate_asset_entity_link(db: Session, entity_id: str | None) -> None:
+    if entity_id is None:
+        return
+    _get_entity_or_404(db, entity_id)
+
+
 @router.get("/categories", response_model=list[InvestmentCategoryRead])
 def list_investment_categories(db: Session = Depends(get_db)) -> list[InvestmentCategory]:
     return _get_categories(db)
@@ -237,6 +252,7 @@ def list_asset_types(category_id: str | None = None, db: Session = Depends(get_d
 @router.post("/asset-types", response_model=AssetTypeRead, status_code=status.HTTP_201_CREATED)
 def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -> AssetType:
     _get_category_or_404(db, payload.category_id)
+    _validate_asset_entity_link(db, payload.entity_id)
 
     existing = db.scalars(select(AssetType).where(AssetType.name == payload.name)).first()
     if existing is not None:
@@ -250,6 +266,7 @@ def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -
         ticker=payload.ticker,
         currency=payload.currency,
         monthly_contribution=payload.monthly_contribution,
+        entity_id=payload.entity_id,
     )
     db.add(asset)
     db.commit()
@@ -264,10 +281,39 @@ def update_asset_type(
     asset = db.get(AssetType, asset_type_id)
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
-    asset.monthly_contribution = payload.monthly_contribution
+
+    updates = payload.model_dump(exclude_unset=True)
+    if "entity_id" in updates:
+        _validate_asset_entity_link(db, updates["entity_id"])
+        asset.entity_id = updates["entity_id"]
+    if "monthly_contribution" in updates:
+        asset.monthly_contribution = updates["monthly_contribution"]
+
     db.commit()
     db.refresh(asset)
     return asset
+
+
+@router.get("/{year}/{month}/entities/{entity_id}/linked-invested-total", response_model=LinkedInvestedTotalResponse)
+def get_entity_linked_invested_total(
+    year: int, month: int, entity_id: str, db: Session = Depends(get_db)
+) -> LinkedInvestedTotalResponse:
+    """Suma en EUR los importes de monthly_asset_investments de activos vinculados a la entidad."""
+    entity = _get_entity_or_404(db, entity_id)
+    if entity.entity_type != EntityType.HYBRID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La entidad '{entity_id}' no es híbrida",
+        )
+
+    totals = sum_linked_asset_investments_eur(db, entity_id, year, month)
+    return LinkedInvestedTotalResponse(
+        entity_id=entity_id,
+        year=year,
+        month=month,
+        total_eur=float(totals["total_eur"]),
+        asset_count=int(totals["asset_count"]),
+    )
 
 
 def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewResponse:

@@ -12,6 +12,7 @@ import {
   CategoryInvestmentsUpsert,
   InvestmentCategory,
   InvestmentOverviewResponse,
+  LinkedInvestedTotalResponse,
 } from '../models/investment.model';
 
 @Injectable({ providedIn: 'root' })
@@ -68,6 +69,16 @@ export class InvestmentApiService {
     return this.http.post<CategoryDetailResponse>(
       `${this.baseUrl}/${year}/${month}/categories/${encodeURIComponent(categoryId)}/assets`,
       payload,
+    );
+  }
+
+  getLinkedInvestedTotal(
+    year: number,
+    month: number,
+    entityId: string,
+  ): Observable<LinkedInvestedTotalResponse> {
+    return this.http.get<LinkedInvestedTotalResponse>(
+      `${this.baseUrl}/${year}/${month}/entities/${encodeURIComponent(entityId)}/linked-invested-total`,
     );
   }
 }

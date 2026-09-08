@@ -20,5 +20,7 @@ class AssetType(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     monthly_contribution: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(30), ForeignKey("entities.id"), nullable=True)
 
     category: Mapped["InvestmentCategory"] = relationship()
+    entity: Mapped["Entity | None"] = relationship()

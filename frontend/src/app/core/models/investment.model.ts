@@ -14,6 +14,7 @@ export interface AssetType {
   is_active: boolean;
   display_order: number;
   monthly_contribution: number | null;
+  entity_id: string | null;
 }
 
 export interface AssetTypeCreate {
@@ -22,10 +23,20 @@ export interface AssetTypeCreate {
   ticker?: string | null;
   currency: string;
   monthly_contribution?: number | null;
+  entity_id?: string | null;
 }
 
 export interface AssetTypeUpdate {
   monthly_contribution: number | null;
+  entity_id?: string | null;
+}
+
+export interface LinkedInvestedTotalResponse {
+  entity_id: string;
+  year: number;
+  month: number;
+  total_eur: number;
+  asset_count: number;
 }
 
 export interface CategoryInvestmentInput {

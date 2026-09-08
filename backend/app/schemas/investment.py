@@ -25,6 +25,7 @@ class AssetTypeRead(BaseModel):
     is_active: bool
     display_order: int
     monthly_contribution: float | None = None
+    entity_id: str | None = None
 
 
 class AssetTypeCreate(BaseModel):
@@ -33,6 +34,7 @@ class AssetTypeCreate(BaseModel):
     ticker: str | None = None
     currency: str = "EUR"
     monthly_contribution: float | None = Field(default=None, ge=0)
+    entity_id: str | None = None
 
     @field_validator("currency")
     @classmethod
@@ -44,6 +46,15 @@ class AssetTypeCreate(BaseModel):
 
 class AssetTypeUpdate(BaseModel):
     monthly_contribution: float | None = Field(default=None, ge=0)
+    entity_id: str | None = None
+
+
+class LinkedInvestedTotalResponse(BaseModel):
+    entity_id: str
+    year: int
+    month: int
+    total_eur: float
+    asset_count: int
 
 
 class CategoryInvestmentInput(BaseModel):
