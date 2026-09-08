@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, ElementRef, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 
@@ -14,9 +14,9 @@ import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
 import { parseDecimalInput } from '../../core/utils/parse-decimal';
+import { readCssVar } from '../../core/utils/read-css-var';
 
-const FALLBACK_PALETTE = ['#f59e0b', '#6366f1', '#22c55e', '#ec4899', '#06b6d4', '#eab308', '#f43f5e'];
-const OTHERS_COLOR = '#64748b';
+const FALLBACK_DEFAULTS = ['#f59e0b', '#6366f1', '#22c55e', '#ec4899', '#06b6d4', '#eab308', '#f43f5e'];
 
 /** Convierte un número a texto para prellenar inputs; nunca se usa mientras el usuario escribe,
  * así que no interfiere con la coma/punto que esté tecleando en ese momento. */
@@ -72,11 +72,13 @@ function createPanelState(): CategoryPanelState {
   selector: 'app-investment-detail',
   imports: [DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent],
   templateUrl: './investment-detail.component.html',
+  styleUrl: './investment-detail.component.scss',
 })
 export class InvestmentDetailComponent {
   private readonly api = inject(InvestmentApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly periodStorage = inject(PeriodStorageService);
+  private readonly host = inject(ElementRef<HTMLElement>);
 
   readonly monthNames = MONTH_NAMES;
 
@@ -99,7 +101,7 @@ export class InvestmentDetailComponent {
       id: c.category_id,
       label: c.name,
       value: c.amount_eur,
-      color: c.color ?? FALLBACK_PALETTE[i % FALLBACK_PALETTE.length],
+      color: c.color ?? this.fallbackColor(i),
     }));
   });
 
@@ -266,10 +268,10 @@ export class InvestmentDetailComponent {
         id: a.asset_type_id,
         label: a.ticker ?? a.name,
         value: a.amount_eur,
-        color: FALLBACK_PALETTE[i % FALLBACK_PALETTE.length],
+        color: this.fallbackColor(i),
       }));
     if (detail.others_amount_eur > 0) {
-      segments.push({ id: '__others__', label: 'Otros', value: detail.others_amount_eur, color: OTHERS_COLOR });
+      segments.push({ id: '__others__', label: 'Otros', value: detail.others_amount_eur, color: this.othersColor() });
     }
     return segments;
   }
@@ -406,6 +408,22 @@ export class InvestmentDetailComponent {
           });
         },
       });
+  }
+
+  private fallbackPalette(): string[] {
+    const el = this.host.nativeElement;
+    return FALLBACK_DEFAULTS.map((fallback, index) =>
+      readCssVar(el, `--fallback-color-${index + 1}`, fallback),
+    );
+  }
+
+  private fallbackColor(index: number): string {
+    const palette = this.fallbackPalette();
+    return palette[index % palette.length];
+  }
+
+  private othersColor(): string {
+    return readCssVar(this.host.nativeElement, '--others-color', '#64748b');
   }
 
   private extractError(err: unknown, fallback: string): string {

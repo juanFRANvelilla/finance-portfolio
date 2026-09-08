@@ -5,18 +5,23 @@ import {
   OnChanges,
   OnDestroy,
   ViewChild,
+  inject,
   input,
 } from '@angular/core';
 import { Chart, ChartConfiguration } from 'chart.js/auto';
 
 import { EurCurrencyPipe } from '../../../../core/pipes/eur-currency.pipe';
+import { readCssVar } from '../../../../core/utils/read-css-var';
 
 @Component({
   selector: 'app-donut-chart',
   imports: [EurCurrencyPipe],
   templateUrl: './donut-chart.component.html',
+  styleUrl: './donut-chart.component.scss',
 })
 export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+
   readonly totalLiquid = input.required<number>();
   readonly totalInvested = input.required<number>();
   readonly totalNetWorth = input.required<number>();
@@ -38,7 +43,17 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.chart?.destroy();
   }
 
+  private chartColors(): { liquid: string; invested: string; border: string } {
+    const el = this.host.nativeElement;
+    return {
+      liquid: readCssVar(el, '--chart-liquid-color', '#38bdf8'),
+      invested: readCssVar(el, '--chart-invested-color', '#a855f7'),
+      border: readCssVar(el, '--chart-border-color', '#0f172a'),
+    };
+  }
+
   private renderChart(): void {
+    const colors = this.chartColors();
     const config: ChartConfiguration<'doughnut'> = {
       type: 'doughnut',
       data: {
@@ -46,8 +61,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
         datasets: [
           {
             data: [this.totalLiquid(), this.totalInvested()],
-            backgroundColor: ['#38bdf8', '#a855f7'],
-            borderColor: '#0f172a',
+            backgroundColor: [colors.liquid, colors.invested],
+            borderColor: colors.border,
             borderWidth: 3,
             hoverOffset: 6,
           },

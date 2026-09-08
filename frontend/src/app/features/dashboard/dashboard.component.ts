@@ -34,6 +34,7 @@ import { TimelineChartComponent } from './components/timeline-chart/timeline-cha
     TimelineChartComponent,
   ],
   templateUrl: './dashboard.component.html',
+  styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent {
   private readonly api = inject(FinanceApiService);

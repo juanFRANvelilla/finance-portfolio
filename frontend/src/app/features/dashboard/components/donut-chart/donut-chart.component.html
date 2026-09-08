@@ -1,21 +1,21 @@
-<div class="relative flex h-64 w-64 items-center justify-center">
+<div class="chart-wrap">
   <canvas #canvasRef></canvas>
 
-  <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-    <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Patrimonio neto</span>
-    <span class="mt-1 text-2xl font-bold text-white">{{ totalNetWorth() | eurCurrency }}</span>
+  <div class="chart-center">
+    <span class="chart-center-label">Patrimonio neto</span>
+    <span class="chart-center-value">{{ totalNetWorth() | eurCurrency }}</span>
   </div>
 </div>
 
-<div class="mt-4 flex items-center justify-center gap-6 text-sm">
-  <div class="flex items-center gap-2">
-    <span class="h-2.5 w-2.5 rounded-full bg-sky-400"></span>
-    <span class="text-slate-300">Líquido</span>
-    <span class="font-semibold text-white">{{ totalLiquid() | eurCurrency }}</span>
+<div class="chart-legend">
+  <div class="chart-legend-item">
+    <span class="chart-legend-dot chart-legend-dot--liquid"></span>
+    <span class="chart-legend-label">Líquido</span>
+    <span class="chart-legend-value">{{ totalLiquid() | eurCurrency }}</span>
   </div>
-  <div class="flex items-center gap-2">
-    <span class="h-2.5 w-2.5 rounded-full bg-purple-500"></span>
-    <span class="text-slate-300">Invertido</span>
-    <span class="font-semibold text-white">{{ totalInvested() | eurCurrency }}</span>
+  <div class="chart-legend-item">
+    <span class="chart-legend-dot chart-legend-dot--invested"></span>
+    <span class="chart-legend-label">Invertido</span>
+    <span class="chart-legend-value">{{ totalInvested() | eurCurrency }}</span>
   </div>
 </div>

@@ -1,27 +1,27 @@
-<div class="relative mx-auto flex h-64 w-64 items-center justify-center">
+<div class="chart-wrap">
   <canvas #canvasRef></canvas>
 
   @if (centerLabel()) {
-    <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-      <span class="text-xs font-medium uppercase tracking-wider text-slate-400">{{ centerLabel() }}</span>
-      <span class="mt-1 text-2xl font-bold text-white">{{ centerValue() | eurCurrency }}</span>
+    <div class="chart-center">
+      <span class="chart-center-label">{{ centerLabel() }}</span>
+      <span class="chart-center-value">{{ centerValue() | eurCurrency }}</span>
     </div>
   }
 </div>
 
-<div class="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+<div class="chart-legend">
   @for (segment of segments(); track segment.id) {
     <button
       type="button"
       (click)="onLegendClick(segment.id)"
-      class="flex items-center gap-2"
-      [class.cursor-pointer]="clickable()"
-      [class.cursor-default]="!clickable()"
+      class="chart-legend-item"
+      [class.chart-legend-item--clickable]="clickable()"
+      [class.chart-legend-item--static]="!clickable()"
       [disabled]="!clickable()"
     >
-      <span class="h-2.5 w-2.5 rounded-full" [style.background-color]="segment.color"></span>
-      <span class="text-slate-300">{{ segment.label }}</span>
-      <span class="font-semibold text-white">{{ segment.value | eurCurrency }}</span>
+      <span class="chart-legend-dot" [style.background-color]="segment.color"></span>
+      <span class="chart-legend-label">{{ segment.label }}</span>
+      <span class="chart-legend-value">{{ segment.value | eurCurrency }}</span>
     </button>
   }
 </div>

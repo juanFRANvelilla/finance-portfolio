@@ -1,0 +1,47 @@
+<div class="app-shell">
+  <header class="app-header">
+    <div class="app-header-inner">
+
+      <div>
+        <span class="app-brand-label">Finance Portfolio</span>
+        <h1 class="app-brand-title">Panel de patrimonio personal</h1>
+      </div>
+
+      <app-month-navigator
+        [year]="year()"
+        [month]="month()"
+        (monthChange)="onMonthChange($event)"
+      />
+
+      <div class="app-view-switcher">
+        <button
+          type="button"
+          id="nav-dashboard"
+          class="app-nav-btn"
+          [class.app-nav-btn--active-dashboard]="activeView() === 'dashboard'"
+          (click)="navigateTo('dashboard')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="app-nav-btn-icon">
+            <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" />
+          </svg>
+          Vista general
+        </button>
+        <button
+          type="button"
+          id="nav-investment-detail"
+          class="app-nav-btn"
+          [class.app-nav-btn--active-investment]="activeView() === 'investment-detail'"
+          (click)="navigateTo('investment-detail')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="app-nav-btn-icon">
+            <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 3 0v-13A1.5 1.5 0 0 0 15.5 2ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9a1.5 1.5 0 0 0 3 0v-9A1.5 1.5 0 0 0 9.5 6ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5a1.5 1.5 0 0 0 3 0v-5A1.5 1.5 0 0 0 3.5 10Z" />
+          </svg>
+          Detalle de inversión
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <router-outlet />
+</div>

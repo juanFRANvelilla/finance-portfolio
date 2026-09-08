@@ -1,0 +1,15 @@
+:host {
+  --category-accent-width: 4px;
+  --fallback-color-1: #f59e0b;
+  --fallback-color-2: #6366f1;
+  --fallback-color-3: #22c55e;
+  --fallback-color-4: #ec4899;
+  --fallback-color-5: #06b6d4;
+  --fallback-color-6: #eab308;
+  --fallback-color-7: #f43f5e;
+  --others-color: #64748b;
+}
+
+.category-panel {
+  border-left: var(--category-accent-width) solid transparent;
+}

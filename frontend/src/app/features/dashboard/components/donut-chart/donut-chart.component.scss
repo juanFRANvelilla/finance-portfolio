@@ -1,0 +1,78 @@
+:host {
+  --chart-liquid-color: #38bdf8;
+  --chart-invested-color: #a855f7;
+  --chart-border-color: #0f172a;
+}
+
+.chart-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16rem;
+  height: 16rem;
+}
+
+.chart-center {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.chart-center-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.chart-center-value {
+  margin-top: 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-legend-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+
+  &--liquid {
+    background-color: var(--chart-liquid-color);
+  }
+
+  &--invested {
+    background-color: var(--chart-invested-color);
+  }
+}
+
+.chart-legend-label {
+  color: #cbd5e1;
+}
+
+.chart-legend-value {
+  font-weight: 600;
+  color: #fff;
+}

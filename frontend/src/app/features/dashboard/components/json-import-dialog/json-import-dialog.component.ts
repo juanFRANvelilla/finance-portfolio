@@ -8,6 +8,7 @@ import { MONTH_NAMES } from '../../../../core/models/month-names';
   selector: 'app-json-import-dialog',
   imports: [FormsModule],
   templateUrl: './json-import-dialog.component.html',
+  styleUrl: './json-import-dialog.component.scss',
 })
 export class JsonImportDialogComponent {
   readonly open = input.required<boolean>();

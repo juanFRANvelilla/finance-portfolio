@@ -8,3 +8,80 @@
     max-width: 24rem;
   }
 }
+
+.hybrid-fields-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.hybrid-field-liquid {
+  flex: 0.9 1 0%;
+  min-width: 0;
+}
+
+.hybrid-field-invested {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.hybrid-field-preview {
+  flex: 1.15 1 0%;
+  min-width: 0;
+}
+
+.preview-calc-box {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding-inline: 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #c7d2fe;
+  background-color: rgb(99 102 241 / 0.1);
+  box-shadow: 0 0 0 1px rgb(99 102 241 / 0.2);
+}
+
+.linked-invested-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgb(16 185 129 / 0.3);
+  border-radius: 0.75rem;
+  color: #6ee7b7;
+  background-color: rgb(16 185 129 / 0.1);
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: rgb(52 211 153 / 0.4);
+    color: #a7f3d0;
+    background-color: rgb(16 185 129 / 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.linked-invested-btn-icon {
+  width: 1rem;
+  height: 1rem;
+
+  &--spinning {
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

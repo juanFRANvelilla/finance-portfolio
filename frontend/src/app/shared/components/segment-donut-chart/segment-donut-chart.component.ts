@@ -1,7 +1,18 @@
-import { AfterViewInit, Component, ElementRef, OnChanges, OnDestroy, ViewChild, input, output } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnChanges,
+  OnDestroy,
+  ViewChild,
+  inject,
+  input,
+  output,
+} from '@angular/core';
 import { Chart, ChartConfiguration } from 'chart.js/auto';
 
 import { EurCurrencyPipe } from '../../../core/pipes/eur-currency.pipe';
+import { readCssVar } from '../../../core/utils/read-css-var';
 
 export interface DonutSegment {
   id: string;
@@ -14,8 +25,11 @@ export interface DonutSegment {
   selector: 'app-segment-donut-chart',
   imports: [EurCurrencyPipe],
   templateUrl: './segment-donut-chart.component.html',
+  styleUrl: './segment-donut-chart.component.scss',
 })
 export class SegmentDonutChartComponent implements AfterViewInit, OnChanges, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+
   readonly segments = input.required<DonutSegment[]>();
   readonly centerLabel = input<string>('');
   readonly centerValue = input<number | null>(null);
@@ -45,7 +59,12 @@ export class SegmentDonutChartComponent implements AfterViewInit, OnChanges, OnD
     }
   }
 
+  private chartBorderColor(): string {
+    return readCssVar(this.host.nativeElement, '--chart-border-color', '#0f172a');
+  }
+
   private renderChart(): void {
+    const borderColor = this.chartBorderColor();
     const config: ChartConfiguration<'doughnut'> = {
       type: 'doughnut',
       data: {
@@ -54,7 +73,7 @@ export class SegmentDonutChartComponent implements AfterViewInit, OnChanges, OnD
           {
             data: this.segments().map((s) => s.value),
             backgroundColor: this.segments().map((s) => s.color),
-            borderColor: '#0f172a',
+            borderColor,
             borderWidth: 3,
             hoverOffset: 6,
           },

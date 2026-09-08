@@ -7,6 +7,7 @@ import { EurCurrencyPipe } from '../../../../core/pipes/eur-currency.pipe';
   selector: 'app-diff-badge',
   imports: [EurCurrencyPipe, DecimalPipe],
   templateUrl: './diff-badge.component.html',
+  styleUrl: './diff-badge.component.scss',
 })
 export class DiffBadgeComponent {
   readonly diff = input<number | null>(null);

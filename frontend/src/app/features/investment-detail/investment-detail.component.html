@@ -37,8 +37,7 @@
     <section class="flex flex-col gap-4">
       @for (cat of overview()!.categories; track cat.category_id) {
         <div
-          class="overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10"
-          style="border-left-width: 4px; border-left-style: solid;"
+          class="category-panel overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10"
           [style.border-left-color]="cat.color"
         >
           <button

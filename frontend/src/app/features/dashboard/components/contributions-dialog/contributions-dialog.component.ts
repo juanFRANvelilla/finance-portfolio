@@ -12,6 +12,7 @@ import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
   selector: 'app-contributions-dialog',
   imports: [FormsModule, DatePipe, DecimalPipe, EurCurrencyPipe],
   templateUrl: './contributions-dialog.component.html',
+  styleUrl: './contributions-dialog.component.scss',
 })
 export class ContributionsDialogComponent {
   private readonly api = inject(FinanceApiService);

@@ -5,6 +5,7 @@ import { MONTH_NAMES } from '../../../../core/models/month-names';
 @Component({
   selector: 'app-month-navigator',
   templateUrl: './month-navigator.component.html',
+  styleUrl: './month-navigator.component.scss',
 })
 export class MonthNavigatorComponent {
   readonly year = input.required<number>();

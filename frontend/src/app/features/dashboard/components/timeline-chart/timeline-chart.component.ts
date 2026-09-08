@@ -5,20 +5,22 @@ import {
   OnChanges,
   OnDestroy,
   ViewChild,
+  inject,
   input,
 } from '@angular/core';
 import { Chart, ChartConfiguration } from 'chart.js/auto';
 
 import { TimelinePoint } from '../../../../core/models/monthly-record.model';
-
-const COLOR_NET_WORTH = '#f97316';
-const COLOR_INVESTED = '#a855f7';
+import { readCssVar } from '../../../../core/utils/read-css-var';
 
 @Component({
   selector: 'app-timeline-chart',
   templateUrl: './timeline-chart.component.html',
+  styleUrl: './timeline-chart.component.scss',
 })
 export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestroy {
+  private readonly host = inject(ElementRef<HTMLElement>);
+
   readonly points = input.required<TimelinePoint[]>();
 
   @ViewChild('canvasRef') private readonly canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -55,7 +57,21 @@ export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestr
     return this.points().map((p) => `${shortMonths[p.month - 1]} ${String(p.year).slice(-2)}`);
   }
 
+  private chartTheme() {
+    const el = this.host.nativeElement;
+    return {
+      netWorth: readCssVar(el, '--chart-net-worth-color', '#f97316'),
+      invested: readCssVar(el, '--chart-invested-color', '#a855f7'),
+      border: readCssVar(el, '--chart-border-color', '#0f172a'),
+      netWorthFill: readCssVar(el, '--chart-net-worth-fill', 'rgba(249, 115, 22, 0.12)'),
+      investedFill: readCssVar(el, '--chart-invested-fill', 'rgba(168, 85, 247, 0.12)'),
+      axis: readCssVar(el, '--chart-axis-color', '#94a3b8'),
+      grid: readCssVar(el, '--chart-grid-color', 'rgba(255,255,255,0.05)'),
+    };
+  }
+
   private renderChart(): void {
+    const theme = this.chartTheme();
     const config: ChartConfiguration<'line'> = {
       type: 'line',
       data: {
@@ -64,10 +80,10 @@ export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestr
           {
             label: 'Patrimonio neto',
             data: this.points().map((p) => p.total_net_worth),
-            borderColor: COLOR_NET_WORTH,
-            backgroundColor: 'rgba(249, 115, 22, 0.12)',
-            pointBackgroundColor: COLOR_NET_WORTH,
-            pointBorderColor: '#0f172a',
+            borderColor: theme.netWorth,
+            backgroundColor: theme.netWorthFill,
+            pointBackgroundColor: theme.netWorth,
+            pointBorderColor: theme.border,
             pointBorderWidth: 2,
             pointRadius: 5,
             pointHoverRadius: 7,
@@ -77,10 +93,10 @@ export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestr
           {
             label: 'Total invertido',
             data: this.points().map((p) => p.total_invested),
-            borderColor: COLOR_INVESTED,
-            backgroundColor: 'rgba(168, 85, 247, 0.12)',
-            pointBackgroundColor: COLOR_INVESTED,
-            pointBorderColor: '#0f172a',
+            borderColor: theme.invested,
+            backgroundColor: theme.investedFill,
+            pointBackgroundColor: theme.invested,
+            pointBorderColor: theme.border,
             pointBorderWidth: 2,
             pointRadius: 5,
             pointHoverRadius: 7,
@@ -99,7 +115,7 @@ export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestr
             position: 'top',
             align: 'end',
             labels: {
-              color: '#94a3b8',
+              color: theme.axis,
               boxWidth: 12,
               usePointStyle: true,
               pointStyle: 'circle',
@@ -119,13 +135,13 @@ export class TimelineChartComponent implements AfterViewInit, OnChanges, OnDestr
         },
         scales: {
           x: {
-            grid: { color: 'rgba(255,255,255,0.05)' },
-            ticks: { color: '#94a3b8', font: { size: 11 } },
+            grid: { color: theme.grid },
+            ticks: { color: theme.axis, font: { size: 11 } },
           },
           y: {
-            grid: { color: 'rgba(255,255,255,0.05)' },
+            grid: { color: theme.grid },
             ticks: {
-              color: '#94a3b8',
+              color: theme.axis,
               callback: (value) =>
                 new Intl.NumberFormat('es-ES', {
                   style: 'currency',
