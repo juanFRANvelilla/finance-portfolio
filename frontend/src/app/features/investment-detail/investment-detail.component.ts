@@ -36,6 +36,17 @@ interface AssetRow {
   monthlyContribution: number | null;
 }
 
+interface AssetEditSnapshotRow {
+  assetTypeId: string;
+  amount: string;
+  units: string;
+}
+
+interface AssetEditSnapshot {
+  assetRows: AssetEditSnapshotRow[];
+  categoryTotalInput: string;
+}
+
 interface CategoryPanelState {
   open: boolean;
   loadingDetail: boolean;
@@ -52,6 +63,8 @@ interface CategoryPanelState {
   creatingAsset: boolean;
   /** Total de categoría editable en modo edición (EUR). */
   categoryTotalInput: string;
+  /** Estado al entrar en edición; sirve para detectar cambios pendientes. */
+  editSnapshot: AssetEditSnapshot | null;
 }
 
 function createPanelState(): CategoryPanelState {
@@ -70,6 +83,7 @@ function createPanelState(): CategoryPanelState {
     newAssetCurrency: 'EUR',
     creatingAsset: false,
     categoryTotalInput: '',
+    editSnapshot: null,
   };
 }
 
@@ -195,20 +209,79 @@ export class InvestmentDetailComponent {
   }
 
   private applyDetail(categoryId: string, detail: CategoryDetailResponse): void {
+    const assetRows = this.buildAssetRows(detail);
+    const categoryTotalInput = this.initialCategoryTotalInput(detail);
+    const autoEdit = detail.allocated_amount_eur <= 0;
+
     this.updatePanel(categoryId, {
       loadingDetail: false,
       detail,
-      assetEditMode: detail.allocated_amount_eur <= 0,
-      assetRows: this.buildAssetRows(detail),
+      assetEditMode: autoEdit,
+      assetRows,
       fxUsdToEur: detail.fx_usd_to_eur,
-      categoryTotalInput: toInputString(
-        Math.max(detail.category_amount_eur, detail.allocated_amount_eur),
-      ),
+      categoryTotalInput,
+      editSnapshot: null,
+    });
+
+    if (autoEdit) {
+      this.clampCategoryTotalToAllocated(categoryId);
+      this.refreshEditSnapshot(categoryId);
+    }
+  }
+
+  private refreshEditSnapshot(categoryId: string): void {
+    const current = this.panel(categoryId);
+    this.updatePanel(categoryId, {
+      editSnapshot: this.snapshotFrom(current.assetRows, current.categoryTotalInput),
     });
   }
 
   private initialCategoryTotalInput(detail: CategoryDetailResponse): string {
     return toInputString(Math.max(detail.category_amount_eur, detail.allocated_amount_eur));
+  }
+
+  private snapshotFrom(assetRows: AssetRow[], categoryTotalInput: string): AssetEditSnapshot {
+    return {
+      assetRows: assetRows.map((row) => ({
+        assetTypeId: row.assetTypeId,
+        amount: row.amount,
+        units: row.units,
+      })),
+      categoryTotalInput,
+    };
+  }
+
+  hasPendingAssetChanges(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    if (!p.assetEditMode || !p.editSnapshot) {
+      return false;
+    }
+
+    if (p.categoryTotalInput.trim() !== p.editSnapshot.categoryTotalInput.trim()) {
+      return true;
+    }
+
+    if (p.assetRows.length !== p.editSnapshot.assetRows.length) {
+      return true;
+    }
+
+    const snapshotById = new Map(p.editSnapshot.assetRows.map((row) => [row.assetTypeId, row]));
+    for (const row of p.assetRows) {
+      const previous = snapshotById.get(row.assetTypeId);
+      if (!previous) {
+        return true;
+      }
+      if (row.amount.trim() !== previous.amount.trim() || row.units.trim() !== previous.units.trim()) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  canSaveAssets(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    return !p.savingAssets && this.hasPendingAssetChanges(categoryId);
   }
 
   /**
@@ -385,20 +458,40 @@ export class InvestmentDetailComponent {
   toggleAssetEditMode(categoryId: string): void {
     const p = this.panel(categoryId);
     const enteringEdit = !p.assetEditMode;
+
+    if (enteringEdit && p.detail) {
+      const assetRows = this.buildAssetRows(p.detail);
+      const categoryTotalInput = this.initialCategoryTotalInput(p.detail);
+      this.updatePanel(categoryId, {
+        assetEditMode: true,
+        assetRows,
+        categoryTotalInput,
+        editSnapshot: null,
+        showAddAsset: false,
+        errorMessage: null,
+      });
+      this.clampCategoryTotalToAllocated(categoryId);
+      this.refreshEditSnapshot(categoryId);
+      return;
+    }
+
     this.updatePanel(categoryId, {
-      assetEditMode: enteringEdit,
+      assetEditMode: false,
+      editSnapshot: null,
+      showAddAsset: false,
+      errorMessage: null,
       assetRows: p.detail ? this.buildAssetRows(p.detail) : p.assetRows,
       categoryTotalInput: p.detail ? this.initialCategoryTotalInput(p.detail) : p.categoryTotalInput,
-      errorMessage: null,
     });
-    if (enteringEdit) {
-      this.clampCategoryTotalToAllocated(categoryId);
-    }
   }
 
   saveAssets(categoryId: string): void {
     const p = this.panel(categoryId);
     if (!p.detail) return;
+
+    if (!this.hasPendingAssetChanges(categoryId)) {
+      return;
+    }
 
     this.clampCategoryTotalToAllocated(categoryId);
     const allocated = this.assetAllocatedFor(categoryId);
@@ -421,11 +514,15 @@ export class InvestmentDetailComponent {
     };
     this.api.upsertCategoryAssets(this.year(), this.month(), categoryId, payload).subscribe({
       next: (response) => {
+        const assetRows = this.buildAssetRows(response);
+        const categoryTotalInput = this.initialCategoryTotalInput(response);
         this.updatePanel(categoryId, {
           detail: response,
           savingAssets: false,
           assetEditMode: false,
-          assetRows: this.buildAssetRows(response),
+          assetRows,
+          categoryTotalInput,
+          editSnapshot: null,
           fxUsdToEur: response.fx_usd_to_eur,
         });
         this.loadOverview();
