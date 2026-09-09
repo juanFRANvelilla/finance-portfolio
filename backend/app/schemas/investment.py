@@ -153,7 +153,7 @@ class AssetInvestmentDetail(BaseModel):
     suggested_units: float | None = None
     """Previsión de títulos desde asset_transactions cuando aplica."""
     has_transactions: bool = False
-    """True si el activo tiene operaciones registradas en asset_transactions."""
+    """True si el activo tiene operaciones en asset_transactions hasta fin del mes consultado."""
 
 
 class CategoryDetailResponse(BaseModel):

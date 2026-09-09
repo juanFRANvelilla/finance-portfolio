@@ -308,12 +308,12 @@ def update_asset_type(
 def get_asset_transaction_preview(
     year: int, month: int, asset_type_id: UUID, db: Session = Depends(get_db)
 ) -> AssetTransactionPreviewResponse:
-    """Suma acumulada de asset_transactions: importe (divisa nativa) y títulos."""
+    """Suma asset_transactions con transaction_date <= fin de mes: importe (divisa nativa) y títulos."""
     asset = db.get(AssetType, asset_type_id)
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
 
-    tx_totals = transaction_totals_by_asset_type(db, [asset_type_id]).get(asset_type_id)
+    tx_totals = transaction_totals_by_asset_type(db, [asset_type_id], year=year, month=month).get(asset_type_id)
     if not tx_totals:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -523,7 +523,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
             ).all()
         }
 
-    tx_totals_by_asset = transaction_totals_by_asset_type(db, asset_type_ids)
+    tx_totals_by_asset = transaction_totals_by_asset_type(db, asset_type_ids, year=year, month=month)
 
     assets_detail: list[AssetInvestmentDetail] = []
     allocated = Decimal("0")
