@@ -27,7 +27,9 @@ export interface AssetTypeCreate {
 }
 
 export interface AssetTypeUpdate {
-  monthly_contribution: number | null;
+  ticker?: string | null;
+  currency?: string;
+  monthly_contribution?: number | null;
   entity_id?: string | null;
 }
 
@@ -93,6 +95,8 @@ export interface AssetInvestmentDetail {
   name: string;
   ticker: string | null;
   currency: string;
+  entity_id: string | null;
+  entity_name: string | null;
   /** Importe en la divisa nativa del activo (EUR o USD según asset_types). */
   amount: number;
   /** Equivalente en EUR calculado al vuelo por el backend; no se persiste. */

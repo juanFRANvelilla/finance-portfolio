@@ -1,0 +1,77 @@
+@if (open() && asset(); as current) {
+  <div class="asset-edit-backdrop">
+    <div class="asset-edit-dialog">
+      <div class="asset-edit-header">
+        <h3 class="asset-edit-title">Editar activo · {{ current.name }}</h3>
+        <p class="asset-edit-subtitle">Datos del catálogo: ticker, divisa y entidad vinculada</p>
+      </div>
+
+      <div class="asset-edit-body">
+        @if (errorMessage()) {
+          <div class="asset-edit-error">{{ errorMessage() }}</div>
+        }
+
+        <p class="asset-edit-hint">
+          Los importes y títulos del mes se editan con «Editar activos».
+        </p>
+
+        <label class="asset-edit-field">
+          <span class="asset-edit-label">Ticker</span>
+          <input
+            type="text"
+            class="asset-edit-input"
+            placeholder="p.ej. BTC, AAPL"
+            [ngModel]="ticker()"
+            (ngModelChange)="onTickerChange($event)"
+          />
+        </label>
+
+        <label class="asset-edit-field">
+          <span class="asset-edit-label">Divisa nativa</span>
+          <select
+            class="asset-edit-input"
+            [ngModel]="currency()"
+            (ngModelChange)="onCurrencyChange($event)"
+          >
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+          </select>
+        </label>
+
+        <label class="asset-edit-field">
+          <span class="asset-edit-label">Entidad vinculada</span>
+          <select
+            class="asset-edit-input"
+            [ngModel]="entityId()"
+            (ngModelChange)="onEntityChange($event)"
+          >
+            <option value="">Sin vincular</option>
+            @for (entity of entityOptions(); track entity.id) {
+              <option [value]="entity.id">
+                {{ entity.name }} ({{ entityTypeLabel(entity) }})
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <div class="asset-edit-footer">
+        <button type="button" class="asset-edit-btn asset-edit-btn--ghost" (click)="close.emit()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="asset-edit-btn asset-edit-btn--primary"
+          [disabled]="saving()"
+          (click)="save()"
+        >
+          @if (saving()) {
+            Guardando...
+          } @else {
+            Guardar
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

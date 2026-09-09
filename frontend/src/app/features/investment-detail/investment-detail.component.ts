@@ -5,11 +5,13 @@ import { ActivatedRoute } from '@angular/router';
 import { InvestmentApiService } from '../../core/services/investment-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
 import {
+  AssetInvestmentDetail,
   AssetType,
   CategoryDetailResponse,
   CategoryOverview,
   InvestmentOverviewResponse,
 } from '../../core/models/investment.model';
+import { AssetEditDialogComponent } from './components/asset-edit-dialog/asset-edit-dialog.component';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
@@ -70,7 +72,7 @@ function createPanelState(): CategoryPanelState {
 
 @Component({
   selector: 'app-investment-detail',
-  imports: [DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent],
+  imports: [DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent, AssetEditDialogComponent],
   templateUrl: './investment-detail.component.html',
   styleUrl: './investment-detail.component.scss',
 })
@@ -91,6 +93,10 @@ export class InvestmentDetailComponent {
 
   readonly overview = signal<InvestmentOverviewResponse | null>(null);
   readonly panels = signal<Record<string, CategoryPanelState>>({});
+
+  readonly assetEditDialogOpen = signal(false);
+  readonly assetEditCategoryId = signal<string | null>(null);
+  readonly assetEditTarget = signal<AssetInvestmentDetail | null>(null);
 
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
@@ -307,6 +313,33 @@ export class InvestmentDetailComponent {
       r.assetTypeId === assetTypeId ? { ...r, units: value } : r,
     );
     this.updatePanel(categoryId, { assetRows: rows });
+  }
+
+  openAssetEditDialog(categoryId: string, asset: AssetInvestmentDetail): void {
+    this.assetEditCategoryId.set(categoryId);
+    this.assetEditTarget.set(asset);
+    this.assetEditDialogOpen.set(true);
+  }
+
+  closeAssetEditDialog(): void {
+    this.assetEditDialogOpen.set(false);
+    this.assetEditCategoryId.set(null);
+    this.assetEditTarget.set(null);
+  }
+
+  onAssetEditSaved(categoryId: string): void {
+    this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
+      next: (detail) => {
+        this.applyDetail(categoryId, detail);
+        this.closeAssetEditDialog();
+      },
+      error: () => {
+        this.updatePanel(categoryId, {
+          errorMessage: 'Se guardó el activo, pero no se pudo refrescar el detalle.',
+        });
+        this.closeAssetEditDialog();
+      },
+    });
   }
 
   toggleAssetEditMode(categoryId: string): void {

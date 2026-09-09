@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.models.asset_type import AssetType
@@ -233,7 +233,12 @@ def _get_entity_or_404(db: Session, entity_id: str) -> Entity:
 def _validate_asset_entity_link(db: Session, entity_id: str | None) -> None:
     if entity_id is None:
         return
-    _get_entity_or_404(db, entity_id)
+    entity = _get_entity_or_404(db, entity_id)
+    if entity.entity_type not in (EntityType.INVESTED, EntityType.HYBRID):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La entidad '{entity_id}' debe ser de tipo INVESTED o HYBRID",
+        )
 
 
 @router.get("/categories", response_model=list[InvestmentCategoryRead])
@@ -283,6 +288,10 @@ def update_asset_type(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
 
     updates = payload.model_dump(exclude_unset=True)
+    if "ticker" in updates:
+        asset.ticker = updates["ticker"]
+    if "currency" in updates:
+        asset.currency = updates["currency"]
     if "entity_id" in updates:
         _validate_asset_entity_link(db, updates["entity_id"])
         asset.entity_id = updates["entity_id"]
@@ -441,6 +450,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
     asset_types = list(
         db.scalars(
             select(AssetType)
+            .options(joinedload(AssetType.entity))
             .where(AssetType.category_id == category.id, AssetType.is_active.is_(True))
             .order_by(AssetType.display_order)
         ).all()
@@ -501,6 +511,8 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 name=asset.name,
                 ticker=asset.ticker,
                 currency=asset.currency,
+                entity_id=asset.entity_id,
+                entity_name=asset.entity.name if asset.entity else None,
                 amount=amount,
                 amount_eur=amount_eur,
                 units=float(saved.units) if saved and saved.units is not None else None,
@@ -596,9 +608,18 @@ def upsert_category_assets(
 
     if category.id not in COMPUTED_CATEGORY_IDS:
         allocated_eur = Decimal("0")
-        for item in payload.assets:
-            asset = asset_types_by_id[item.asset_type_id]
-            allocated_eur += Decimal(str(amount_to_eur(item.amount, asset.currency, year, month)))
+        saved_rows = db.scalars(
+            select(MonthlyAssetInvestment)
+            .join(AssetType, MonthlyAssetInvestment.asset_type_id == AssetType.id)
+            .where(
+                MonthlyAssetInvestment.year == year,
+                MonthlyAssetInvestment.month == month,
+                AssetType.category_id == category.id,
+            )
+        ).all()
+        for saved in saved_rows:
+            asset = asset_types_by_id[saved.asset_type_id]
+            allocated_eur += Decimal(str(amount_to_eur(float(saved.amount), asset.currency, year, month)))
         category_row = db.scalars(
             select(MonthlyCategoryInvestment).where(
                 MonthlyCategoryInvestment.year == year,

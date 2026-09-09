@@ -45,8 +45,17 @@ class AssetTypeCreate(BaseModel):
 
 
 class AssetTypeUpdate(BaseModel):
+    ticker: str | None = None
+    currency: str | None = None
     monthly_contribution: float | None = Field(default=None, ge=0)
     entity_id: str | None = None
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str | None) -> str | None:
+        if value is not None and value not in ALLOWED_CURRENCIES:
+            raise ValueError(f"La divisa debe ser una de {ALLOWED_CURRENCIES}")
+        return value
 
 
 class LinkedInvestedTotalResponse(BaseModel):
@@ -110,6 +119,8 @@ class AssetInvestmentDetail(BaseModel):
     name: str
     ticker: str | None = None
     currency: str
+    entity_id: str | None = None
+    entity_name: str | None = None
     amount: float
     """Importe en la divisa nativa del activo (EUR o USD según asset_types)."""
     amount_eur: float

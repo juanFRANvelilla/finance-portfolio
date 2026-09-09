@@ -143,7 +143,10 @@
                       [centerValue]="categoryTotalDisplay(cat.category_id)"
                       [clickable]="false"
                     />
-                    <div class="mt-4 overflow-hidden rounded-xl ring-1 ring-white/5">
+                  }
+
+                  @if (panel(cat.category_id).detail!.assets.length > 0) {
+                    <div class="overflow-hidden rounded-xl ring-1 ring-white/5" [class.mt-4]="assetSegmentsFor(cat.category_id).length > 0">
                       <table class="w-full text-sm">
                         <thead>
                           <tr class="bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -153,12 +156,12 @@
                             }
                             <th class="px-3 py-2 font-medium text-right">Importe</th>
                             <th class="px-3 py-2 font-medium text-right">Valor EUR</th>
+                            <th class="px-3 py-2 font-medium text-right w-10"></th>
                           </tr>
                         </thead>
                         <tbody>
                           @for (asset of panel(cat.category_id).detail!.assets; track asset.asset_type_id) {
-                            @if (asset.amount_eur > 0 || asset.units) {
-                              <tr class="border-t border-white/5">
+                              <tr class="border-t border-white/5" [class.opacity-50]="asset.amount_eur <= 0 && !asset.units">
                                 <td class="px-3 py-2 text-slate-300">
                                   {{ asset.name }}
                                   @if (asset.ticker) {
@@ -179,8 +182,20 @@
                                 <td class="px-3 py-2 text-right tabular-nums font-medium text-white">
                                   {{ asset.amount_eur | eurCurrency }}
                                 </td>
+                                <td class="px-3 py-2 text-right">
+                                  <button
+                                    type="button"
+                                    title="Editar activo"
+                                    aria-label="Editar activo"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-indigo-300"
+                                    (click)="openAssetEditDialog(cat.category_id, asset)"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                      <path d="m2.695 14.363 1.414-1.414 9.193 9.193-1.414 1.414-9.193-9.193ZM16.707 2.293a1 1 0 0 1 0 1.414l-8.25 8.25a1 1 0 0 1-.707.293H5a1 1 0 0 1-1-1v-2.75a1 1 0 0 1 .293-.707l8.25-8.25a1 1 0 0 1 1.414 0Z" />
+                                    </svg>
+                                  </button>
+                                </td>
                               </tr>
-                            }
                           }
                         </tbody>
                       </table>
@@ -192,7 +207,7 @@
                     </div>
                   } @else {
                     <p class="py-6 text-center text-sm text-slate-500">
-                      Todavía no hay activos con importe asignado en esta categoría.
+                      Todavía no hay activos en esta categoría. Usa «Editar activos» para crear el primero.
                     </p>
                   }
                 } @else {
@@ -344,3 +359,13 @@
     </section>
   }
 </main>
+
+@if (assetEditDialogOpen() && assetEditTarget()) {
+  <app-asset-edit-dialog
+    [open]="assetEditDialogOpen()"
+    [categoryId]="assetEditCategoryId()!"
+    [asset]="assetEditTarget()"
+    (close)="closeAssetEditDialog()"
+    (saved)="onAssetEditSaved(assetEditCategoryId()!)"
+  />
+}

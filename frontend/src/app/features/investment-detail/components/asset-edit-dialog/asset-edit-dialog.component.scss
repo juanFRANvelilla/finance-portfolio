@@ -1,0 +1,129 @@
+.asset-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgb(2 6 23 / 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.asset-edit-dialog {
+  display: flex;
+  width: 100%;
+  max-width: 28rem;
+  flex-direction: column;
+  border-radius: 1rem;
+  background-color: #0f172a;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+.asset-edit-header {
+  border-bottom: 1px solid rgb(255 255 255 / 0.05);
+  padding: 1rem 1.5rem;
+}
+
+.asset-edit-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.asset-edit-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.asset-edit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1rem 1.5rem;
+}
+
+.asset-edit-error {
+  border-radius: 0.75rem;
+  background-color: rgb(244 63 94 / 0.1);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fda4af;
+  box-shadow: 0 0 0 1px rgb(244 63 94 / 0.2);
+}
+
+.asset-edit-field {
+  display: block;
+
+}
+
+.asset-edit-hint {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.asset-edit-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.asset-edit-input {
+  width: 100%;
+  border: none;
+  border-radius: 0.75rem;
+  background-color: rgb(15 23 42 / 0.6);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fff;
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+
+  &:focus {
+    box-shadow: 0 0 0 2px #6366f1;
+  }
+}
+
+.asset-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  border-top: 1px solid rgb(255 255 255 / 0.05);
+  padding: 1rem 1.5rem;
+}
+
+.asset-edit-btn {
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+
+  &--ghost {
+    color: #cbd5e1;
+    background: transparent;
+
+    &:hover {
+      background-color: rgb(255 255 255 / 0.05);
+    }
+  }
+
+  &--primary {
+    color: #fff;
+    background-color: #4f46e5;
+
+    &:hover:not(:disabled) {
+      background-color: #4338ca;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
