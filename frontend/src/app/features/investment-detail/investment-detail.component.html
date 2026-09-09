@@ -237,6 +237,21 @@
                                 </td>
                               </tr>
                           }
+                          @if (categoryOthersDisplay(cat.category_id) > 0) {
+                            <tr class="border-t border-white/5 bg-slate-900/20">
+                              <td class="px-3 py-2 text-slate-400 italic">Otros</td>
+                              @if (showUnitsFor(cat.category_id)) {
+                                <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                              }
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-400">
+                                {{ categoryOthersDisplay(cat.category_id) | number:'1.2-2' }} EUR
+                              </td>
+                              <td class="px-3 py-2 text-right tabular-nums font-medium text-slate-300">
+                                {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
+                              </td>
+                              <td class="px-3 py-2"></td>
+                            </tr>
+                          }
                         </tbody>
                       </table>
                       @if (panel(cat.category_id).fxUsdToEur) {
