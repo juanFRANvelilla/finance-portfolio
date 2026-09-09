@@ -12,8 +12,7 @@ class MonthlyAssetInvestment(Base):
 
     Desacoplada de monthly_records: se referencia directamente por (year, month).
     `amount` se guarda en la divisa definida en asset_types (EUR o USD).
-    `units` (nº de títulos) es exclusivo de activos de la categoría Acciones;
-    para Fondos/Crypto queda a NULL.
+    `units` (nº de títulos/participaciones) es opcional para cualquier activo.
     La conversión a EUR se calcula al vuelo, nunca se persiste aquí.
     """
 

@@ -191,9 +191,7 @@
                         <thead>
                           <tr class="bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
                             <th class="px-3 py-2 font-medium">Activo</th>
-                            @if (showUnitsFor(cat.category_id)) {
-                              <th class="px-3 py-2 font-medium text-right">Títulos</th>
-                            }
+                            <th class="px-3 py-2 font-medium text-right">Títulos</th>
                             <th class="px-3 py-2 font-medium text-right">Importe</th>
                             <th class="px-3 py-2 font-medium text-right">Valor EUR</th>
                             <th class="px-3 py-2 font-medium text-right w-10"></th>
@@ -211,11 +209,9 @@
                                     <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
                                   }
                                 </td>
-                                @if (showUnitsFor(cat.category_id)) {
-                                  <td class="px-3 py-2 text-right tabular-nums text-slate-400">
-                                    {{ asset.units ?? '—' }}
-                                  </td>
-                                }
+                                <td class="px-3 py-2 text-right tabular-nums text-slate-400">
+                                  {{ asset.units ?? '—' }}
+                                </td>
                                 <td class="px-3 py-2 text-right tabular-nums text-slate-300">
                                   {{ asset.amount | number:'1.2-2' }} {{ asset.currency }}
                                 </td>
@@ -240,9 +236,7 @@
                           @if (categoryOthersDisplay(cat.category_id) > 0) {
                             <tr class="border-t border-white/5 bg-slate-900/20">
                               <td class="px-3 py-2 text-slate-400 italic">Otros</td>
-                              @if (showUnitsFor(cat.category_id)) {
-                                <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              }
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
                               <td class="px-3 py-2 text-right tabular-nums text-slate-400">
                                 {{ categoryOthersDisplay(cat.category_id) | number:'1.2-2' }} EUR
                               </td>
@@ -288,19 +282,17 @@
                             <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
                           }
                         </p>
-                        <div class="grid gap-2" [class]="assetGridCols(cat.category_id, row.currency)">
-                          @if (showUnitsFor(cat.category_id)) {
-                            <label class="block">
-                              <span class="mb-1 block text-xs text-slate-400">Títulos</span>
-                              <input
-                                type="text"
-                                inputmode="decimal"
-                                class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
-                                [value]="row.units"
-                                (input)="onAssetUnitsChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
-                              />
-                            </label>
-                          }
+                        <div class="grid gap-2" [class]="assetGridCols(row.currency)">
+                          <label class="block">
+                            <span class="mb-1 block text-xs text-slate-400">Títulos</span>
+                            <input
+                              type="text"
+                              inputmode="decimal"
+                              class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                              [value]="row.units"
+                              (input)="onAssetUnitsChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
+                            />
+                          </label>
                           <label class="block">
                             <span class="mb-1 block text-xs text-slate-400">Importe ({{ row.currency }})</span>
                             <input

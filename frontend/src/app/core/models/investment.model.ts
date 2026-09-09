@@ -118,8 +118,6 @@ export interface CategoryDetailResponse {
   category_name: string;
   /** true para Acciones: category_amount_eur es la suma de sus activos, no un valor manual. */
   is_computed: boolean;
-  /** true solo para Acciones: sus activos llevan además nº de títulos (units). */
-  has_units: boolean;
   category_amount_eur: number;
   /** Tipo USD→EUR usado para convertir activos de este mes (informativo). */
   fx_usd_to_eur: number | null;

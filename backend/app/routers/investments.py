@@ -38,9 +38,6 @@ FIAT_DEPOSIT_PREVIEW_CATEGORY_ID = "crypto"
 # Acciones: el total de categoría se calcula solo a partir de sus activos.
 COMPUTED_CATEGORY_IDS = {"acciones"}
 
-# Categorías cuyos activos llevan además nº de títulos (units).
-HAS_UNITS_CATEGORY_IDS = {"acciones"}
-
 
 def _round2(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01")))
@@ -449,7 +446,6 @@ def upsert_category_investments(
 
 def _build_category_detail(db: Session, year: int, month: int, category: InvestmentCategory) -> CategoryDetailResponse:
     is_computed = category.id in COMPUTED_CATEGORY_IDS
-    has_units = category.id in HAS_UNITS_CATEGORY_IDS
 
     asset_types = list(
         db.scalars(
@@ -507,7 +503,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
             currency=asset.currency,
             year=year,
             month=month,
-            include_units=has_units,
+            include_units=True,
         )
         assets_detail.append(
             AssetInvestmentDetail(
@@ -551,7 +547,6 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         category_id=category.id,
         category_name=category.name,
         is_computed=is_computed,
-        has_units=has_units,
         category_amount_eur=category_amount,
         fx_usd_to_eur=fx_usd_to_eur,
         assets=assets_detail,

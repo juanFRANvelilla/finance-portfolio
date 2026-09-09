@@ -343,15 +343,9 @@ export class InvestmentDetailComponent {
     return Math.round(value * rate * 100) / 100;
   }
 
-  showUnitsFor(categoryId: string): boolean {
-    return this.panel(categoryId).detail?.has_units ?? false;
-  }
-
-  assetGridCols(categoryId: string, currency: string): string {
-    const hasUnits = this.showUnitsFor(categoryId);
-    if (hasUnits && currency === 'USD') return 'sm:grid-cols-3';
-    if (hasUnits || currency === 'USD') return 'sm:grid-cols-2';
-    return '';
+  assetGridCols(currency: string): string {
+    if (currency === 'USD') return 'sm:grid-cols-3';
+    return 'sm:grid-cols-2';
   }
 
   onAssetUnitsChange(categoryId: string, assetTypeId: string, value: string): void {
