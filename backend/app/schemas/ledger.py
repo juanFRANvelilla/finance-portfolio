@@ -24,10 +24,6 @@ class AssetTransactionLedgerRow(BaseModel):
     """Unidades del activo compradas en esta operación."""
     asset_acumulado: float
     """Unidades acumuladas del activo hasta esta fila."""
-    beneficios: float | None = None
-    """Plusvalía/minusvalía no realizada; null porque no hay una fuente de precio de
-    mercado en vivo integrada todavía (fx_converter solo resuelve USD/EUR, no cotización
-    de cada activo)."""
 
 
 class AssetLedgerGroup(BaseModel):

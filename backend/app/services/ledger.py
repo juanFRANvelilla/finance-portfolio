@@ -112,7 +112,6 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
                         euros_totales=_round2(running_eur),
                         asset_comprado=_round8(units),
                         asset_acumulado=_round8(running_units),
-                        beneficios=None,
                     )
                 )
             asset_groups.append(

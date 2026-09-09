@@ -60,11 +60,10 @@
                         <th class="px-4 py-2.5 text-right">€ metidos total</th>
                         <th class="px-4 py-2.5 text-right">Cantidad activo</th>
                         <th class="px-4 py-2.5 text-right">Acumulado activo</th>
-                        <th class="px-4 py-2.5 text-right">Beneficios</th>
                       </tr>
                     </thead>
                     <tbody>
-                      @for (tx of asset.transactions; track tx.fecha + tx.asset_acumulado) {
+                      @for (tx of groupedTransactions(asset); track tx.fecha + tx.asset_acumulado) {
                         <tr class="border-t border-white/5 transition hover:bg-white/5">
                           <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-400">
@@ -84,12 +83,6 @@
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums font-medium text-slate-100">
                             {{ tx.asset_acumulado | number: '1.2-8' }}
-                          </td>
-                          <td
-                            class="px-4 py-2 text-right tabular-nums font-semibold"
-                            [class]="profitClass(tx.beneficios)"
-                          >
-                            {{ tx.beneficios !== null ? (tx.beneficios | currency: 'EUR') : '—' }}
                           </td>
                         </tr>
                       }

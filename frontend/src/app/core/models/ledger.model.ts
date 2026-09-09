@@ -28,11 +28,6 @@ export interface AssetTransactionRow {
   asset_comprado: number;
   /** Cantidad de unidades acumuladas del activo hasta esta operación. */
   asset_acumulado: number;
-  /**
-   * Plusvalía/minusvalía en EUR en el momento de esta fila (valor actual - coste).
-   * `null` cuando no hay una fuente de precio de mercado en vivo para valorarlo.
-   */
-  beneficios: number | null;
 }
 
 export interface AssetGroup {
