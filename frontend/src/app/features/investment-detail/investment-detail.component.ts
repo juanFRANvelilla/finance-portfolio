@@ -233,9 +233,12 @@ export class InvestmentDetailComponent {
   }
 
   private refreshEditSnapshot(categoryId: string): void {
-    const current = this.panel(categoryId);
+    const detail = this.panel(categoryId).detail;
+    if (!detail) {
+      return;
+    }
     this.updatePanel(categoryId, {
-      editSnapshot: this.snapshotFrom(current.assetRows, current.categoryTotalInput),
+      editSnapshot: this.snapshotFromSavedDetail(detail),
     });
   }
 
@@ -243,14 +246,15 @@ export class InvestmentDetailComponent {
     return toInputString(Math.max(detail.category_amount_eur, detail.allocated_amount_eur));
   }
 
-  private snapshotFrom(assetRows: AssetRow[], categoryTotalInput: string): AssetEditSnapshot {
+  /** Baseline en BD (sin previsión de transacciones) para detectar cambios pendientes. */
+  private snapshotFromSavedDetail(detail: CategoryDetailResponse): AssetEditSnapshot {
     return {
-      assetRows: assetRows.map((row) => ({
-        assetTypeId: row.assetTypeId,
-        amount: row.amount,
-        units: row.units,
+      assetRows: detail.assets.map((asset) => ({
+        assetTypeId: asset.asset_type_id,
+        amount: toInputString(asset.amount),
+        units: toInputString(asset.units),
       })),
-      categoryTotalInput,
+      categoryTotalInput: this.initialCategoryTotalInput(detail),
     };
   }
 
@@ -364,7 +368,7 @@ export class InvestmentDetailComponent {
     if (!p.assetEditMode) {
       return;
     }
-    const allocated = this.assetAllocatedFor(categoryId);
+    const allocated = Math.round(this.assetAllocatedFor(categoryId) * 100) / 100;
     const parsed = parseDecimalInput(p.categoryTotalInput);
     if (parsed === null || parsed < allocated) {
       this.updatePanel(categoryId, { categoryTotalInput: toInputString(allocated) });
