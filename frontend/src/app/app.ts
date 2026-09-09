@@ -5,7 +5,7 @@ import { filter } from 'rxjs';
 import { MonthNavigatorComponent } from './features/dashboard/components/month-navigator/month-navigator.component';
 import { PeriodStorageService } from './core/services/period-storage.service';
 
-type ActiveView = 'dashboard' | 'investment-detail';
+type ActiveView = 'dashboard' | 'investment-detail' | 'investment-ledger';
 
 @Component({
   selector: 'app-root',
@@ -27,13 +27,32 @@ export class App implements OnInit {
     this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
       .subscribe((e) => {
-        const url = (e as NavigationEnd).urlAfterRedirects;
-        this.activeView.set(url.includes('investment-detail') ? 'investment-detail' : 'dashboard');
+        this.activeView.set(this.viewFromUrl((e as NavigationEnd).urlAfterRedirects));
       });
 
     // Inicializa desde la URL actual (p.ej. recarga de página)
-    const url = this.router.url;
-    this.activeView.set(url.includes('investment-detail') ? 'investment-detail' : 'dashboard');
+    this.activeView.set(this.viewFromUrl(this.router.url));
+  }
+
+  private viewFromUrl(url: string): ActiveView {
+    if (url.includes('investment-ledger')) {
+      return 'investment-ledger';
+    }
+    if (url.includes('investment-detail')) {
+      return 'investment-detail';
+    }
+    return 'dashboard';
+  }
+
+  private pathForView(view: ActiveView): string {
+    switch (view) {
+      case 'investment-detail':
+        return '/investment-detail';
+      case 'investment-ledger':
+        return '/investment-ledger';
+      default:
+        return '/';
+    }
   }
 
   onMonthChange(next: { year: number; month: number }): void {
@@ -42,8 +61,7 @@ export class App implements OnInit {
     this.periodStorage.save(next.year, next.month);
 
     // Navega a la vista activa con el nuevo periodo en los query params
-    const path = this.activeView() === 'investment-detail' ? '/investment-detail' : '/';
-    this.router.navigate([path], {
+    this.router.navigate([this.pathForView(this.activeView())], {
       queryParams: { year: next.year, month: next.month },
       replaceUrl: true,
     });
@@ -51,8 +69,7 @@ export class App implements OnInit {
 
   navigateTo(view: ActiveView): void {
     this.activeView.set(view);
-    const path = view === 'investment-detail' ? '/investment-detail' : '/';
-    this.router.navigate([path], {
+    this.router.navigate([this.pathForView(view)], {
       queryParams: { year: this.year(), month: this.month() },
     });
   }

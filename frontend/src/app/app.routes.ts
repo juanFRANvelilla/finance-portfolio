@@ -13,5 +13,12 @@ export const routes: Routes = [
         (m) => m.InvestmentDetailComponent,
       ),
   },
+  {
+    path: 'investment-ledger',
+    loadComponent: () =>
+      import('./features/investment-ledger/investment-ledger-page.component').then(
+        (m) => m.InvestmentLedgerPageComponent,
+      ),
+  },
   { path: '**', redirectTo: '' },
 ];

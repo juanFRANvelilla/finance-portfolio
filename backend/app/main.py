@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import check_db_connection
-from app.routers import contributions, entities, investments, records
+from app.routers import contributions, entities, investments, ledger, records
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ app.include_router(entities.router)
 app.include_router(records.router)
 app.include_router(contributions.router)
 app.include_router(investments.router)
+app.include_router(ledger.router)
 
 
 @app.get("/api/health", tags=["health"])

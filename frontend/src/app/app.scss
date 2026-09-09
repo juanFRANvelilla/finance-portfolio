@@ -41,6 +41,14 @@
   color: #fff;
 }
 
+.app-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .app-view-switcher {
   display: flex;
   align-items: center;
@@ -86,4 +94,33 @@
 .app-nav-btn-icon {
   width: 0.875rem;
   height: 0.875rem;
+}
+
+.app-manage-tx-btn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid rgb(16 185 129 / 0.3);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6ee7b7;
+  background-color: rgb(16 185 129 / 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(.app-manage-tx-btn--active) {
+    border-color: rgb(52 211 153 / 0.4);
+    color: #a7f3d0;
+    background-color: rgb(16 185 129 / 0.2);
+  }
+
+  &--active {
+    border-color: transparent;
+    color: #fff;
+    background-color: #059669;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  }
 }

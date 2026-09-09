@@ -1,0 +1,112 @@
+<div class="flex flex-col gap-8">
+  @for (entity of entities(); track entity.entity_name) {
+    <section class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
+      <!-- ==================== Cabecera de entidad ==================== -->
+      <div class="mb-5 flex items-center gap-3 border-b border-white/5 pb-4">
+        <span class="h-2.5 w-2.5 rounded-full bg-indigo-400"></span>
+        <h2 class="text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
+      </div>
+
+      <!-- ==================== Tabla de aportaciones fiat ==================== -->
+      @if (hasFiatDeposits(entity)) {
+        <div class="ledger-table-card mb-6 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr class="ledger-thead-fiat text-left text-xs font-semibold uppercase tracking-wide">
+                  <th class="px-4 py-2.5">Fecha</th>
+                  <th class="px-4 py-2.5 text-right">Cantidad EUR</th>
+                  <th class="px-4 py-2.5 text-right">Total acumulado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (deposit of entity.fiat_deposits; track deposit.fecha) {
+                  <tr class="border-t border-white/5 transition hover:bg-white/5">
+                    <td class="px-4 py-2 text-slate-300">{{ deposit.fecha | date: 'dd/MM/yyyy' }}</td>
+                    <td class="px-4 py-2 text-right tabular-nums text-slate-200">
+                      {{ deposit.cantidad | currency: 'EUR' }}
+                    </td>
+                    <td class="px-4 py-2 text-right tabular-nums font-semibold text-amber-200">
+                      {{ deposit.total_acumulado | currency: 'EUR' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ==================== Tablas de activos (una por ticker) ==================== -->
+      @if (entity.assets.length > 0) {
+        <div class="flex flex-col gap-5">
+          @for (asset of entity.assets; track asset.exchange_ticker) {
+            <div class="ledger-table-card overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
+              <div class="ledger-asset-title flex items-center justify-between px-4 py-2.5">
+                <span class="text-xs font-bold uppercase tracking-wide text-indigo-300">
+                  {{ asset.exchange_ticker }}
+                </span>
+              </div>
+
+              @if (hasTransactions(asset)) {
+                <div class="overflow-x-auto">
+                  <table class="w-full min-w-[860px] text-sm">
+                    <thead>
+                      <tr class="ledger-thead-crypto text-left text-xs font-semibold uppercase tracking-wide">
+                        <th class="px-4 py-2.5">Fecha</th>
+                        <th class="px-4 py-2.5 text-right">Precio promedio</th>
+                        <th class="px-4 py-2.5 text-right">Precio compra</th>
+                        <th class="px-4 py-2.5 text-right">€ metidos</th>
+                        <th class="px-4 py-2.5 text-right">€ metidos total</th>
+                        <th class="px-4 py-2.5 text-right">Cantidad activo</th>
+                        <th class="px-4 py-2.5 text-right">Acumulado activo</th>
+                        <th class="px-4 py-2.5 text-right">Beneficios</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (tx of asset.transactions; track tx.fecha + tx.asset_acumulado) {
+                        <tr class="border-t border-white/5 transition hover:bg-white/5">
+                          <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
+                          <td class="px-4 py-2 text-right tabular-nums text-slate-400">
+                            {{ tx.precio_promedio | currency: 'EUR' : 'symbol' : '1.2-2' }}
+                          </td>
+                          <td class="px-4 py-2 text-right tabular-nums text-slate-400">
+                            {{ tx.precio_compra | currency: 'EUR' : 'symbol' : '1.2-2' }}
+                          </td>
+                          <td class="px-4 py-2 text-right tabular-nums text-slate-300">
+                            {{ tx.euros_metidos | currency: 'EUR' }}
+                          </td>
+                          <td class="px-4 py-2 text-right tabular-nums font-medium text-white">
+                            {{ tx.euros_totales | currency: 'EUR' }}
+                          </td>
+                          <td class="px-4 py-2 text-right tabular-nums text-slate-300">
+                            {{ tx.asset_comprado | number: '1.2-8' }}
+                          </td>
+                          <td class="px-4 py-2 text-right tabular-nums font-medium text-slate-100">
+                            {{ tx.asset_acumulado | number: '1.2-8' }}
+                          </td>
+                          <td
+                            class="px-4 py-2 text-right tabular-nums font-semibold"
+                            [class]="profitClass(tx.beneficios)"
+                          >
+                            {{ tx.beneficios !== null ? (tx.beneficios | currency: 'EUR') : '—' }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="px-4 py-4 text-center text-xs text-slate-500">Sin operaciones registradas.</p>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="py-6 text-center text-sm text-slate-500">Esta entidad todavía no tiene activos registrados.</p>
+      }
+    </section>
+  } @empty {
+    <p class="py-10 text-center text-sm text-slate-500">No hay datos de inversión que mostrar.</p>
+  }
+</div>

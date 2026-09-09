@@ -1,0 +1,40 @@
+:host {
+  display: block;
+}
+
+/* Fondo base de cada tarjeta de tabla; los thead lo sobreescriben con su tinte. */
+.ledger-table-card {
+  background-color: rgb(15 23 42 / 0.5); // slate-900/50
+}
+
+/* Cabecera "fiat": tinte ámbar/naranja sutil, inspirado en el Excel original. */
+.ledger-thead-fiat {
+  background-color: rgb(245 158 11 / 0.1); // amber-500/10
+  color: #fcd34d; // amber-300
+}
+
+/* Cabecera "activo/cripto": tinte azul/morado sutil. */
+.ledger-thead-crypto {
+  background-color: rgb(99 102 241 / 0.1); // indigo-500/10
+  color: #a5b4fc; // indigo-300
+}
+
+.ledger-asset-title {
+  background-color: rgb(99 102 241 / 0.12);
+  border-bottom: 1px solid rgb(255 255 255 / 0.05);
+}
+
+/* Scrollbar horizontal fino para tablas anchas en pantallas pequeñas. */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 0.15);
+    border-radius: 999px;
+  }
+}

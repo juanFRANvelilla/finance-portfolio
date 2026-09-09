@@ -15,6 +15,7 @@ import {
   LinkedInvestedTotalResponse,
   AssetTransactionPreviewResponse,
 } from '../models/investment.model';
+import { EntityGroup } from '../models/ledger.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvestmentApiService {
@@ -91,5 +92,9 @@ export class InvestmentApiService {
     return this.http.get<AssetTransactionPreviewResponse>(
       `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/transaction-preview`,
     );
+  }
+
+  getInvestmentLedger(): Observable<EntityGroup[]> {
+    return this.http.get<EntityGroup[]>(`${this.baseUrl}/ledger`);
   }
 }
