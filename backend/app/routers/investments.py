@@ -25,6 +25,7 @@ from app.schemas.investment import (
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
     LinkedInvestedTotalResponse,
+    AssetTransactionPreviewResponse,
 )
 from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
@@ -300,6 +301,45 @@ def update_asset_type(
     return asset
 
 
+@router.get(
+    "/{year}/{month}/asset-types/{asset_type_id}/transaction-preview",
+    response_model=AssetTransactionPreviewResponse,
+)
+def get_asset_transaction_preview(
+    year: int, month: int, asset_type_id: UUID, db: Session = Depends(get_db)
+) -> AssetTransactionPreviewResponse:
+    """Suma acumulada de asset_transactions: importe (divisa nativa) y títulos."""
+    asset = db.get(AssetType, asset_type_id)
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
+
+    tx_totals = transaction_totals_by_asset_type(db, [asset_type_id]).get(asset_type_id)
+    if not tx_totals:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El activo no tiene operaciones en asset_transactions",
+        )
+
+    invested_eur = tx_totals.get("invested_amount_eur", 0)
+    units = tx_totals.get("asset_amount", 0)
+    if invested_eur <= 0 and units <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El activo no tiene operaciones en asset_transactions",
+        )
+
+    amount_native = eur_to_native(invested_eur, asset.currency, year, month)
+    return AssetTransactionPreviewResponse(
+        asset_type_id=asset_type_id,
+        year=year,
+        month=month,
+        currency=asset.currency,
+        amount=amount_native,
+        amount_eur=invested_eur,
+        units=units,
+    )
+
+
 @router.get("/{year}/{month}/entities/{entity_id}/linked-invested-total", response_model=LinkedInvestedTotalResponse)
 def get_entity_linked_invested_total(
     year: int, month: int, entity_id: str, db: Session = Depends(get_db)
@@ -496,8 +536,9 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         allocated += Decimal(str(amount_eur))
         prev_amount = float(prev.amount) if prev else None
         monthly_contribution = float(asset.monthly_contribution) if asset.monthly_contribution is not None else None
+        tx_totals = tx_totals_by_asset.get(asset.id)
         suggested_amount, suggested_units = _asset_preview_from_transactions(
-            tx_totals=tx_totals_by_asset.get(asset.id),
+            tx_totals=tx_totals,
             previous_amount=prev_amount,
             monthly_contribution=monthly_contribution,
             currency=asset.currency,
@@ -521,6 +562,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 monthly_contribution=monthly_contribution,
                 suggested_amount=suggested_amount,
                 suggested_units=suggested_units,
+                has_transactions=tx_totals is not None,
             )
         )
 

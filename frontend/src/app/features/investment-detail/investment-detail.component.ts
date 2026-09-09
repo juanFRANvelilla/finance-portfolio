@@ -34,6 +34,7 @@ interface AssetRow {
   amount: string;
   units: string;
   monthlyContribution: number | null;
+  hasTransactions: boolean;
 }
 
 interface AssetEditSnapshotRow {
@@ -114,6 +115,8 @@ export class InvestmentDetailComponent {
   readonly assetEditDialogOpen = signal(false);
   readonly assetEditCategoryId = signal<string | null>(null);
   readonly assetEditTarget = signal<AssetInvestmentDetail | null>(null);
+  /** Clave `${categoryId}:${assetTypeId}` mientras se recalcula desde asset_transactions. */
+  readonly transactionReloadLoading = signal<Record<string, boolean>>({});
 
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
@@ -380,7 +383,44 @@ export class InvestmentDetailComponent {
         amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
         units: toInputString(hasSaved ? asset.units : (asset.suggested_units ?? asset.previous_units ?? null)),
         monthlyContribution: asset.monthly_contribution,
+        hasTransactions: asset.has_transactions ?? false,
       };
+    });
+  }
+
+  private transactionReloadKey(categoryId: string, assetTypeId: string): string {
+    return `${categoryId}:${assetTypeId}`;
+  }
+
+  isLoadingTransactionReload(categoryId: string, assetTypeId: string): boolean {
+    return this.transactionReloadLoading()[this.transactionReloadKey(categoryId, assetTypeId)] ?? false;
+  }
+
+  applyTransactionTotals(categoryId: string, assetTypeId: string): void {
+    const key = this.transactionReloadKey(categoryId, assetTypeId);
+    this.transactionReloadLoading.update((current) => ({ ...current, [key]: true }));
+
+    this.api.getAssetTransactionPreview(this.year(), this.month(), assetTypeId).subscribe({
+      next: (preview) => {
+        const rows = this.panel(categoryId).assetRows.map((row) =>
+          row.assetTypeId === assetTypeId
+            ? {
+                ...row,
+                amount: toInputString(preview.amount),
+                units: toInputString(preview.units),
+              }
+            : row,
+        );
+        this.updatePanel(categoryId, { assetRows: rows });
+        this.clampCategoryTotalToAllocated(categoryId);
+        this.transactionReloadLoading.update((current) => ({ ...current, [key]: false }));
+      },
+      error: () => {
+        this.transactionReloadLoading.update((current) => ({ ...current, [key]: false }));
+        this.updatePanel(categoryId, {
+          errorMessage: 'No se pudieron calcular los totales desde las transacciones del activo.',
+        });
+      },
     });
   }
 
@@ -583,6 +623,7 @@ export class InvestmentDetailComponent {
               amount: '0',
               units: '',
               monthlyContribution: asset.monthly_contribution,
+              hasTransactions: false,
             },
           ];
           this.updatePanel(categoryId, { creatingAsset: false, showAddAsset: false, assetRows: rows });

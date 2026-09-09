@@ -266,13 +266,40 @@
                   <div class="flex flex-col gap-3">
                     @for (row of panel(cat.category_id).assetRows; track row.assetTypeId) {
                       <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
-                        <p class="mb-2 text-sm font-medium text-slate-300">
-                          {{ row.name }}
-                          <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
-                          @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
-                            <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
+                        <div class="mb-2 flex items-start justify-between gap-2">
+                          <p class="text-sm font-medium text-slate-300">
+                            {{ row.name }}
+                            <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
+                            @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
+                              <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
+                            }
+                          </p>
+                          @if (row.hasTransactions) {
+                            <button
+                              type="button"
+                              title="Calcular títulos e importe desde transacciones"
+                              aria-label="Calcular títulos e importe desde transacciones"
+                              [disabled]="isLoadingTransactionReload(cat.category_id, row.assetTypeId)"
+                              (click)="applyTransactionTotals(cat.category_id, row.assetTypeId)"
+                              class="transaction-reload-btn"
+                            >
+                              <svg
+                                class="transaction-reload-btn-icon"
+                                [class.transaction-reload-btn-icon--spinning]="isLoadingTransactionReload(cat.category_id, row.assetTypeId)"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                <path d="M21 3v6h-6" />
+                              </svg>
+                            </button>
                           }
-                        </p>
+                        </div>
                         <div class="grid gap-2" [class]="assetGridCols(row.currency)">
                           <label class="block">
                             <span class="mb-1 block text-xs text-slate-400">Títulos</span>

@@ -13,3 +13,44 @@
 .category-panel {
   border-left: var(--category-accent-width) solid transparent;
 }
+
+.transaction-reload-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(16 185 129 / 0.3);
+  border-radius: 0.75rem;
+  color: #6ee7b7;
+  background-color: rgb(16 185 129 / 0.1);
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: rgb(52 211 153 / 0.4);
+    color: #a7f3d0;
+    background-color: rgb(16 185 129 / 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.transaction-reload-btn-icon {
+  width: 1rem;
+  height: 1rem;
+
+  &--spinning {
+    animation: transaction-reload-spin 1s linear infinite;
+  }
+}
+
+@keyframes transaction-reload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

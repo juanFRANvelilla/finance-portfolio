@@ -41,6 +41,16 @@ export interface LinkedInvestedTotalResponse {
   asset_count: number;
 }
 
+export interface AssetTransactionPreviewResponse {
+  asset_type_id: string;
+  year: number;
+  month: number;
+  currency: string;
+  amount: number;
+  amount_eur: number;
+  units: number;
+}
+
 export interface CategoryInvestmentInput {
   category_id: string;
   amount_eur: number;
@@ -109,6 +119,7 @@ export interface AssetInvestmentDetail {
   monthly_contribution: number | null;
   suggested_amount: number | null;
   suggested_units: number | null;
+  has_transactions: boolean;
 }
 
 export interface CategoryDetailResponse {

@@ -66,6 +66,19 @@ class LinkedInvestedTotalResponse(BaseModel):
     asset_count: int
 
 
+class AssetTransactionPreviewResponse(BaseModel):
+    asset_type_id: UUID
+    year: int
+    month: int
+    currency: str
+    amount: float
+    """Importe acumulado en la divisa nativa del activo (EUR o USD)."""
+    amount_eur: float
+    """Equivalente en EUR de la suma de asset_transactions."""
+    units: float
+    """Cantidad acumulada (SUM asset_amount)."""
+
+
 class CategoryInvestmentInput(BaseModel):
     category_id: str
     amount_eur: float = Field(ge=0)
@@ -139,6 +152,8 @@ class AssetInvestmentDetail(BaseModel):
     """Previsión: suma asset_transactions (P1) o mes anterior + monthly_contribution (P2)."""
     suggested_units: float | None = None
     """Previsión de títulos desde asset_transactions cuando aplica."""
+    has_transactions: bool = False
+    """True si el activo tiene operaciones registradas en asset_transactions."""
 
 
 class CategoryDetailResponse(BaseModel):
