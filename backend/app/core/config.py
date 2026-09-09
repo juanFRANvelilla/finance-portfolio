@@ -13,6 +13,9 @@ class Settings(BaseSettings):
 
     database_url: str
     cors_origins: str = "http://localhost:4200"
+    kucoin_api_key: str | None = None
+    kucoin_secret: str | None = None
+    kucoin_passphrase: str | None = None
 
     model_config = SettingsConfigDict(env_file=str(ENV_FILE), extra="ignore")
 

@@ -6,7 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import check_db_connection
+from app.core.scheduler import run_kucoin_sync_on_startup, shutdown_scheduler, start_scheduler
 from app.routers import contributions, entities, investments, ledger, records
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    force=True,
+)
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -19,7 +26,13 @@ async def lifespan(app: FastAPI):
         logger.info("Conexion a PostgreSQL OK")
     except Exception as exc:
         logger.warning("PostgreSQL no disponible al arrancar: %s", exc)
+
+    start_scheduler()
+    await run_kucoin_sync_on_startup()
+
     yield
+
+    shutdown_scheduler()
 
 
 app = FastAPI(
