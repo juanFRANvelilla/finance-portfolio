@@ -31,9 +31,31 @@ export interface AssetTransactionRow {
 }
 
 export interface AssetGroup {
+  asset_type_id: string;
   /** Ticker del activo en el exchange, p. ej. 'BTC', 'ETH'. */
   exchange_ticker: string;
+  /** Divisa nativa del activo (EUR o USD). */
+  currency: string;
+  total_asset_acumulado: number;
+  total_euros_metidos: number;
+  last_precio_compra: number;
   transactions: AssetTransactionRow[];
+}
+
+export interface LedgerProfitRequest {
+  asset_acumulado: number;
+  euros_totales: number;
+  price: number;
+  currency: 'EUR' | 'USD';
+  year: number;
+  month: number;
+}
+
+export interface LedgerProfitResponse {
+  /** Beneficio/pérdida en EUR. */
+  profit: number;
+  profit_percentage: number;
+  fx_usd_to_eur: number;
 }
 
 export interface EntityGroup {

@@ -1,0 +1,157 @@
+.profit-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgb(2 6 23 / 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.profit-dialog {
+  display: flex;
+  width: 100%;
+  max-width: 24rem;
+  flex-direction: column;
+  border-radius: 1rem;
+  background-color: #0f172a;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+.profit-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.05);
+  padding: 1rem 1.5rem;
+}
+
+.profit-dialog-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.profit-dialog-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.profit-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.profit-dialog-error {
+  border-radius: 0.75rem;
+  background-color: rgb(244 63 94 / 0.1);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fda4af;
+  box-shadow: 0 0 0 1px rgb(244 63 94 / 0.2);
+}
+
+.profit-dialog-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profit-dialog-field {
+  display: block;
+
+  &--grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &--currency {
+    width: 6.5rem;
+    flex-shrink: 0;
+  }
+}
+
+.profit-dialog-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.profit-dialog-input {
+  width: 100%;
+  border: none;
+  border-radius: 0.75rem;
+  background-color: rgb(15 23 42 / 0.6);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fff;
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+
+  &:focus {
+    box-shadow: 0 0 0 2px #6366f1;
+  }
+}
+
+.profit-dialog-result {
+  border-radius: 0.75rem;
+  background-color: rgb(15 23 42 / 0.5);
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.05);
+}
+
+.profit-dialog-result-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.profit-dialog-result-value {
+  margin-top: 0.375rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.profit-dialog-result-pct {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.profit-dialog-loading,
+.profit-dialog-hint {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.profit-dialog-close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.5rem;
+  color: #94a3b8;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+
+  &:hover {
+    color: #fff;
+    background-color: rgb(255 255 255 / 0.08);
+  }
+}

@@ -15,7 +15,7 @@ import {
   LinkedInvestedTotalResponse,
   AssetTransactionPreviewResponse,
 } from '../models/investment.model';
-import { EntityGroup } from '../models/ledger.model';
+import { EntityGroup, LedgerProfitRequest, LedgerProfitResponse } from '../models/ledger.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvestmentApiService {
@@ -96,5 +96,24 @@ export class InvestmentApiService {
 
   getInvestmentLedger(): Observable<EntityGroup[]> {
     return this.http.get<EntityGroup[]>(`${this.baseUrl}/ledger`);
+  }
+
+  calculateLedgerProfit(payload: LedgerProfitRequest): Observable<LedgerProfitResponse> {
+    return this.http.post<LedgerProfitResponse>(`${this.baseUrl}/ledger/profit`, payload);
+  }
+
+  getLedgerUnitPrice(
+    year: number,
+    month: number,
+    priceEur: number,
+    currency: string,
+  ): Observable<{ price: number; currency: string; fx_usd_to_eur: number }> {
+    const params = new URLSearchParams({
+      price_eur: String(priceEur),
+      currency,
+    });
+    return this.http.get<{ price: number; currency: string; fx_usd_to_eur: number }>(
+      `${this.baseUrl}/${year}/${month}/ledger/unit-price?${params.toString()}`,
+    );
   }
 }

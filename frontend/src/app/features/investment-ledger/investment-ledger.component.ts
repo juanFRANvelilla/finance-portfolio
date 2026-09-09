@@ -1,7 +1,8 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, input } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 
 import { AssetGroup, AssetTransactionRow, EntityGroup } from '../../core/models/ledger.model';
+import { LedgerProfitDialogComponent } from './components/ledger-profit-dialog/ledger-profit-dialog.component';
 
 /** Tolerancia para comparar precios ya redondeados a 2 decimales por el backend. */
 const PRICE_EPSILON = 0.005;
@@ -23,12 +24,17 @@ function round2(value: number): number {
  */
 @Component({
   selector: 'app-investment-ledger',
-  imports: [CurrencyPipe, DecimalPipe, DatePipe],
+  imports: [CurrencyPipe, DecimalPipe, DatePipe, LedgerProfitDialogComponent],
   templateUrl: './investment-ledger.component.html',
   styleUrl: './investment-ledger.component.scss',
 })
 export class InvestmentLedgerComponent {
   readonly entities = input.required<EntityGroup[]>();
+  readonly year = input.required<number>();
+  readonly month = input.required<number>();
+
+  readonly profitDialogOpen = signal(false);
+  readonly profitDialogAsset = signal<AssetGroup | null>(null);
 
   hasFiatDeposits(entity: EntityGroup): boolean {
     return !!entity.fiat_deposits && entity.fiat_deposits.length > 0;
@@ -65,5 +71,15 @@ export class InvestmentLedgerComponent {
     }
 
     return grouped;
+  }
+
+  openProfitDialog(asset: AssetGroup): void {
+    this.profitDialogAsset.set(asset);
+    this.profitDialogOpen.set(true);
+  }
+
+  closeProfitDialog(): void {
+    this.profitDialogOpen.set(false);
+    this.profitDialogAsset.set(null);
   }
 }

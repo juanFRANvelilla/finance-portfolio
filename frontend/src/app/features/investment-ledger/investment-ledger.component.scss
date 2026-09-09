@@ -24,6 +24,25 @@
   border-bottom: 1px solid rgb(255 255 255 / 0.05);
 }
 
+.ledger-profit-btn {
+  flex-shrink: 0;
+  border: 1px solid rgb(16 185 129 / 0.35);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6ee7b7;
+  background-color: rgb(16 185 129 / 0.12);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+
+  &:hover {
+    border-color: rgb(52 211 153 / 0.45);
+    color: #a7f3d0;
+    background-color: rgb(16 185 129 / 0.22);
+  }
+}
+
 /* Scrollbar horizontal fino para tablas anchas en pantallas pequeñas. */
 .overflow-x-auto {
   scrollbar-width: thin;

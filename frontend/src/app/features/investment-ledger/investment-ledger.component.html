@@ -42,10 +42,19 @@
         <div class="flex flex-col gap-5">
           @for (asset of entity.assets; track asset.exchange_ticker) {
             <div class="ledger-table-card overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
-              <div class="ledger-asset-title flex items-center justify-between px-4 py-2.5">
+              <div class="ledger-asset-title flex items-center justify-between gap-3 px-4 py-2.5">
                 <span class="text-xs font-bold uppercase tracking-wide text-indigo-300">
                   {{ asset.exchange_ticker }}
                 </span>
+                @if (hasTransactions(asset)) {
+                  <button
+                    type="button"
+                    class="ledger-profit-btn"
+                    (click)="openProfitDialog(asset)"
+                  >
+                    Beneficios
+                  </button>
+                }
               </div>
 
               @if (hasTransactions(asset)) {
@@ -103,3 +112,11 @@
     <p class="py-10 text-center text-sm text-slate-500">No hay datos de inversión que mostrar.</p>
   }
 </div>
+
+<app-ledger-profit-dialog
+  [open]="profitDialogOpen()"
+  [asset]="profitDialogAsset()"
+  [year]="year()"
+  [month]="month()"
+  (close)="closeProfitDialog()"
+/>

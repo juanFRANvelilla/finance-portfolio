@@ -114,8 +114,17 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
                         asset_acumulado=_round8(running_units),
                     )
                 )
+            last_tx = transactions[-1] if transactions else None
             asset_groups.append(
-                AssetLedgerGroup(exchange_ticker=asset.ticker or asset.name, transactions=transactions)
+                AssetLedgerGroup(
+                    asset_type_id=str(asset.id),
+                    exchange_ticker=asset.ticker or asset.name,
+                    currency=asset.currency,
+                    total_asset_acumulado=last_tx.asset_acumulado if last_tx else 0,
+                    total_euros_metidos=last_tx.euros_totales if last_tx else 0,
+                    last_precio_compra=last_tx.precio_compra if last_tx else 0,
+                    transactions=transactions,
+                )
             )
 
         groups.append(
