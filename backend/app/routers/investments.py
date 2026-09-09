@@ -341,8 +341,12 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
     total_invested = Decimal("0")
     for cat in categories:
         is_computed = cat.id in COMPUTED_CATEGORY_IDS
-        amount = computed.get(cat.id, 0.0) if is_computed else saved.get(cat.id, 0.0)
-        previous_amount = prev_computed.get(cat.id) if is_computed else prev_saved.get(cat.id)
+        allocated = computed.get(cat.id, 0.0)
+        if cat.id in saved:
+            amount = max(saved[cat.id], allocated)
+        else:
+            amount = allocated
+        previous_amount = prev_saved.get(cat.id) if cat.id in prev_saved else prev_computed.get(cat.id)
         total_invested += Decimal(str(amount))
 
         entity_amount = deposit_breakdown.get(cat.id, {}).get("amount", 0.0)
@@ -526,20 +530,20 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
 
     fx_usd_to_eur = get_usd_to_eur_rate(year, month) if has_usd_assets else None
 
-    if is_computed:
-        # El total NACE del detalle: no hay valor manual que cuadrar, siempre coincide.
-        category_amount = _round2(allocated)
+    allocated_f = _round2(allocated)
+    category_row = db.scalars(
+        select(MonthlyCategoryInvestment).where(
+            MonthlyCategoryInvestment.year == year,
+            MonthlyCategoryInvestment.month == month,
+            MonthlyCategoryInvestment.category_id == category.id,
+        )
+    ).first()
+    if category_row is not None:
+        category_amount = max(float(category_row.amount_eur), allocated_f)
     else:
-        category_row = db.scalars(
-            select(MonthlyCategoryInvestment).where(
-                MonthlyCategoryInvestment.year == year,
-                MonthlyCategoryInvestment.month == month,
-                MonthlyCategoryInvestment.category_id == category.id,
-            )
-        ).first()
-        category_amount = float(category_row.amount_eur) if category_row else 0.0
+        category_amount = allocated_f
 
-    others = _round2(Decimal(str(category_amount)) - allocated)
+    others = max(0.0, _round2(Decimal(str(category_amount)) - allocated))
 
     return CategoryDetailResponse(
         year=year,
@@ -606,36 +610,52 @@ def upsert_category_assets(
                 )
             )
 
-    if category.id not in COMPUTED_CATEGORY_IDS:
-        allocated_eur = Decimal("0")
-        saved_rows = db.scalars(
-            select(MonthlyAssetInvestment)
-            .join(AssetType, MonthlyAssetInvestment.asset_type_id == AssetType.id)
-            .where(
-                MonthlyAssetInvestment.year == year,
-                MonthlyAssetInvestment.month == month,
-                AssetType.category_id == category.id,
+    allocated_eur = Decimal("0")
+    saved_rows = db.scalars(
+        select(MonthlyAssetInvestment)
+        .join(AssetType, MonthlyAssetInvestment.asset_type_id == AssetType.id)
+        .where(
+            MonthlyAssetInvestment.year == year,
+            MonthlyAssetInvestment.month == month,
+            AssetType.category_id == category.id,
+        )
+    ).all()
+    for saved in saved_rows:
+        asset = asset_types_by_id[saved.asset_type_id]
+        allocated_eur += Decimal(str(amount_to_eur(float(saved.amount), asset.currency, year, month)))
+
+    category_row = db.scalars(
+        select(MonthlyCategoryInvestment).where(
+            MonthlyCategoryInvestment.year == year,
+            MonthlyCategoryInvestment.month == month,
+            MonthlyCategoryInvestment.category_id == category.id,
+        )
+    ).first()
+
+    if payload.category_amount_eur is not None:
+        requested = Decimal(str(payload.category_amount_eur))
+        if requested + Decimal("0.005") < allocated_eur:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"El total de categoría ({_round2(requested):.2f} €) no puede ser inferior "
+                    f"a la suma de activos ({_round2(allocated_eur):.2f} €)."
+                ),
             )
-        ).all()
-        for saved in saved_rows:
-            asset = asset_types_by_id[saved.asset_type_id]
-            allocated_eur += Decimal(str(amount_to_eur(float(saved.amount), asset.currency, year, month)))
-        category_row = db.scalars(
-            select(MonthlyCategoryInvestment).where(
-                MonthlyCategoryInvestment.year == year,
-                MonthlyCategoryInvestment.month == month,
-                MonthlyCategoryInvestment.category_id == category.id,
-            )
-        ).first()
+        total_eur = _round2(requested)
+    elif category_row is not None and Decimal(str(category_row.amount_eur)) >= allocated_eur:
+        total_eur = float(category_row.amount_eur)
+    else:
         total_eur = _round2(allocated_eur)
-        if category_row is not None:
-            category_row.amount_eur = total_eur
-        else:
-            db.add(
-                MonthlyCategoryInvestment(
-                    year=year, month=month, category_id=category.id, amount_eur=total_eur
-                )
+
+    if category_row is not None:
+        category_row.amount_eur = total_eur
+    else:
+        db.add(
+            MonthlyCategoryInvestment(
+                year=year, month=month, category_id=category.id, amount_eur=total_eur
             )
+        )
 
     db.commit()
 

@@ -112,6 +112,11 @@ class AssetInvestmentInput(BaseModel):
 
 class AssetInvestmentsUpsert(BaseModel):
     assets: list[AssetInvestmentInput]
+    category_amount_eur: float | None = Field(
+        default=None,
+        ge=0,
+        description="Total declarado de la categoría en EUR. Debe ser >= suma de activos; el excedente es «Otros».",
+    )
 
 
 class AssetInvestmentDetail(BaseModel):

@@ -80,11 +80,11 @@
               @if (panel(cat.category_id).loadingDetail) {
                 <div class="py-8 text-center text-sm text-slate-500">Cargando...</div>
               } @else if (panel(cat.category_id).detail) {
-                <!-- ---- Total de categoría (solo lectura; en edición se actualiza con la suma de activos) ---- -->
+                <!-- ---- Total de categoría ---- -->
                 <div class="mb-5">
-                  <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
-                    Total de la categoría
-                    @if (!panel(cat.category_id).assetEditMode) {
+                  @if (!panel(cat.category_id).assetEditMode) {
+                    <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
+                      Total de la categoría
                       @if (cat.entity_amount_eur > 0) {
                         <span class="text-xs text-emerald-400">
                           Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
@@ -94,20 +94,60 @@
                           Previsión: {{ suggestedAmount(cat) | eurCurrency }}
                         </span>
                       }
-                    } @else {
-                      <span class="text-xs text-indigo-300/80">Suma automática de activos</span>
+                    </span>
+                    <div class="relative">
+                      <input
+                        type="text"
+                        readonly
+                        tabindex="-1"
+                        class="w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10"
+                        [value]="categoryTotalInputDisplay(cat.category_id)"
+                      />
+                      <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
+                    </div>
+                    @if (categoryOthersDisplay(cat.category_id) > 0) {
+                      <p class="mt-2 text-xs text-slate-500">
+                        Incluye {{ categoryOthersDisplay(cat.category_id) | eurCurrency }} en «Otros»
+                        (activos desglosados: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }})
+                      </p>
                     }
-                  </span>
-                  <div class="relative">
-                    <input
-                      type="text"
-                      readonly
-                      tabindex="-1"
-                      class="w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10"
-                      [value]="categoryTotalInputDisplay(cat.category_id)"
-                    />
-                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
-                  </div>
+                  } @else {
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <span class="mb-1 block text-xs font-medium text-slate-400">Suma de activos</span>
+                        <div
+                          class="flex h-[42px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-semibold tabular-nums text-slate-300 ring-1 ring-white/5"
+                        >
+                          {{ assetAllocatedFor(cat.category_id) | eurCurrency }}
+                        </div>
+                      </div>
+                      <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-indigo-300">Total de categoría (≥ suma)</span>
+                        <div class="relative">
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="0,00"
+                            class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                            [value]="categoryTotalInputDisplay(cat.category_id)"
+                            (input)="onCategoryTotalChange(cat.category_id, $any($event.target).value)"
+                            (blur)="onCategoryTotalBlur(cat.category_id)"
+                          />
+                          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
+                        </div>
+                      </label>
+                    </div>
+                    @if (categoryOthersDisplay(cat.category_id) > 0) {
+                      <p class="mt-2 text-xs font-medium text-amber-300/90">
+                        Otros: {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
+                        (diferencia entre total y suma de activos)
+                      </p>
+                    } @else {
+                      <p class="mt-2 text-xs text-slate-500">
+                        Puedes subir el total por encima de la suma; el excedente aparecerá como «Otros».
+                      </p>
+                    }
+                  }
                   <div class="mt-2 flex items-center gap-3">
                     <input
                       type="range"

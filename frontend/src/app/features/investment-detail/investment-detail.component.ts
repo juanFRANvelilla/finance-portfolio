@@ -50,6 +50,8 @@ interface CategoryPanelState {
   newAssetTicker: string;
   newAssetCurrency: string;
   creatingAsset: boolean;
+  /** Total de categoría editable en modo edición (EUR). */
+  categoryTotalInput: string;
 }
 
 function createPanelState(): CategoryPanelState {
@@ -67,6 +69,7 @@ function createPanelState(): CategoryPanelState {
     newAssetTicker: '',
     newAssetCurrency: 'EUR',
     creatingAsset: false,
+    categoryTotalInput: '',
   };
 }
 
@@ -198,7 +201,14 @@ export class InvestmentDetailComponent {
       assetEditMode: detail.allocated_amount_eur <= 0,
       assetRows: this.buildAssetRows(detail),
       fxUsdToEur: detail.fx_usd_to_eur,
+      categoryTotalInput: toInputString(
+        Math.max(detail.category_amount_eur, detail.allocated_amount_eur),
+      ),
     });
+  }
+
+  private initialCategoryTotalInput(detail: CategoryDetailResponse): string {
+    return toInputString(Math.max(detail.category_amount_eur, detail.allocated_amount_eur));
   }
 
   /**
@@ -219,6 +229,7 @@ export class InvestmentDetailComponent {
       r.assetTypeId === assetTypeId ? { ...r, amount: value } : r,
     );
     this.updatePanel(categoryId, { assetRows: rows });
+    this.clampCategoryTotalToAllocated(categoryId);
   }
 
   formatMonthlyContribution(value: number | null, currency: string): string | null {
@@ -236,17 +247,52 @@ export class InvestmentDetailComponent {
     return ((value / total) * 100).toFixed(1);
   }
 
-  /** Total de categoría: en edición suma activos en vivo; en vista el valor guardado. */
+  /** Total de categoría declarado (sidebar / donut). En edición puede superar la suma de activos. */
   categoryTotalDisplay(categoryId: string): number {
     const p = this.panel(categoryId);
     if (p.assetEditMode) {
-      return this.assetAllocatedFor(categoryId);
+      const allocated = this.assetAllocatedFor(categoryId);
+      const parsed = parseDecimalInput(p.categoryTotalInput);
+      const value = parsed === null ? allocated : parsed;
+      return Math.max(value, allocated);
     }
     return p.detail?.category_amount_eur ?? 0;
   }
 
   categoryTotalInputDisplay(categoryId: string): string {
+    const p = this.panel(categoryId);
+    if (p.assetEditMode) {
+      return p.categoryTotalInput;
+    }
     return String(this.categoryTotalDisplay(categoryId)).replace('.', ',');
+  }
+
+  categoryOthersDisplay(categoryId: string): number {
+    const p = this.panel(categoryId);
+    if (p.assetEditMode) {
+      return Math.max(0, this.categoryTotalDisplay(categoryId) - this.assetAllocatedFor(categoryId));
+    }
+    return p.detail?.others_amount_eur ?? 0;
+  }
+
+  onCategoryTotalChange(categoryId: string, value: string): void {
+    this.updatePanel(categoryId, { categoryTotalInput: value });
+  }
+
+  onCategoryTotalBlur(categoryId: string): void {
+    this.clampCategoryTotalToAllocated(categoryId);
+  }
+
+  private clampCategoryTotalToAllocated(categoryId: string): void {
+    const p = this.panel(categoryId);
+    if (!p.assetEditMode) {
+      return;
+    }
+    const allocated = this.assetAllocatedFor(categoryId);
+    const parsed = parseDecimalInput(p.categoryTotalInput);
+    if (parsed === null || parsed < allocated) {
+      this.updatePanel(categoryId, { categoryTotalInput: toInputString(allocated) });
+    }
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
@@ -344,16 +390,31 @@ export class InvestmentDetailComponent {
 
   toggleAssetEditMode(categoryId: string): void {
     const p = this.panel(categoryId);
+    const enteringEdit = !p.assetEditMode;
     this.updatePanel(categoryId, {
-      assetEditMode: !p.assetEditMode,
+      assetEditMode: enteringEdit,
       assetRows: p.detail ? this.buildAssetRows(p.detail) : p.assetRows,
+      categoryTotalInput: p.detail ? this.initialCategoryTotalInput(p.detail) : p.categoryTotalInput,
       errorMessage: null,
     });
+    if (enteringEdit) {
+      this.clampCategoryTotalToAllocated(categoryId);
+    }
   }
 
   saveAssets(categoryId: string): void {
     const p = this.panel(categoryId);
     if (!p.detail) return;
+
+    this.clampCategoryTotalToAllocated(categoryId);
+    const allocated = this.assetAllocatedFor(categoryId);
+    const total = this.categoryTotalDisplay(categoryId);
+    if (total + 0.001 < allocated) {
+      this.updatePanel(categoryId, {
+        errorMessage: `El total de categoría no puede ser inferior a la suma de activos (${allocated.toFixed(2)} €).`,
+      });
+      return;
+    }
 
     this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
     const payload = {
@@ -362,6 +423,7 @@ export class InvestmentDetailComponent {
         amount: parseDecimalInput(row.amount) ?? 0,
         units: parseDecimalInput(row.units),
       })),
+      category_amount_eur: this.categoryTotalDisplay(categoryId),
     };
     this.api.upsertCategoryAssets(this.year(), this.month(), categoryId, payload).subscribe({
       next: (response) => {

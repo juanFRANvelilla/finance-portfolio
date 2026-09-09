@@ -88,6 +88,8 @@ export interface AssetInvestmentInput {
 
 export interface AssetInvestmentsUpsert {
   assets: AssetInvestmentInput[];
+  /** Total declarado en EUR; debe ser >= suma de activos. El excedente es «Otros». */
+  category_amount_eur?: number | null;
 }
 
 export interface AssetInvestmentDetail {
