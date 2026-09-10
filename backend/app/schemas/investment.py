@@ -3,6 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ALLOWED_CURRENCIES = ("EUR", "USD")
+ALLOWED_PRICE_SOURCES = ("kucoin", "yahoo")
 
 
 class InvestmentCategoryRead(BaseModel):
@@ -26,6 +27,7 @@ class AssetTypeRead(BaseModel):
     display_order: int
     monthly_contribution: float | None = None
     entity_id: str | None = None
+    price_source: str | None = None
 
 
 class AssetTypeCreate(BaseModel):
@@ -35,6 +37,7 @@ class AssetTypeCreate(BaseModel):
     currency: str = "EUR"
     monthly_contribution: float | None = Field(default=None, ge=0)
     entity_id: str | None = None
+    price_source: str | None = None
 
     @field_validator("currency")
     @classmethod
@@ -43,18 +46,33 @@ class AssetTypeCreate(BaseModel):
             raise ValueError(f"La divisa debe ser una de {ALLOWED_CURRENCIES}")
         return value
 
+    @field_validator("price_source")
+    @classmethod
+    def validate_price_source(cls, value: str | None) -> str | None:
+        if value is not None and value not in ALLOWED_PRICE_SOURCES:
+            raise ValueError(f"price_source debe ser uno de {ALLOWED_PRICE_SOURCES}")
+        return value
+
 
 class AssetTypeUpdate(BaseModel):
     ticker: str | None = None
     currency: str | None = None
     monthly_contribution: float | None = Field(default=None, ge=0)
     entity_id: str | None = None
+    price_source: str | None = None
 
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str | None) -> str | None:
         if value is not None and value not in ALLOWED_CURRENCIES:
             raise ValueError(f"La divisa debe ser una de {ALLOWED_CURRENCIES}")
+        return value
+
+    @field_validator("price_source")
+    @classmethod
+    def validate_price_source(cls, value: str | None) -> str | None:
+        if value is not None and value not in ALLOWED_PRICE_SOURCES:
+            raise ValueError(f"price_source debe ser uno de {ALLOWED_PRICE_SOURCES}")
         return value
 
 

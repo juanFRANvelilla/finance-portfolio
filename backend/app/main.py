@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import check_db_connection
 from app.core.scheduler import run_kucoin_sync_on_startup, shutdown_scheduler, start_scheduler
-from app.routers import contributions, entities, investments, ledger, records
+from app.routers import contributions, entities, investments, ledger, market_prices, records
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +55,7 @@ app.include_router(records.router)
 app.include_router(contributions.router)
 app.include_router(investments.router)
 app.include_router(ledger.router)
+app.include_router(market_prices.router)
 
 
 @app.get("/api/health", tags=["health"])

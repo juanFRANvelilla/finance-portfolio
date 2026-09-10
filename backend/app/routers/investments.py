@@ -270,6 +270,7 @@ def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -
         currency=payload.currency,
         monthly_contribution=payload.monthly_contribution,
         entity_id=payload.entity_id,
+        price_source=payload.price_source,
     )
     db.add(asset)
     db.commit()
@@ -295,6 +296,8 @@ def update_asset_type(
         asset.entity_id = updates["entity_id"]
     if "monthly_contribution" in updates:
         asset.monthly_contribution = updates["monthly_contribution"]
+    if "price_source" in updates:
+        asset.price_source = updates["price_source"]
 
     db.commit()
     db.refresh(asset)

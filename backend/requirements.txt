@@ -8,3 +8,4 @@ python-dotenv==1.0.1
 certifi==2025.1.31
 ccxt==4.4.69
 APScheduler==3.11.0
+yfinance==1.7.0
