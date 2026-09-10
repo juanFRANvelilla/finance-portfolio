@@ -37,6 +37,16 @@ interface LivePriceMetrics {
 
 /** Resumen agregado de P/L en vivo de una categoría (siempre en EUR). */
 interface CategoryLiveSummary {
+  marketValueEur: number;
+  profitEur: number;
+  profitPct: number;
+  assetCount: number;
+  hasData: boolean;
+}
+
+/** Resumen de cartera según precios de mercado actuales (siempre en EUR). */
+interface PortfolioLiveSummary {
+  marketValueEur: number;
   profitEur: number;
   profitPct: number;
   assetCount: number;
@@ -152,6 +162,9 @@ export class InvestmentDetailComponent {
 
   /** Panel de info de P/L agregado abierto por categoría. */
   readonly categoryProfitInfoOpen = signal<Record<string, boolean>>({});
+
+  /** Panel de valor de mercado total (sección «Total invertido»). */
+  readonly totalProfitInfoOpen = signal(false);
 
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
@@ -298,6 +311,66 @@ export class InvestmentDetailComponent {
     return { amount: asset.amount, currency: asset.currency };
   }
 
+  toggleTotalProfitInfo(): void {
+    const willOpen = !this.totalProfitInfoOpen();
+    this.totalProfitInfoOpen.set(willOpen);
+    if (willOpen) {
+      this.ensureAllCategoryDetailsLoaded();
+    }
+  }
+
+  isPortfolioSummaryLoading(): boolean {
+    if (!this.totalProfitInfoOpen()) {
+      return false;
+    }
+    const overview = this.overview();
+    if (!overview) {
+      return false;
+    }
+    return overview.categories.some((cat) => {
+      const state = this.panel(cat.category_id);
+      return !state.detail && state.loadingDetail;
+    });
+  }
+
+  /** Valor de mercado total en EUR y rendimiento agregado de toda la cartera. */
+  portfolioLiveSummary(): PortfolioLiveSummary {
+    const overview = this.overview();
+    if (!overview) {
+      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+    }
+
+    let totalMarketEur = 0;
+    let totalCostEur = 0;
+    let assetCount = 0;
+
+    for (const cat of overview.categories) {
+      const detail = this.panel(cat.category_id).detail;
+      if (!detail) {
+        continue;
+      }
+
+      for (const asset of detail.assets) {
+        const marketEur = this.assetMarketValueEur(asset, cat.category_id);
+        if (marketEur === null) {
+          continue;
+        }
+        totalMarketEur += marketEur;
+        totalCostEur += asset.amount_eur;
+        assetCount += 1;
+      }
+    }
+
+    if (assetCount === 0) {
+      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+    }
+
+    const marketValueEur = this.round2(totalMarketEur);
+    const profitEur = this.round2(marketValueEur - totalCostEur);
+    const profitPct = totalCostEur > 0 ? this.round2((profitEur / totalCostEur) * 100) : 0;
+    return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
+  }
+
   toggleCategoryProfitInfo(event: Event, categoryId: string): void {
     event.stopPropagation();
     const willOpen = !(this.categoryProfitInfoOpen()[categoryId] ?? false);
@@ -318,34 +391,35 @@ export class InvestmentDetailComponent {
   categoryLiveSummary(categoryId: string): CategoryLiveSummary {
     const detail = this.panel(categoryId).detail;
     if (!detail) {
-      return { profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    let totalProfitEur = 0;
+    let totalMarketEur = 0;
     let totalCostEur = 0;
     let assetCount = 0;
 
     for (const asset of detail.assets) {
-      const profitEur = this.assetProfitEur(asset, categoryId);
-      if (profitEur === null) {
+      const marketEur = this.assetMarketValueEur(asset, categoryId);
+      if (marketEur === null) {
         continue;
       }
-      totalProfitEur += profitEur;
+      totalMarketEur += marketEur;
       totalCostEur += asset.amount_eur;
       assetCount += 1;
     }
 
     if (assetCount === 0) {
-      return { profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    const profitEur = this.round2(totalProfitEur);
+    const marketValueEur = this.round2(totalMarketEur);
+    const profitEur = this.round2(marketValueEur - totalCostEur);
     const profitPct = totalCostEur > 0 ? this.round2((profitEur / totalCostEur) * 100) : 0;
-    return { profitEur, profitPct, assetCount, hasData: true };
+    return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
   }
 
-  /** P/L de un activo siempre normalizado a EUR (para agregados de categoría). */
-  private assetProfitEur(asset: AssetInvestmentDetail, categoryId: string): number | null {
+  /** Valor de mercado de un activo en EUR (precio en vivo × títulos). */
+  private assetMarketValueEur(asset: AssetInvestmentDetail, categoryId: string): number | null {
     const live = this.livePriceFor(asset.asset_type_id);
     const units = asset.units;
     if (!live || units === null || units <= 0) {
@@ -353,8 +427,29 @@ export class InvestmentDetailComponent {
     }
 
     const fx = this.panel(categoryId).fxUsdToEur ?? 1;
-    const marketEur = this.round2(units * this.amountToEur(live.price, live.currency, fx));
+    return this.round2(units * this.amountToEur(live.price, live.currency, fx));
+  }
+
+  /** P/L de un activo siempre normalizado a EUR (para agregados de categoría). */
+  private assetProfitEur(asset: AssetInvestmentDetail, categoryId: string): number | null {
+    const marketEur = this.assetMarketValueEur(asset, categoryId);
+    if (marketEur === null) {
+      return null;
+    }
     return this.round2(marketEur - asset.amount_eur);
+  }
+
+  private ensureAllCategoryDetailsLoaded(): void {
+    const overview = this.overview();
+    if (!overview) {
+      return;
+    }
+    for (const cat of overview.categories) {
+      const state = this.panel(cat.category_id);
+      if (!state.detail && !state.loadingDetail) {
+        this.loadCategoryDetail(cat.category_id);
+      }
+    }
   }
 
   private buildLiveMetrics(

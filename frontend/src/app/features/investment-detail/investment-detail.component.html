@@ -19,8 +19,64 @@
 
     <!-- ==================== TOTAL INVERTIDO ==================== -->
     <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
-      <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Total invertido</h2>
-      <p class="mt-1 text-2xl font-bold text-white">{{ overview()!.total_invested | eurCurrency }}</p>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Total invertido</h2>
+          <p class="mt-1 text-2xl font-bold text-white">{{ overview()!.total_invested | eurCurrency }}</p>
+        </div>
+        <button
+          type="button"
+          class="category-info-btn"
+          [class.category-info-btn--active]="totalProfitInfoOpen()"
+          title="Valor de mercado total según precios en vivo"
+          aria-label="Valor de mercado total según precios en vivo"
+          (click)="toggleTotalProfitInfo()"
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
+
+      @if (totalProfitInfoOpen()) {
+        <div class="category-profit-info mt-4 rounded-xl">
+          @if (isPortfolioSummaryLoading()) {
+            <p class="category-profit-info-text">Calculando valor de mercado total...</p>
+          } @else if (portfolioLiveSummary(); as summary) {
+            @if (summary.hasData) {
+              <div class="category-profit-info-grid category-profit-info-grid--triple">
+                <div>
+                  <p class="category-profit-info-label">Valor de mercado (EUR)</p>
+                  <p class="category-profit-info-value text-white">
+                    {{ summary.marketValueEur | eurCurrency }}
+                  </p>
+                </div>
+                <div>
+                  <p class="category-profit-info-label">Balance</p>
+                  <p [class]="'category-profit-info-value ' + liveProfitClass(summary.profitEur)">
+                    {{ summary.profitEur >= 0 ? '+' : '' }}{{ summary.profitEur | eurCurrency }}
+                  </p>
+                </div>
+                <div>
+                  <p class="category-profit-info-label">Rendimiento</p>
+                  <p [class]="'category-profit-info-value ' + liveProfitClass(summary.profitEur)">
+                    {{ summary.profitPct >= 0 ? '+' : '' }}{{ summary.profitPct | number:'1.2-2' }}%
+                  </p>
+                </div>
+              </div>
+            } @else {
+              <p class="category-profit-info-text">
+                No hay datos suficientes (activos con ticker, fuente de precio y títulos en todas las categorías).
+              </p>
+            }
+          }
+        </div>
+      }
+
       <div class="mt-4">
         <app-segment-donut-chart
           [segments]="categorySegments()"
@@ -93,9 +149,15 @@
                 <p class="category-profit-info-text">Calculando resultado en vivo...</p>
               } @else if (categoryLiveSummary(cat.category_id); as summary) {
                 @if (summary.hasData) {
-                  <div class="category-profit-info-grid">
+                  <div class="category-profit-info-grid category-profit-info-grid--triple">
                     <div>
-                      <p class="category-profit-info-label">Resultado total (EUR)</p>
+                      <p class="category-profit-info-label">Valor de mercado (EUR)</p>
+                      <p class="category-profit-info-value text-white">
+                        {{ summary.marketValueEur | eurCurrency }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="category-profit-info-label">Balance</p>
                       <p [class]="'category-profit-info-value ' + liveProfitClass(summary.profitEur)">
                         {{ summary.profitEur >= 0 ? '+' : '' }}{{ summary.profitEur | eurCurrency }}
                       </p>
@@ -107,9 +169,6 @@
                       </p>
                     </div>
                   </div>
-                  <p class="category-profit-info-hint">
-                    Suma en euros de {{ summary.assetCount }} activo(s) con precio en vivo y títulos registrados.
-                  </p>
                 } @else {
                   <p class="category-profit-info-text">
                     No hay datos suficientes (activos con ticker, fuente de precio y títulos).
