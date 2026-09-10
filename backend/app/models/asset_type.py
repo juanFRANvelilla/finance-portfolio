@@ -21,8 +21,6 @@ class AssetType(Base):
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     monthly_contribution: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(30), ForeignKey("entities.id"), nullable=True)
-    # Proveedor de precio de mercado en vivo para `ticker` ('kucoin' | 'yahoo'). No confundir con
-    # `exchange_ticker` (código corto usado solo para casar fills de KuCoin en asset_transactions).
     price_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     category: Mapped["InvestmentCategory"] = relationship()

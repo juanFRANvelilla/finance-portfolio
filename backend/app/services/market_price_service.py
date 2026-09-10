@@ -54,7 +54,7 @@ class MarketPriceService:
         self._cache: dict[tuple[str, str], _CacheEntry] = {}
         self._lock = threading.Lock()
 
-    def get_prices(self, db: Session) -> list[MarketPriceItem]:
+    def get_prices(self, db: Session, *, force_refresh: bool = False) -> list[MarketPriceItem]:
         rows = db.execute(
             select(AssetType.id, AssetType.ticker, AssetType.price_source).where(
                 AssetType.ticker.is_not(None),
@@ -69,7 +69,7 @@ class MarketPriceService:
                 logger.warning("price_source '%s' desconocido para ticker '%s'; se omite.", price_source, ticker)
                 continue
 
-            resolved = self._get_price_cached(provider, price_source, ticker)
+            resolved = self._get_price_cached(provider, price_source, ticker, force_refresh=force_refresh)
             if resolved is None:
                 continue
 
@@ -85,8 +85,20 @@ class MarketPriceService:
             )
         return items
 
+    def invalidate_ticker(self, price_source: str | None, ticker: str | None) -> None:
+        """Elimina la entrada de caché de un ticker (p. ej. tras editar un activo)."""
+        if not price_source or not ticker:
+            return
+        with self._lock:
+            self._cache.pop((price_source, ticker), None)
+
     def _get_price_cached(
-        self, provider: MarketDataProvider, price_source: str, ticker: str
+        self,
+        provider: MarketDataProvider,
+        price_source: str,
+        ticker: str,
+        *,
+        force_refresh: bool = False,
     ) -> tuple[float, str, float] | None:
         cache_key = (price_source, ticker)
         now = time.time()
@@ -94,7 +106,11 @@ class MarketPriceService:
         with self._lock:
             cached = self._cache.get(cache_key)
 
-        if cached is not None and (now - cached.fetched_at) < CACHE_TTL_SECONDS:
+        if (
+            not force_refresh
+            and cached is not None
+            and (now - cached.fetched_at) < CACHE_TTL_SECONDS
+        ):
             return cached.price, cached.currency, cached.fetched_at
 
         try:

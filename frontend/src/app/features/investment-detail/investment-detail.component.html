@@ -40,34 +40,84 @@
           class="category-panel overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10"
           [style.border-left-color]="cat.color"
         >
-          <button
-            type="button"
-            (click)="togglePanel(cat.category_id)"
-            class="flex w-full items-center justify-between p-4 text-left transition hover:bg-slate-900/40"
-          >
-            <div class="flex items-center gap-3">
-              <span class="h-2.5 w-2.5 rounded-full" [style.background-color]="cat.color"></span>
-              <div>
-                <p class="text-sm font-medium text-slate-200">{{ cat.name }}</p>
-                <p class="text-xs text-slate-500">{{ cat.percentage }}% del total invertido</p>
+          <div class="flex items-center gap-1 pr-2">
+            <button
+              type="button"
+              (click)="togglePanel(cat.category_id)"
+              class="flex min-w-0 flex-1 items-center justify-between p-4 text-left transition hover:bg-slate-900/40"
+            >
+              <div class="flex items-center gap-3">
+                <span class="h-2.5 w-2.5 rounded-full" [style.background-color]="cat.color"></span>
+                <div>
+                  <p class="text-sm font-medium text-slate-200">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500">{{ cat.percentage }}% del total invertido</p>
+                </div>
               </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="font-semibold text-white">{{ cat.amount_eur | eurCurrency }}</span>
-              <svg
-                class="h-4 w-4 text-slate-400 transition-transform"
-                [class.rotate-180]="isPanelOpen(cat.category_id)"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
+              <div class="flex items-center gap-3">
+                <span class="font-semibold text-white">{{ cat.amount_eur | eurCurrency }}</span>
+                <svg
+                  class="h-4 w-4 text-slate-400 transition-transform"
+                  [class.rotate-180]="isPanelOpen(cat.category_id)"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="category-info-btn"
+              [class.category-info-btn--active]="isCategoryProfitInfoOpen(cat.category_id)"
+              title="Resultado total en vivo de la categoría"
+              aria-label="Resultado total en vivo de la categoría"
+              (click)="toggleCategoryProfitInfo($event, cat.category_id)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
                   fill-rule="evenodd"
-                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                  d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z"
                   clip-rule="evenodd"
                 />
               </svg>
+            </button>
+          </div>
+
+          @if (isCategoryProfitInfoOpen(cat.category_id)) {
+            <div class="category-profit-info">
+              @if (panel(cat.category_id).loadingDetail) {
+                <p class="category-profit-info-text">Calculando resultado en vivo...</p>
+              } @else if (categoryLiveSummary(cat.category_id); as summary) {
+                @if (summary.hasData) {
+                  <div class="category-profit-info-grid">
+                    <div>
+                      <p class="category-profit-info-label">Resultado total (EUR)</p>
+                      <p [class]="'category-profit-info-value ' + liveProfitClass(summary.profitEur)">
+                        {{ summary.profitEur >= 0 ? '+' : '' }}{{ summary.profitEur | eurCurrency }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="category-profit-info-label">Rendimiento</p>
+                      <p [class]="'category-profit-info-value ' + liveProfitClass(summary.profitEur)">
+                        {{ summary.profitPct >= 0 ? '+' : '' }}{{ summary.profitPct | number:'1.2-2' }}%
+                      </p>
+                    </div>
+                  </div>
+                  <p class="category-profit-info-hint">
+                    Suma en euros de {{ summary.assetCount }} activo(s) con precio en vivo y títulos registrados.
+                  </p>
+                } @else {
+                  <p class="category-profit-info-text">
+                    No hay datos suficientes (activos con ticker, fuente de precio y títulos).
+                  </p>
+                }
+              }
             </div>
-          </button>
+          }
 
           @if (isPanelOpen(cat.category_id)) {
             <div class="border-t border-white/5 px-4 py-4">
@@ -193,8 +243,10 @@
                             <th class="px-3 py-2 font-medium">Activo</th>
                             <th class="px-3 py-2 font-medium text-right">Títulos</th>
                             <th class="px-3 py-2 font-medium text-right">Importe</th>
-                            <th class="px-3 py-2 font-medium text-right">Valor EUR</th>
-                            <th class="px-3 py-2 font-medium text-right">Precio en vivo</th>
+                            <th class="px-3 py-2 font-medium text-right">Precio</th>
+                            <th class="px-3 py-2 font-medium text-right">Valor real</th>
+                            <th class="px-3 py-2 font-medium text-right">Resultado</th>
+                            <th class="px-3 py-2 font-medium text-right">%</th>
                             <th class="px-3 py-2 font-medium text-right w-10"></th>
                           </tr>
                         </thead>
@@ -211,21 +263,64 @@
                                   {{ asset.units ?? '—' }}
                                 </td>
                                 <td class="px-3 py-2 text-right tabular-nums text-slate-300">
-                                  {{ asset.amount | number:'1.2-2' }} {{ asset.currency }}
-                                </td>
-                                <td class="px-3 py-2 text-right tabular-nums font-medium text-white">
-                                  {{ asset.amount_eur | eurCurrency }}
-                                </td>
-                                <td class="px-3 py-2 text-right tabular-nums">
-                                  @if (livePriceFor(asset.asset_type_id); as live) {
-                                    <span class="live-price-badge" title="Actualizado: {{ live.updated_at }}">
-                                      <span class="live-price-dot"></span>
-                                      {{ live.price | currency: live.currency }}
-                                    </span>
-                                  } @else {
-                                    <span class="text-slate-500">—</span>
+                                  @if (importeDisplayForAsset(asset); as importe) {
+                                    <div class="live-price-row justify-end">
+                                      <span>{{ importe.amount | currency: importe.currency }}</span>
+                                      @if (assetShowEurToggle(asset)) {
+                                        <button
+                                          type="button"
+                                          class="live-price-eur-toggle"
+                                          [class.live-price-eur-toggle--active]="isLivePriceEurMode(asset.asset_type_id)"
+                                          [title]="liveCurrencyToggleTitle(asset.asset_type_id)"
+                                          (click)="toggleLivePriceEur(asset.asset_type_id)"
+                                        >
+                                          {{ liveCurrencyToggleLabel(asset.asset_type_id) }}
+                                        </button>
+                                      }
+                                    </div>
                                   }
                                 </td>
+                                @if (liveMetricsForAsset(asset, cat.category_id); as metrics) {
+                                  <td class="px-3 py-2 text-right tabular-nums">
+                                    <span
+                                      class="live-price-badge"
+                                      title="Actualizado: {{ livePriceFor(asset.asset_type_id)!.updated_at }}"
+                                    >
+                                      <span class="live-price-dot"></span>
+                                      {{ metrics.price | currency: metrics.currency }}
+                                    </span>
+                                  </td>
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-300">
+                                    @if (metrics.marketValue !== null) {
+                                      {{ metrics.marketValue | currency: metrics.currency }}
+                                    } @else {
+                                      <span class="text-slate-500">—</span>
+                                    }
+                                  </td>
+                                  <td class="px-3 py-2 text-right tabular-nums font-semibold">
+                                    @if (metrics.profit !== null) {
+                                      <span [class]="liveProfitClass(metrics.profit)">
+                                        {{ metrics.profit >= 0 ? '+' : '' }}{{ metrics.profit | currency: metrics.currency }}
+                                      </span>
+                                    } @else {
+                                      <span class="text-slate-500">—</span>
+                                    }
+                                  </td>
+                                  <td class="px-3 py-2 text-right tabular-nums font-semibold">
+                                    @if (metrics.profitPct !== null) {
+                                      <span [class]="liveProfitClass(metrics.profit)">
+                                        {{ metrics.profitPct >= 0 ? '+' : '' }}{{ metrics.profitPct | number:'1.2-2' }}%
+                                      </span>
+                                    } @else {
+                                      <span class="text-slate-500">—</span>
+                                    }
+                                  </td>
+                                } @else {
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                                  <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                                }
                                 <td class="px-3 py-2 text-right">
                                   <button
                                     type="button"
@@ -246,11 +341,11 @@
                               <td class="px-3 py-2 text-slate-400 italic">Otros</td>
                               <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
                               <td class="px-3 py-2 text-right tabular-nums text-slate-400">
-                                {{ categoryOthersDisplay(cat.category_id) | number:'1.2-2' }} EUR
-                              </td>
-                              <td class="px-3 py-2 text-right tabular-nums font-medium text-slate-300">
                                 {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
                               </td>
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
                               <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
                               <td class="px-3 py-2"></td>
                             </tr>
@@ -282,10 +377,37 @@
                             @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
                               <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
                             }
-                            @if (livePriceFor(row.assetTypeId); as live) {
-                              <span class="live-price-badge ml-2" title="Actualizado: {{ live.updated_at }}">
-                                <span class="live-price-dot"></span>
-                                {{ live.price | currency: live.currency }}
+                            @if (liveMetricsForRow(row, cat.category_id); as metrics) {
+                              <span class="live-price-inline ml-2">
+                                <span
+                                  class="live-price-badge"
+                                  title="Actualizado: {{ livePriceFor(row.assetTypeId)!.updated_at }}"
+                                >
+                                  <span class="live-price-dot"></span>
+                                  {{ metrics.price | currency: metrics.currency }}
+                                </span>
+                                @if (metrics.showEurToggle) {
+                                  <button
+                                    type="button"
+                                    class="live-price-eur-toggle"
+                                    [class.live-price-eur-toggle--active]="isLivePriceEurMode(row.assetTypeId)"
+                                    [title]="liveCurrencyToggleTitle(row.assetTypeId)"
+                                    (click)="toggleLivePriceEur(row.assetTypeId)"
+                                  >
+                                    {{ liveCurrencyToggleLabel(row.assetTypeId) }}
+                                  </button>
+                                }
+                                @if (metrics.marketValue !== null) {
+                                  <span class="live-price-value">
+                                    · Valor {{ metrics.marketValue | currency: metrics.currency }}
+                                  </span>
+                                  @if (metrics.profit !== null) {
+                                    <span [class]="liveProfitClass(metrics.profit)">
+                                      · {{ metrics.profit >= 0 ? '+' : '' }}{{ metrics.profit | currency: metrics.currency }}
+                                      ({{ metrics.profitPct | number:'1.2-2' }}%)
+                                    </span>
+                                  }
+                                }
                               </span>
                             }
                           </p>

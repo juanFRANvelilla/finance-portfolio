@@ -25,6 +25,24 @@ import { readCssVar } from '../../core/utils/read-css-var';
 /** Sondeo de precios en vivo: cada 35s, arranca al montar el componente. */
 const MARKET_PRICE_POLL_MS = 35_000;
 
+/** Métricas derivadas del precio en vivo (valor de mercado y P/L vs importe registrado). */
+interface LivePriceMetrics {
+  price: number;
+  currency: string;
+  showEurToggle: boolean;
+  marketValue: number | null;
+  profit: number | null;
+  profitPct: number | null;
+}
+
+/** Resumen agregado de P/L en vivo de una categoría (siempre en EUR). */
+interface CategoryLiveSummary {
+  profitEur: number;
+  profitPct: number;
+  assetCount: number;
+  hasData: boolean;
+}
+
 const FALLBACK_DEFAULTS = ['#f59e0b', '#6366f1', '#22c55e', '#ec4899', '#06b6d4', '#eab308', '#f43f5e'];
 
 /** Convierte un número a texto para prellenar inputs; nunca se usa mientras el usuario escribe,
@@ -129,6 +147,12 @@ export class InvestmentDetailComponent {
   /** Precios de mercado en vivo (GET /api/v1/market-prices), indexados por asset_type_id. */
   readonly marketPrices = signal<Record<string, MarketPriceResponse>>({});
 
+  /** Por activo: si true, precio/valor/P/L se muestran convertidos a EUR (USD/USDT). */
+  readonly livePriceEurMode = signal<Record<string, boolean>>({});
+
+  /** Panel de info de P/L agregado abierto por categoría. */
+  readonly categoryProfitInfoOpen = signal<Record<string, boolean>>({});
+
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
   readonly categorySegments = computed<DonutSegment[]>(() => {
@@ -170,18 +194,249 @@ export class InvestmentDetailComponent {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((prices) => {
-        const byAssetTypeId: Record<string, MarketPriceResponse> = {};
-        for (const price of prices) {
-          byAssetTypeId[price.asset_type_id] = price;
-        }
-        this.marketPrices.set(byAssetTypeId);
-      });
+      .subscribe((prices) => this.applyMarketPrices(prices));
+  }
+
+  /** Fuerza una consulta inmediata (p. ej. tras editar ticker o price_source). */
+  refreshMarketPrices(forceRefresh = false): void {
+    this.marketPriceApi
+      .getMarketPrices(forceRefresh)
+      .pipe(catchError(() => of<MarketPriceResponse[]>([])))
+      .subscribe((prices) => this.applyMarketPrices(prices));
+  }
+
+  private applyMarketPrices(prices: MarketPriceResponse[]): void {
+    const byAssetTypeId: Record<string, MarketPriceResponse> = {};
+    for (const price of prices) {
+      byAssetTypeId[price.asset_type_id] = price;
+    }
+    this.marketPrices.set(byAssetTypeId);
   }
 
   /** Precio de mercado en vivo del activo, o `null` si no tiene ticker/price_source configurados. */
   livePriceFor(assetTypeId: string): MarketPriceResponse | null {
     return this.marketPrices()[assetTypeId] ?? null;
+  }
+
+  toggleLivePriceEur(assetTypeId: string): void {
+    this.livePriceEurMode.update((current) => ({
+      ...current,
+      [assetTypeId]: !(current[assetTypeId] ?? false),
+    }));
+  }
+
+  isLivePriceEurMode(assetTypeId: string): boolean {
+    return this.livePriceEurMode()[assetTypeId] ?? false;
+  }
+
+  /** USDT se trata como USD en visualización y conversiones. */
+  displayCurrencyCode(currency: string): string {
+    return currency === 'USDT' ? 'USD' : currency;
+  }
+
+  isUsdLikeCurrency(currency: string): boolean {
+    return currency === 'USD' || currency === 'USDT';
+  }
+
+  liveCurrencyToggleLabel(assetTypeId: string): string {
+    return this.isLivePriceEurMode(assetTypeId) ? '€' : '$';
+  }
+
+  liveCurrencyToggleTitle(assetTypeId: string): string {
+    return this.isLivePriceEurMode(assetTypeId)
+      ? 'Mostrando en euros. Pulsa para ver en dólares'
+      : 'Mostrando en dólares. Pulsa para ver en euros';
+  }
+
+  liveMetricsForAsset(asset: AssetInvestmentDetail, categoryId: string): LivePriceMetrics | null {
+    return this.buildLiveMetrics(
+      asset.asset_type_id,
+      categoryId,
+      asset.units,
+      asset.amount_eur,
+      asset.amount,
+      asset.currency,
+    );
+  }
+
+  liveMetricsForRow(row: AssetRow, categoryId: string): LivePriceMetrics | null {
+    return this.buildLiveMetrics(
+      row.assetTypeId,
+      categoryId,
+      parseDecimalInput(row.units),
+      this.assetRowPreviewEur(categoryId, row),
+      parseDecimalInput(row.amount) ?? 0,
+      row.currency,
+    );
+  }
+
+  liveProfitClass(profit: number | null): string {
+    if (profit === null || profit === 0) {
+      return 'live-price-profit live-price-profit--neutral';
+    }
+    return profit > 0
+      ? 'live-price-profit live-price-profit--gain'
+      : 'live-price-profit live-price-profit--loss';
+  }
+
+  /** Muestra el botón €/$ en activos USD o con precio en vivo USD/USDT. */
+  assetShowEurToggle(asset: AssetInvestmentDetail): boolean {
+    if (asset.currency === 'USD') {
+      return true;
+    }
+    const live = this.livePriceFor(asset.asset_type_id);
+    return live !== null && this.isUsdLikeCurrency(live.currency);
+  }
+
+  /** Importe invertido en la divisa activa (nativa o EUR si el toggle € está activo). */
+  importeDisplayForAsset(
+    asset: AssetInvestmentDetail,
+  ): { amount: number; currency: string } {
+    if (this.isLivePriceEurMode(asset.asset_type_id) && this.assetShowEurToggle(asset)) {
+      return { amount: asset.amount_eur, currency: 'EUR' };
+    }
+    return { amount: asset.amount, currency: asset.currency };
+  }
+
+  toggleCategoryProfitInfo(event: Event, categoryId: string): void {
+    event.stopPropagation();
+    const willOpen = !(this.categoryProfitInfoOpen()[categoryId] ?? false);
+    this.categoryProfitInfoOpen.update((current) => ({
+      ...current,
+      [categoryId]: willOpen,
+    }));
+    if (willOpen && !this.panel(categoryId).detail) {
+      this.loadCategoryDetail(categoryId);
+    }
+  }
+
+  isCategoryProfitInfoOpen(categoryId: string): boolean {
+    return this.categoryProfitInfoOpen()[categoryId] ?? false;
+  }
+
+  /** Suma de ganancias/pérdidas en EUR y % agregado de los activos con precio en vivo y títulos. */
+  categoryLiveSummary(categoryId: string): CategoryLiveSummary {
+    const detail = this.panel(categoryId).detail;
+    if (!detail) {
+      return { profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+    }
+
+    let totalProfitEur = 0;
+    let totalCostEur = 0;
+    let assetCount = 0;
+
+    for (const asset of detail.assets) {
+      const profitEur = this.assetProfitEur(asset, categoryId);
+      if (profitEur === null) {
+        continue;
+      }
+      totalProfitEur += profitEur;
+      totalCostEur += asset.amount_eur;
+      assetCount += 1;
+    }
+
+    if (assetCount === 0) {
+      return { profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
+    }
+
+    const profitEur = this.round2(totalProfitEur);
+    const profitPct = totalCostEur > 0 ? this.round2((profitEur / totalCostEur) * 100) : 0;
+    return { profitEur, profitPct, assetCount, hasData: true };
+  }
+
+  /** P/L de un activo siempre normalizado a EUR (para agregados de categoría). */
+  private assetProfitEur(asset: AssetInvestmentDetail, categoryId: string): number | null {
+    const live = this.livePriceFor(asset.asset_type_id);
+    const units = asset.units;
+    if (!live || units === null || units <= 0) {
+      return null;
+    }
+
+    const fx = this.panel(categoryId).fxUsdToEur ?? 1;
+    const marketEur = this.round2(units * this.amountToEur(live.price, live.currency, fx));
+    return this.round2(marketEur - asset.amount_eur);
+  }
+
+  private buildLiveMetrics(
+    assetTypeId: string,
+    categoryId: string,
+    units: number | null | undefined,
+    costEur: number,
+    costNative: number,
+    assetCurrency: string,
+  ): LivePriceMetrics | null {
+    const live = this.livePriceFor(assetTypeId);
+    if (!live) {
+      return null;
+    }
+
+    const fx = this.panel(categoryId).fxUsdToEur ?? 1;
+    const quoteCurrency = this.displayCurrencyCode(live.currency);
+    const showEurToggle = this.isUsdLikeCurrency(live.currency);
+    const showEur = showEurToggle && this.isLivePriceEurMode(assetTypeId);
+
+    const nativePrice = live.price;
+    const displayPrice = showEur ? this.amountToEur(nativePrice, live.currency, fx) : nativePrice;
+    const displayCurrency = showEur ? 'EUR' : quoteCurrency;
+
+    const unitCount = units ?? null;
+    if (unitCount === null || unitCount <= 0) {
+      return {
+        price: displayPrice,
+        currency: displayCurrency,
+        showEurToggle,
+        marketValue: null,
+        profit: null,
+        profitPct: null,
+      };
+    }
+
+    const marketValue = this.round2(unitCount * displayPrice);
+
+    let profit: number;
+    let profitBasis: number;
+
+    if (showEur) {
+      const marketEur = this.round2(unitCount * this.amountToEur(nativePrice, live.currency, fx));
+      profit = this.round2(marketEur - costEur);
+      profitBasis = costEur;
+    } else if (quoteCurrency === assetCurrency) {
+      profit = this.round2(marketValue - costNative);
+      profitBasis = costNative;
+    } else if (this.isUsdLikeCurrency(live.currency)) {
+      const costInQuote = assetCurrency === 'EUR' ? costEur / fx : costNative;
+      profit = this.round2(marketValue - costInQuote);
+      profitBasis = costInQuote;
+    } else {
+      const marketEur = this.round2(unitCount * this.amountToEur(nativePrice, live.currency, fx));
+      profit = this.round2(marketEur - costEur);
+      profitBasis = costEur;
+    }
+
+    const profitPct = profitBasis > 0 ? this.round2((profit / profitBasis) * 100) : 0;
+
+    return {
+      price: displayPrice,
+      currency: displayCurrency,
+      showEurToggle,
+      marketValue,
+      profit,
+      profitPct,
+    };
+  }
+
+  private amountToEur(amount: number, currency: string, fxRate: number): number {
+    if (currency === 'EUR') {
+      return amount;
+    }
+    if (currency === 'USD' || currency === 'USDT') {
+      return this.round2(amount * fxRate);
+    }
+    return amount;
+  }
+
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 
   private loadOverview(): void {
@@ -517,6 +772,7 @@ export class InvestmentDetailComponent {
   }
 
   onAssetEditSaved(categoryId: string): void {
+    this.refreshMarketPrices(true);
     this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
       next: (detail) => {
         this.applyDetail(categoryId, detail);

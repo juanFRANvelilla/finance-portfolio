@@ -14,6 +14,77 @@
   border-left: var(--category-accent-width) solid transparent;
 }
 
+.category-info-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  color: #94a3b8;
+  background-color: rgb(15 23 42 / 0.4);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &:hover {
+    color: #e2e8f0;
+    border-color: rgb(255 255 255 / 0.2);
+    background-color: rgb(15 23 42 / 0.7);
+  }
+
+  &--active {
+    color: #93c5fd;
+    border-color: rgb(59 130 246 / 0.45);
+    background-color: rgb(59 130 246 / 0.12);
+  }
+}
+
+.category-profit-info {
+  border-top: 1px solid rgb(255 255 255 / 0.05);
+  border-bottom: 1px solid rgb(255 255 255 / 0.05);
+  background-color: rgb(15 23 42 / 0.35);
+  padding: 0.75rem 1rem;
+}
+
+.category-profit-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.category-profit-info-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.category-profit-info-value {
+  margin-top: 0.15rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.category-profit-info-hint,
+.category-profit-info-text {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.category-profit-info-text {
+  margin-top: 0;
+}
+
 .transaction-reload-btn {
   display: inline-flex;
   flex-shrink: 0;
@@ -55,6 +126,30 @@
   }
 }
 
+.live-price-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.live-price-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  &.justify-end {
+    justify-content: flex-end;
+  }
+}
+
+.live-price-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .live-price-badge {
   display: inline-flex;
   align-items: center;
@@ -67,6 +162,62 @@
   background-color: rgb(16 185 129 / 0.1);
   box-shadow: 0 0 0 1px rgb(16 185 129 / 0.25);
   white-space: nowrap;
+}
+
+.live-price-eur-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  background-color: rgb(15 23 42 / 0.6);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+
+  &:hover {
+    color: #e2e8f0;
+    border-color: rgb(255 255 255 / 0.25);
+  }
+
+  &--active {
+    color: #fde68a;
+    border-color: rgb(251 191 36 / 0.45);
+    background-color: rgb(251 191 36 / 0.12);
+  }
+}
+
+.live-price-derived {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+}
+
+.live-price-value {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.live-price-profit {
+  font-weight: 600;
+
+  &--gain {
+    color: #6ee7b7;
+  }
+
+  &--loss {
+    color: #fda4af;
+  }
+
+  &--neutral {
+    color: #94a3b8;
+  }
 }
 
 .live-price-dot {

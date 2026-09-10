@@ -9,9 +9,9 @@ router = APIRouter(prefix="/api/v1", tags=["market-data"])
 
 
 @router.get("/market-prices", response_model=list[MarketPriceResponse])
-def get_market_prices(db: Session = Depends(get_db)) -> list[MarketPriceResponse]:
+def get_market_prices(refresh: bool = False, db: Session = Depends(get_db)) -> list[MarketPriceResponse]:
     """Precios de mercado en vivo (caché ~45s) para activos con `ticker` + `price_source`."""
-    items = market_price_service.get_prices(db)
+    items = market_price_service.get_prices(db, force_refresh=refresh)
     return [
         MarketPriceResponse(
             asset_type_id=item.asset_type_id,

@@ -31,6 +31,7 @@ from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
 from app.services.fx_converter import amount_to_eur, eur_to_native, get_usd_to_eur_rate
 from app.services.linked_asset_investments import sum_linked_asset_investments_eur
+from app.services.market_price_service import market_price_service
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
@@ -287,6 +288,8 @@ def update_asset_type(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
 
     updates = payload.model_dump(exclude_unset=True)
+    previous_ticker = asset.ticker
+    previous_price_source = asset.price_source
     if "ticker" in updates:
         asset.ticker = updates["ticker"]
     if "currency" in updates:
@@ -301,6 +304,11 @@ def update_asset_type(
 
     db.commit()
     db.refresh(asset)
+
+    if "ticker" in updates or "price_source" in updates:
+        market_price_service.invalidate_ticker(previous_price_source, previous_ticker)
+        market_price_service.invalidate_ticker(asset.price_source, asset.ticker)
+
     return asset
 
 

@@ -23,15 +23,15 @@ def resolve_sync_start_datetime(db: Session) -> datetime:
     return datetime.combine(max_date, datetime.min.time())
 
 
-def load_exchange_ticker_map(db: Session) -> dict[str, str]:
-    """Mapea exchange_ticker (upper) → asset_type_id (str) desde asset_types."""
+def load_kucoin_asset_name_map(db: Session) -> dict[str, str]:
+    """Mapea name (upper) → asset_type_id para casar la divisa base de fills KuCoin (p.ej. BTC, ETH)."""
     rows = db.execute(
         text(
-            "SELECT id, exchange_ticker FROM public.asset_types "
-            "WHERE exchange_ticker IS NOT NULL"
+            "SELECT id, name FROM public.asset_types "
+            "WHERE price_source = 'kucoin' AND name IS NOT NULL"
         )
     ).fetchall()
-    return {row.exchange_ticker.upper(): str(row.id) for row in rows}
+    return {row.name.upper(): str(row.id) for row in rows}
 
 
 def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int]:

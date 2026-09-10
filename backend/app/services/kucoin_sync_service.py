@@ -15,7 +15,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.repositories.asset_transactions import (
     insert_transactions_batch,
-    load_exchange_ticker_map,
+    load_kucoin_asset_name_map,
     resolve_sync_start_datetime,
 )
 
@@ -68,10 +68,10 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
         result.usdt_eur_rate = usdt_eur_rate
 
         with SessionLocal() as db:
-            asset_map = load_exchange_ticker_map(db)
+            asset_map = load_kucoin_asset_name_map(db)
             if not asset_map:
                 result.success = False
-                result.error = "No hay activos con exchange_ticker en asset_types."
+                result.error = "No hay activos KuCoin (price_source='kucoin') en asset_types."
                 logger.error(result.error)
                 return result
 

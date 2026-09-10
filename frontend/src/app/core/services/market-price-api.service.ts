@@ -10,7 +10,10 @@ export class MarketPriceApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/v1`;
 
-  getMarketPrices(): Observable<MarketPriceResponse[]> {
-    return this.http.get<MarketPriceResponse[]>(`${this.baseUrl}/market-prices`);
+  getMarketPrices(refresh = false): Observable<MarketPriceResponse[]> {
+    const url = refresh
+      ? `${this.baseUrl}/market-prices?refresh=true`
+      : `${this.baseUrl}/market-prices`;
+    return this.http.get<MarketPriceResponse[]>(url);
   }
 }

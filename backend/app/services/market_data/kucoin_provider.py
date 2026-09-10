@@ -51,4 +51,6 @@ class KucoinMarketDataProvider(MarketDataProvider):
         if last_price is None:
             raise ValueError(f"KuCoin no devolvió precio 'last' para '{symbol}'")
 
-        return {"price": float(last_price), "currency": quote_currency}
+        # USDT se expone como USD para homogeneizar con el resto de activos en dólares.
+        display_currency = "USD" if quote_currency == "USDT" else quote_currency
+        return {"price": float(last_price), "currency": display_currency}
