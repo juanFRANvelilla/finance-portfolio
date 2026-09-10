@@ -54,3 +54,35 @@
     transform: rotate(360deg);
   }
 }
+
+.live-price-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.125rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a7f3d0;
+  background-color: rgb(16 185 129 / 0.1);
+  box-shadow: 0 0 0 1px rgb(16 185 129 / 0.25);
+  white-space: nowrap;
+}
+
+.live-price-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: #34d399;
+  animation: live-price-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-price-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

@@ -1,8 +1,11 @@
 import { Component, computed, ElementRef, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
+import { catchError, of, switchMap, timer } from 'rxjs';
 
 import { InvestmentApiService } from '../../core/services/investment-api.service';
+import { MarketPriceApiService } from '../../core/services/market-price-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
 import {
   AssetInvestmentDetail,
@@ -11,12 +14,16 @@ import {
   CategoryOverview,
   InvestmentOverviewResponse,
 } from '../../core/models/investment.model';
+import { MarketPriceResponse } from '../../core/models/market-price.model';
 import { AssetEditDialogComponent } from './components/asset-edit-dialog/asset-edit-dialog.component';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
 import { parseDecimalInput } from '../../core/utils/parse-decimal';
 import { readCssVar } from '../../core/utils/read-css-var';
+
+/** Sondeo de precios en vivo: cada 35s, arranca al montar el componente. */
+const MARKET_PRICE_POLL_MS = 35_000;
 
 const FALLBACK_DEFAULTS = ['#f59e0b', '#6366f1', '#22c55e', '#ec4899', '#06b6d4', '#eab308', '#f43f5e'];
 
@@ -90,12 +97,13 @@ function createPanelState(): CategoryPanelState {
 
 @Component({
   selector: 'app-investment-detail',
-  imports: [DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent, AssetEditDialogComponent],
+  imports: [CurrencyPipe, DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent, AssetEditDialogComponent],
   templateUrl: './investment-detail.component.html',
   styleUrl: './investment-detail.component.scss',
 })
 export class InvestmentDetailComponent {
   private readonly api = inject(InvestmentApiService);
+  private readonly marketPriceApi = inject(MarketPriceApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly periodStorage = inject(PeriodStorageService);
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -117,6 +125,9 @@ export class InvestmentDetailComponent {
   readonly assetEditTarget = signal<AssetInvestmentDetail | null>(null);
   /** Clave `${categoryId}:${assetTypeId}` mientras se recalcula desde asset_transactions. */
   readonly transactionReloadLoading = signal<Record<string, boolean>>({});
+
+  /** Precios de mercado en vivo (GET /api/v1/market-prices), indexados por asset_type_id. */
+  readonly marketPrices = signal<Record<string, MarketPriceResponse>>({});
 
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
@@ -150,6 +161,27 @@ export class InvestmentDetailComponent {
         this.loadOverview();
       }
     });
+
+    // Sondeo de precios en vivo: arranca al montar el componente y se cancela solo al destruirlo.
+    timer(0, MARKET_PRICE_POLL_MS)
+      .pipe(
+        switchMap(() =>
+          this.marketPriceApi.getMarketPrices().pipe(catchError(() => of<MarketPriceResponse[]>([]))),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((prices) => {
+        const byAssetTypeId: Record<string, MarketPriceResponse> = {};
+        for (const price of prices) {
+          byAssetTypeId[price.asset_type_id] = price;
+        }
+        this.marketPrices.set(byAssetTypeId);
+      });
+  }
+
+  /** Precio de mercado en vivo del activo, o `null` si no tiene ticker/price_source configurados. */
+  livePriceFor(assetTypeId: string): MarketPriceResponse | null {
+    return this.marketPrices()[assetTypeId] ?? null;
   }
 
   private loadOverview(): void {
@@ -435,7 +467,7 @@ export class InvestmentDetailComponent {
       .filter((a) => a.amount_eur > 0)
       .map((a, i) => ({
         id: a.asset_type_id,
-        label: a.ticker ?? a.name,
+        label: a.name,
         value: a.amount_eur,
         color: this.fallbackColor(i),
       }));

@@ -194,6 +194,7 @@
                             <th class="px-3 py-2 font-medium text-right">Títulos</th>
                             <th class="px-3 py-2 font-medium text-right">Importe</th>
                             <th class="px-3 py-2 font-medium text-right">Valor EUR</th>
+                            <th class="px-3 py-2 font-medium text-right">Precio en vivo</th>
                             <th class="px-3 py-2 font-medium text-right w-10"></th>
                           </tr>
                         </thead>
@@ -202,9 +203,6 @@
                               <tr class="border-t border-white/5" [class.opacity-50]="asset.amount_eur <= 0 && !asset.units">
                                 <td class="px-3 py-2 text-slate-300">
                                   {{ asset.name }}
-                                  @if (asset.ticker) {
-                                    <span class="ml-1 text-xs text-slate-500">({{ asset.ticker }})</span>
-                                  }
                                   @if (formatMonthlyContribution(asset.monthly_contribution, asset.currency); as contributionLabel) {
                                     <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
                                   }
@@ -217,6 +215,16 @@
                                 </td>
                                 <td class="px-3 py-2 text-right tabular-nums font-medium text-white">
                                   {{ asset.amount_eur | eurCurrency }}
+                                </td>
+                                <td class="px-3 py-2 text-right tabular-nums">
+                                  @if (livePriceFor(asset.asset_type_id); as live) {
+                                    <span class="live-price-badge" title="Actualizado: {{ live.updated_at }}">
+                                      <span class="live-price-dot"></span>
+                                      {{ live.price | currency: live.currency }}
+                                    </span>
+                                  } @else {
+                                    <span class="text-slate-500">—</span>
+                                  }
                                 </td>
                                 <td class="px-3 py-2 text-right">
                                   <button
@@ -243,6 +251,7 @@
                               <td class="px-3 py-2 text-right tabular-nums font-medium text-slate-300">
                                 {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
                               </td>
+                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
                               <td class="px-3 py-2"></td>
                             </tr>
                           }
@@ -272,6 +281,12 @@
                             <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
                             @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
                               <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
+                            }
+                            @if (livePriceFor(row.assetTypeId); as live) {
+                              <span class="live-price-badge ml-2" title="Actualizado: {{ live.updated_at }}">
+                                <span class="live-price-dot"></span>
+                                {{ live.price | currency: live.currency }}
+                              </span>
                             }
                           </p>
                           @if (row.hasTransactions) {

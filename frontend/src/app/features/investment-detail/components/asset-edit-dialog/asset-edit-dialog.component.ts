@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 
 import { Entity } from '../../../../core/models/entity.model';
-import { AssetInvestmentDetail } from '../../../../core/models/investment.model';
+import { AssetInvestmentDetail, PriceSource } from '../../../../core/models/investment.model';
 import { FinanceApiService } from '../../../../core/services/finance-api.service';
 import { InvestmentApiService } from '../../../../core/services/investment-api.service';
 
@@ -27,6 +27,7 @@ export class AssetEditDialogComponent {
   readonly ticker = signal('');
   readonly currency = signal<'EUR' | 'USD'>('EUR');
   readonly entityId = signal<string>('');
+  readonly priceSource = signal<PriceSource | ''>('');
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
@@ -70,6 +71,7 @@ export class AssetEditDialogComponent {
       this.entityId.set(asset.entity_id ?? '');
       this.errorMessage.set(null);
       this.refreshAssetCatalog(asset.asset_type_id);
+      // El detalle mensual no trae price_source; se completa al refrescar el catálogo abajo.
     });
 
     effect(() => {
@@ -97,12 +99,17 @@ export class AssetEditDialogComponent {
         this.ticker.set(catalog.ticker ?? '');
         this.currency.set(catalog.currency === 'USD' ? 'USD' : 'EUR');
         this.entityId.set(catalog.entity_id ?? '');
+        this.priceSource.set(catalog.price_source ?? '');
       },
     });
   }
 
   onTickerChange(value: string): void {
     this.ticker.set(value);
+  }
+
+  onPriceSourceChange(value: string): void {
+    this.priceSource.set(value === 'kucoin' || value === 'yahoo' ? value : '');
   }
 
   onCurrencyChange(value: string): void {
@@ -134,12 +141,14 @@ export class AssetEditDialogComponent {
 
     const entityId = this.entityId().trim() || null;
     const ticker = this.ticker().trim() || null;
+    const priceSource = this.priceSource() || null;
 
     this.investmentApi
       .updateAssetType(asset.asset_type_id, {
         ticker,
         currency: this.currency(),
         entity_id: entityId,
+        price_source: priceSource,
       })
       .subscribe({
         next: () => {

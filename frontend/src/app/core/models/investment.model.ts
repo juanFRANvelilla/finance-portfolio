@@ -5,6 +5,9 @@ export interface InvestmentCategory {
   display_order: number;
 }
 
+/** Proveedor de precio de mercado en vivo para `ticker` (ver GET /api/v1/market-prices). */
+export type PriceSource = 'kucoin' | 'yahoo';
+
 export interface AssetType {
   id: string;
   category_id: string;
@@ -15,6 +18,7 @@ export interface AssetType {
   display_order: number;
   monthly_contribution: number | null;
   entity_id: string | null;
+  price_source: PriceSource | null;
 }
 
 export interface AssetTypeCreate {
@@ -24,6 +28,7 @@ export interface AssetTypeCreate {
   currency: string;
   monthly_contribution?: number | null;
   entity_id?: string | null;
+  price_source?: PriceSource | null;
 }
 
 export interface AssetTypeUpdate {
@@ -31,6 +36,7 @@ export interface AssetTypeUpdate {
   currency?: string;
   monthly_contribution?: number | null;
   entity_id?: string | null;
+  price_source?: PriceSource | null;
 }
 
 export interface LinkedInvestedTotalResponse {

@@ -20,10 +20,24 @@
           <input
             type="text"
             class="asset-edit-input"
-            placeholder="p.ej. BTC, AAPL"
+            placeholder="p.ej. BTC-EUR, MSFT, GLDA.DE"
             [ngModel]="ticker()"
             (ngModelChange)="onTickerChange($event)"
           />
+          <span class="asset-edit-hint">Identificador de mercado usado para el precio en vivo.</span>
+        </label>
+
+        <label class="asset-edit-field">
+          <span class="asset-edit-label">Fuente de precio</span>
+          <select
+            class="asset-edit-input"
+            [ngModel]="priceSource()"
+            (ngModelChange)="onPriceSourceChange($event)"
+          >
+            <option value="">Sin precio en vivo</option>
+            <option value="kucoin">KuCoin</option>
+            <option value="yahoo">Yahoo Finance</option>
+          </select>
         </label>
 
         <label class="asset-edit-field">
