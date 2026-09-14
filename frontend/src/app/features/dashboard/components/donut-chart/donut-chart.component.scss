@@ -1,4 +1,9 @@
 :host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 20.5rem;
   --chart-liquid-color: #38bdf8;
   --chart-invested-color: #a855f7;
   --chart-border-color: #0f172a;
@@ -7,6 +12,7 @@
 .chart-wrap {
   position: relative;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 16rem;
@@ -24,37 +30,78 @@
   text-align: center;
 }
 
+.chart-center-label-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.125rem;
+}
+
 .chart-center-label {
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #94a3b8;
+  white-space: nowrap;
+}
+
+.chart-center-sublabel {
+  margin-top: 0.125rem;
+  min-height: 0.875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+
+  &--hidden {
+    visibility: hidden;
+  }
 }
 
 .chart-center-value {
   margin-top: 0.25rem;
+  min-height: 2rem;
   font-size: 1.5rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: #fff;
+  white-space: nowrap;
 }
 
 .chart-legend {
   display: flex;
-  align-items: center;
+  flex-shrink: 0;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 2rem;
+  width: 100%;
+  min-height: 1.5rem;
   margin-top: 1rem;
   font-size: 0.875rem;
 }
 
 .chart-legend-item {
-  display: flex;
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.5rem;
+
+  &--liquid {
+    min-width: 10.5rem;
+    justify-content: flex-start;
+  }
+
+  &--invested {
+    min-width: 16.5rem;
+    justify-content: flex-start;
+  }
 }
 
 .chart-legend-dot {
+  flex-shrink: 0;
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 9999px;
@@ -69,10 +116,15 @@
 }
 
 .chart-legend-label {
+  flex-shrink: 0;
   color: #cbd5e1;
+  white-space: nowrap;
 }
 
 .chart-legend-value {
+  flex-shrink: 0;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: #fff;
+  white-space: nowrap;
 }

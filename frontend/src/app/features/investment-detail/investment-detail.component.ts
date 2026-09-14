@@ -333,7 +333,7 @@ export class InvestmentDetailComponent {
     });
   }
 
-  /** Valor de mercado total en EUR y rendimiento agregado de toda la cartera. */
+  /** Valor de mercado total en EUR y balance vs total invertido registrado. */
   portfolioLiveSummary(): PortfolioLiveSummary {
     const overview = this.overview();
     if (!overview) {
@@ -341,33 +341,26 @@ export class InvestmentDetailComponent {
     }
 
     let totalMarketEur = 0;
-    let totalCostEur = 0;
     let assetCount = 0;
 
     for (const cat of overview.categories) {
       const detail = this.panel(cat.category_id).detail;
       if (!detail) {
-        continue;
+        return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
       }
 
       for (const asset of detail.assets) {
-        const marketEur = this.assetMarketValueEur(asset, cat.category_id);
-        if (marketEur === null) {
-          continue;
-        }
-        totalMarketEur += marketEur;
-        totalCostEur += asset.amount_eur;
+        totalMarketEur += this.assetPortfolioValueEur(asset, cat.category_id);
         assetCount += 1;
       }
+      totalMarketEur += detail.others_amount_eur;
     }
 
-    if (assetCount === 0) {
-      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
-    }
-
+    const totalInvestedEur = overview.total_invested;
     const marketValueEur = this.round2(totalMarketEur);
-    const profitEur = this.round2(marketValueEur - totalCostEur);
-    const profitPct = totalCostEur > 0 ? this.round2((profitEur / totalCostEur) * 100) : 0;
+    const profitEur = this.round2(marketValueEur - totalInvestedEur);
+    const profitPct =
+      totalInvestedEur > 0 ? this.round2((profitEur / totalInvestedEur) * 100) : 0;
     return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
   }
 
@@ -387,34 +380,28 @@ export class InvestmentDetailComponent {
     return this.categoryProfitInfoOpen()[categoryId] ?? false;
   }
 
-  /** Suma de ganancias/pérdidas en EUR y % agregado de los activos con precio en vivo y títulos. */
+  /** Valor de mercado de la categoría y balance vs total invertido de la categoría. */
   categoryLiveSummary(categoryId: string): CategoryLiveSummary {
+    const overview = this.overview();
     const detail = this.panel(categoryId).detail;
-    if (!detail) {
+    const category = overview?.categories.find((cat) => cat.category_id === categoryId);
+    if (!detail || !category) {
       return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    let totalMarketEur = 0;
-    let totalCostEur = 0;
+    let totalMarketEur = detail.others_amount_eur;
     let assetCount = 0;
 
     for (const asset of detail.assets) {
-      const marketEur = this.assetMarketValueEur(asset, categoryId);
-      if (marketEur === null) {
-        continue;
-      }
-      totalMarketEur += marketEur;
-      totalCostEur += asset.amount_eur;
+      totalMarketEur += this.assetPortfolioValueEur(asset, categoryId);
       assetCount += 1;
     }
 
-    if (assetCount === 0) {
-      return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
-    }
-
+    const totalInvestedEur = category.amount_eur;
     const marketValueEur = this.round2(totalMarketEur);
-    const profitEur = this.round2(marketValueEur - totalCostEur);
-    const profitPct = totalCostEur > 0 ? this.round2((profitEur / totalCostEur) * 100) : 0;
+    const profitEur = this.round2(marketValueEur - totalInvestedEur);
+    const profitPct =
+      totalInvestedEur > 0 ? this.round2((profitEur / totalInvestedEur) * 100) : 0;
     return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
   }
 
@@ -428,6 +415,15 @@ export class InvestmentDetailComponent {
 
     const fx = this.panel(categoryId).fxUsdToEur ?? 1;
     return this.round2(units * this.amountToEur(live.price, live.currency, fx));
+  }
+
+  /**
+   * Contribución al valor de mercado agregado: títulos × precio en EUR si hay cotización;
+   * si no, importe registrado en EUR (misma regla que el patrimonio en vivo del dashboard).
+   */
+  private assetPortfolioValueEur(asset: AssetInvestmentDetail, categoryId: string): number {
+    const liveMarket = this.assetMarketValueEur(asset, categoryId);
+    return liveMarket !== null ? liveMarket : asset.amount_eur;
   }
 
   /** P/L de un activo siempre normalizado a EUR (para agregados de categoría). */

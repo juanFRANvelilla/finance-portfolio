@@ -1,10 +1,15 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import { forkJoin, Observable } from 'rxjs';
+import { Observable, Subscription, catchError, forkJoin, of, switchMap, timer } from 'rxjs';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
+import { InvestmentApiService } from '../../core/services/investment-api.service';
+import { MarketPriceApiService } from '../../core/services/market-price-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
+import { CategoryDetailResponse } from '../../core/models/investment.model';
+import { MarketPriceResponse } from '../../core/models/market-price.model';
 import { Entity } from '../../core/models/entity.model';
 import {
   EntityBalanceInput,
@@ -22,6 +27,8 @@ import { BalanceFormComponent, BalanceFormSubmission, HybridFormSubmission } fro
 import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
 import { TimelineChartComponent } from './components/timeline-chart/timeline-chart.component';
 
+const LIVE_PATRIMONY_POLL_MS = 35_000;
+
 @Component({
   selector: 'app-dashboard',
   imports: [
@@ -38,8 +45,12 @@ import { TimelineChartComponent } from './components/timeline-chart/timeline-cha
 })
 export class DashboardComponent {
   private readonly api = inject(FinanceApiService);
+  private readonly investmentApi = inject(InvestmentApiService);
+  private readonly marketPriceApi = inject(MarketPriceApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly periodStorage = inject(PeriodStorageService);
+  private readonly destroyRef = inject(DestroyRef);
+  private livePatrimonyPollSub: Subscription | null = null;
 
   readonly monthNames = MONTH_NAMES;
 
@@ -59,6 +70,10 @@ export class DashboardComponent {
   readonly errorMessage = signal<string | null>(null);
   readonly timelinePoints = signal<TimelinePoint[]>([]);
   readonly editing = signal<boolean>(false);
+
+  readonly livePatrimonyMode = signal(false);
+  readonly liveInvestedEur = signal<number | null>(null);
+  readonly livePatrimonyLoading = signal(false);
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
   readonly hasFullRecord = computed(() => {
@@ -85,7 +100,42 @@ export class DashboardComponent {
 
   readonly canImportJson = computed(() => this.isPastMonth() && !this.hasFullRecord());
 
+  readonly displayInvestedEur = computed(() => {
+    if (this.livePatrimonyMode() && this.liveInvestedEur() !== null) {
+      return this.liveInvestedEur()!;
+    }
+    return this.recordResponse()?.record?.total_invested ?? 0;
+  });
+
+  readonly displayNetWorthEur = computed(() => {
+    const liquid = this.recordResponse()?.record?.total_liquid ?? 0;
+    return this.round2(liquid + this.displayInvestedEur());
+  });
+
+  readonly donutInvestedLabel = computed(() =>
+    this.livePatrimonyMode() ? 'Valor real invertido' : 'Invertido',
+  );
+
+  readonly livePatrimonyProfitEur = computed(() => {
+    const liveInvested = this.liveInvestedEur();
+    const recordedInvested = this.recordResponse()?.record?.total_invested;
+    if (!this.livePatrimonyMode() || liveInvested === null || recordedInvested === undefined) {
+      return null;
+    }
+    return this.round2(liveInvested - recordedInvested);
+  });
+
+  readonly livePatrimonyProfitPct = computed(() => {
+    const profit = this.livePatrimonyProfitEur();
+    const recordedInvested = this.recordResponse()?.record?.total_invested;
+    if (profit === null || !recordedInvested || recordedInvested <= 0) {
+      return null;
+    }
+    return this.round2((profit / recordedInvested) * 100);
+  });
+
   constructor() {
+    this.destroyRef.onDestroy(() => this.stopLivePatrimonyPoll());
     // Reacciona a cambios de query params (navegación desde el shell global)
     this.route.queryParamMap.subscribe((params) => {
       const stored = this.periodStorage.read();
@@ -97,6 +147,9 @@ export class DashboardComponent {
       this.month.set(month);
       this.periodStorage.save(year, month);
       this.editing.set(false);
+      this.livePatrimonyMode.set(false);
+      this.liveInvestedEur.set(null);
+      this.stopLivePatrimonyPoll();
 
       if (periodChanged || !this.recordResponse()) {
         this.loadRecord();
@@ -112,6 +165,120 @@ export class DashboardComponent {
       next: (entities) => this.entities.set(entities),
       error: () => this.errorMessage.set('No se pudieron cargar las entidades.'),
     });
+  }
+
+  liveProfitClass(profit: number | null): string {
+    if (profit === null || profit === 0) {
+      return 'live-patrimony-balance live-patrimony-balance--neutral';
+    }
+    return profit > 0
+      ? 'live-patrimony-balance live-patrimony-balance--gain'
+      : 'live-patrimony-balance live-patrimony-balance--loss';
+  }
+
+  toggleLivePatrimony(): void {
+    const willEnable = !this.livePatrimonyMode();
+    this.livePatrimonyMode.set(willEnable);
+    if (willEnable) {
+      this.refreshLivePatrimony();
+      this.startLivePatrimonyPoll();
+      return;
+    }
+    this.stopLivePatrimonyPoll();
+    this.liveInvestedEur.set(null);
+  }
+
+  private startLivePatrimonyPoll(): void {
+    this.stopLivePatrimonyPoll();
+    this.livePatrimonyPollSub = timer(LIVE_PATRIMONY_POLL_MS, LIVE_PATRIMONY_POLL_MS)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.livePatrimonyMode()) {
+          this.refreshLivePatrimony();
+        }
+      });
+  }
+
+  private stopLivePatrimonyPoll(): void {
+    this.livePatrimonyPollSub?.unsubscribe();
+    this.livePatrimonyPollSub = null;
+  }
+
+  private refreshLivePatrimony(): void {
+    if (!this.hasFullRecord()) {
+      return;
+    }
+
+    this.livePatrimonyLoading.set(true);
+    const year = this.year();
+    const month = this.month();
+
+    this.investmentApi
+      .getOverview(year, month)
+      .pipe(
+        switchMap((overview) => {
+          const categoryIds = overview.categories.map((cat) => cat.category_id);
+          if (categoryIds.length === 0) {
+            return of<{ details: CategoryDetailResponse[]; prices: MarketPriceResponse[] }>({
+              details: [],
+              prices: [],
+            });
+          }
+          return forkJoin({
+            details: forkJoin(
+              categoryIds.map((categoryId) =>
+                this.investmentApi.getCategoryDetail(year, month, categoryId),
+              ),
+            ),
+            prices: this.marketPriceApi.getMarketPrices().pipe(catchError(() => of([]))),
+          });
+        }),
+        catchError(() => of<{ details: CategoryDetailResponse[]; prices: MarketPriceResponse[] } | null>(null)),
+      )
+      .subscribe((payload) => {
+        this.livePatrimonyLoading.set(false);
+        if (!payload || !this.livePatrimonyMode()) {
+          return;
+        }
+        this.liveInvestedEur.set(this.computeLiveInvestedEur(payload.details, payload.prices));
+      });
+  }
+
+  private computeLiveInvestedEur(
+    details: CategoryDetailResponse[],
+    prices: MarketPriceResponse[],
+  ): number {
+    const pricesByAssetId = new Map(prices.map((price) => [price.asset_type_id, price]));
+    let total = 0;
+
+    for (const detail of details) {
+      const fx = detail.fx_usd_to_eur ?? 1;
+      for (const asset of detail.assets) {
+        const live = pricesByAssetId.get(asset.asset_type_id);
+        if (live && asset.units !== null && asset.units > 0) {
+          total += asset.units * this.amountToEur(live.price, live.currency, fx);
+        } else {
+          total += asset.amount_eur;
+        }
+      }
+      total += detail.others_amount_eur;
+    }
+
+    return this.round2(total);
+  }
+
+  private amountToEur(amount: number, currency: string, fxRate: number): number {
+    if (currency === 'EUR') {
+      return amount;
+    }
+    if (currency === 'USD' || currency === 'USDT') {
+      return this.round2(amount * fxRate);
+    }
+    return amount;
+  }
+
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 
   private loadRecord(): void {

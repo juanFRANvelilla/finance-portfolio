@@ -2,20 +2,23 @@
   <canvas #canvasRef></canvas>
 
   <div class="chart-center">
-    <span class="chart-center-label">Patrimonio neto</span>
+    <div class="chart-center-label-wrap">
+      <span class="chart-center-label">Patrimonio neto</span>
+      <span class="chart-center-sublabel" [class.chart-center-sublabel--hidden]="!liveMode()">En vivo</span>
+    </div>
     <span class="chart-center-value">{{ totalNetWorth() | eurCurrency }}</span>
   </div>
 </div>
 
 <div class="chart-legend">
-  <div class="chart-legend-item">
+  <div class="chart-legend-item chart-legend-item--liquid">
     <span class="chart-legend-dot chart-legend-dot--liquid"></span>
     <span class="chart-legend-label">Líquido</span>
     <span class="chart-legend-value">{{ totalLiquid() | eurCurrency }}</span>
   </div>
-  <div class="chart-legend-item">
+  <div class="chart-legend-item chart-legend-item--invested">
     <span class="chart-legend-dot chart-legend-dot--invested"></span>
-    <span class="chart-legend-label">Invertido</span>
+    <span class="chart-legend-label">{{ investedLabel() }}</span>
     <span class="chart-legend-value">{{ totalInvested() | eurCurrency }}</span>
   </div>
 </div>

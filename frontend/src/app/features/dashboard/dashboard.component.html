@@ -41,12 +41,58 @@
     </div>
   } @else if (hasFullRecord() && !editing() && recordResponse()?.record) {
     <section class="grid gap-6 md:grid-cols-3">
-      <div class="flex flex-col items-center justify-center rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
-        <app-donut-chart
-          [totalLiquid]="recordResponse()!.record!.total_liquid"
-          [totalInvested]="recordResponse()!.record!.total_invested"
-          [totalNetWorth]="recordResponse()!.record!.total_net_worth"
-        />
+      <div class="dashboard-donut-panel flex flex-col rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
+        <div class="mb-4 flex min-h-[2rem] items-center justify-between gap-3">
+          @if (livePatrimonyMode()) {
+            <div class="live-patrimony-summary">
+              @if (livePatrimonyLoading() && liveInvestedEur() === null) {
+                <span class="live-patrimony-balance live-patrimony-balance--neutral">Calculando...</span>
+              } @else if (livePatrimonyProfitEur() !== null && livePatrimonyProfitPct() !== null) {
+                <span [class]="liveProfitClass(livePatrimonyProfitEur())">
+                  {{ livePatrimonyProfitEur()! >= 0 ? '+' : '' }}{{ livePatrimonyProfitEur()! | eurCurrency }}
+                </span>
+                <span [class]="liveProfitClass(livePatrimonyProfitEur())">
+                  ({{ livePatrimonyProfitPct()! >= 0 ? '+' : '' }}{{ livePatrimonyProfitPct()! | number:'1.2-2' }}%)
+                </span>
+              }
+            </div>
+          } @else {
+            <span aria-hidden="true"></span>
+          }
+          <button
+            type="button"
+            class="live-patrimony-toggle"
+            [class.live-patrimony-toggle--active]="livePatrimonyMode()"
+            [disabled]="livePatrimonyLoading()"
+            [title]="livePatrimonyMode() ? 'Volver a patrimonio registrado' : 'Ver patrimonio en tiempo real'"
+            (click)="toggleLivePatrimony()"
+          >
+            <svg
+              class="live-patrimony-toggle-icon"
+              [class.live-patrimony-toggle-icon--spinning]="livePatrimonyLoading()"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            {{ livePatrimonyMode() ? 'Patrimonio en vivo' : 'Tiempo real' }}
+          </button>
+        </div>
+        <div class="dashboard-donut-panel__chart flex flex-1 flex-col items-center justify-center">
+          <app-donut-chart
+            [totalLiquid]="recordResponse()!.record!.total_liquid"
+            [totalInvested]="displayInvestedEur()"
+            [totalNetWorth]="displayNetWorthEur()"
+            [investedLabel]="donutInvestedLabel()"
+            [liveMode]="livePatrimonyMode()"
+          />
+        </div>
       </div>
 
       <app-diff-badge

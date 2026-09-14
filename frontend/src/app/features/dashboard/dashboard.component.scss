@@ -1,0 +1,82 @@
+.dashboard-donut-panel {
+  min-height: 26.5rem;
+}
+
+.dashboard-donut-panel__chart {
+  min-height: 20.5rem;
+}
+
+.live-patrimony-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-patrimony-balance {
+  white-space: nowrap;
+
+  &--gain {
+    color: #6ee7b7;
+  }
+
+  &--loss {
+    color: #fda4af;
+  }
+
+  &--neutral {
+    color: #94a3b8;
+  }
+}
+
+.live-patrimony-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 9.5rem;
+  border: 1px solid rgb(16 185 129 / 0.3);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6ee7b7;
+  background-color: rgb(16 185 129 / 0.1);
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: rgb(52 211 153 / 0.4);
+    color: #a7f3d0;
+    background-color: rgb(16 185 129 / 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  &--active {
+    color: #fde68a;
+    border-color: rgb(251 191 36 / 0.45);
+    background-color: rgb(251 191 36 / 0.12);
+  }
+}
+
+.live-patrimony-toggle-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+
+  &--spinning {
+    animation: live-patrimony-spin 1s linear infinite;
+  }
+}
+
+@keyframes live-patrimony-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

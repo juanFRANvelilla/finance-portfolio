@@ -25,6 +25,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
   readonly totalLiquid = input.required<number>();
   readonly totalInvested = input.required<number>();
   readonly totalNetWorth = input.required<number>();
+  readonly investedLabel = input<string>('Invertido');
+  readonly liveMode = input<boolean>(false);
 
   @ViewChild('canvasRef') private readonly canvasRef!: ElementRef<HTMLCanvasElement>;
   private chart: Chart | null = null;
@@ -57,7 +59,7 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
     const config: ChartConfiguration<'doughnut'> = {
       type: 'doughnut',
       data: {
-        labels: ['Líquido', 'Invertido'],
+        labels: ['Líquido', this.investedLabel()],
         datasets: [
           {
             data: [this.totalLiquid(), this.totalInvested()],
@@ -72,6 +74,7 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
         cutout: '72%',
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -94,7 +97,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private updateChart(): void {
     if (!this.chart) return;
+    this.chart.data.labels = ['Líquido', this.investedLabel()];
     this.chart.data.datasets[0].data = [this.totalLiquid(), this.totalInvested()];
-    this.chart.update();
+    this.chart.update('none');
   }
 }
