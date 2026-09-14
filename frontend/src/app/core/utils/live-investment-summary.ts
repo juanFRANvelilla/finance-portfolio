@@ -1,4 +1,4 @@
-import { AssetInvestmentDetail } from '../models/investment.model';
+import { AssetInvestmentDetail, CategoryDetailResponse } from '../models/investment.model';
 
 export interface LiveInvestmentSummary {
   marketValueEur: number;
@@ -116,6 +116,56 @@ export function aggregatePortfolioLiveSummary(
 }
 
 /** Comprueba que el total de cartera coincide con la suma de categorías (para tests). */
+export interface CategoryInvestedOverview {
+  categoryId: string;
+  investedEur: number;
+}
+
+export function marketPricesToMap(
+  prices: readonly { asset_type_id: string; price: number; currency: string }[],
+): LivePriceByAssetId {
+  return new Map(
+    prices.map((quote) => [
+      quote.asset_type_id,
+      { price: quote.price, currency: quote.currency },
+    ]),
+  );
+}
+
+/**
+ * Mismo total que el panel ℹ️ de «Total invertido» en detalle de inversión
+ * (y el donut en vivo del dashboard cuando hay overview + detalle por categoría).
+ */
+export function computePortfolioLiveSummaryFromDetails(
+  categories: readonly CategoryInvestedOverview[],
+  details: readonly CategoryDetailResponse[],
+  prices: LivePriceByAssetId,
+  totalInvestedEur: number,
+): LiveInvestmentSummary {
+  const detailByCategoryId = new Map(details.map((detail) => [detail.category_id, detail]));
+  const categorySummaries: LiveInvestmentSummary[] = [];
+
+  for (const category of categories) {
+    const detail = detailByCategoryId.get(category.categoryId);
+    if (!detail) {
+      return { ...EMPTY_SUMMARY };
+    }
+    categorySummaries.push(
+      computeCategoryLiveSummary(
+        {
+          investedEur: category.investedEur,
+          othersAmountEur: detail.others_amount_eur,
+          assets: detail.assets,
+          fxUsdToEur: detail.fx_usd_to_eur ?? 1,
+        },
+        prices,
+      ),
+    );
+  }
+
+  return aggregatePortfolioLiveSummary(categorySummaries, totalInvestedEur);
+}
+
 export function categorySummariesMatchPortfolioAggregate(
   categorySummaries: readonly LiveInvestmentSummary[],
   portfolio: LiveInvestmentSummary,

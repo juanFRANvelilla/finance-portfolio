@@ -45,7 +45,7 @@
         <div class="mb-4 flex min-h-[2rem] items-center justify-between gap-3">
           @if (livePatrimonyMode()) {
             <div class="live-patrimony-summary">
-              @if (livePatrimonyLoading() && liveInvestedEur() === null) {
+              @if (livePatrimonyLoading() && livePortfolioSummary() === null) {
                 <span class="live-patrimony-balance live-patrimony-balance--neutral">Calculando...</span>
               } @else if (livePatrimonyProfitEur() !== null && livePatrimonyProfitPct() !== null) {
                 <span [class]="liveProfitClass(livePatrimonyProfitEur())">

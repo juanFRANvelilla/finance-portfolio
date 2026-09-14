@@ -22,12 +22,13 @@ import { DonutSegment, SegmentDonutChartComponent } from '../../shared/component
 import { parseDecimalInput } from '../../core/utils/parse-decimal';
 import { readCssVar } from '../../core/utils/read-css-var';
 import {
-  aggregatePortfolioLiveSummary,
   amountToEur,
   assetMarketValueEur as computeAssetMarketValueEur,
   computeCategoryLiveSummary,
+  computePortfolioLiveSummaryFromDetails,
   LiveInvestmentSummary,
   LivePriceByAssetId,
+  marketPricesToMap,
   round2,
 } from '../../core/utils/live-investment-summary';
 
@@ -331,18 +332,24 @@ export class InvestmentDetailComponent {
       return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    const prices = this.livePricesMap();
-    const categorySummaries: LiveInvestmentSummary[] = [];
-
+    const details: CategoryDetailResponse[] = [];
     for (const cat of overview.categories) {
       const detail = this.panel(cat.category_id).detail;
       if (!detail) {
         return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
       }
-      categorySummaries.push(this.buildCategoryLiveSummary(cat.category_id, cat.amount_eur, detail, prices));
+      details.push(detail);
     }
 
-    return aggregatePortfolioLiveSummary(categorySummaries, overview.total_invested);
+    return computePortfolioLiveSummaryFromDetails(
+      overview.categories.map((cat) => ({
+        categoryId: cat.category_id,
+        investedEur: cat.amount_eur,
+      })),
+      details,
+      this.livePricesMap(),
+      overview.total_invested,
+    );
   }
 
   toggleCategoryProfitInfo(event: Event, categoryId: string): void {
@@ -396,13 +403,7 @@ export class InvestmentDetailComponent {
   }
 
   private livePricesMap(): LivePriceByAssetId {
-    const record = this.marketPrices();
-    return new Map(
-      Object.entries(record).map(([assetTypeId, quote]) => [
-        assetTypeId,
-        { price: quote.price, currency: quote.currency },
-      ]),
-    );
+    return marketPricesToMap(Object.values(this.marketPrices()));
   }
 
   /** Valor de mercado de un activo en EUR (precio en vivo × títulos). */

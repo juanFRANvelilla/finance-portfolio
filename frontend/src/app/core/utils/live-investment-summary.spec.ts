@@ -5,10 +5,12 @@ import {
   aggregatePortfolioLiveSummary,
   categorySummariesMatchPortfolioAggregate,
   computeCategoryLiveSummary,
+  computePortfolioLiveSummaryFromDetails,
   type CategoryLiveSummaryInput,
   type LiveInvestmentSummary,
   type LivePriceByAssetId,
 } from './live-investment-summary';
+import { CategoryDetailResponse } from '../models/investment.model';
 
 function makeAsset(
   partial: Partial<AssetInvestmentDetail> & {
@@ -140,6 +142,65 @@ describe('live-investment-summary', () => {
       expect(perCategory).toHaveLength(categoryCount);
       expect(categorySummariesMatchPortfolioAggregate(perCategory, portfolio)).toBe(true);
     }
+  });
+
+  it('computePortfolioLiveSummaryFromDetails coincide con agregar categorías (ruta dashboard / detalle)', () => {
+    const prices: LivePriceByAssetId = new Map([
+      ['acc-1', { price: 50, currency: 'EUR' }],
+    ]);
+    const categories = [
+      { categoryId: 'fondos', investedEur: 2_000 },
+      { categoryId: 'acciones', investedEur: 3_000 },
+    ];
+    const details: CategoryDetailResponse[] = [
+      {
+        year: 2026,
+        month: 3,
+        category_id: 'fondos',
+        category_name: 'Fondos',
+        is_computed: false,
+        category_amount_eur: 2_000,
+        fx_usd_to_eur: 1,
+        allocated_amount_eur: 1_900,
+        others_amount_eur: 100,
+        assets: [makeAsset({ asset_type_id: 'fund-1', amount_eur: 1_900 })],
+      },
+      {
+        year: 2026,
+        month: 3,
+        category_id: 'acciones',
+        category_name: 'Acciones',
+        is_computed: true,
+        category_amount_eur: 3_000,
+        fx_usd_to_eur: 1,
+        allocated_amount_eur: 3_000,
+        others_amount_eur: 0,
+        assets: [
+          makeAsset({ asset_type_id: 'acc-1', amount_eur: 2_000, units: 40 }),
+          makeAsset({ asset_type_id: 'acc-2', amount_eur: 1_000, units: null }),
+        ],
+      },
+    ];
+
+    const portfolio = computePortfolioLiveSummaryFromDetails(
+      categories,
+      details,
+      prices,
+      5_000,
+    );
+    const perCategory = categories.map((cat, index) =>
+      computeCategoryLiveSummary(
+        {
+          investedEur: cat.investedEur,
+          othersAmountEur: details[index].others_amount_eur,
+          assets: details[index].assets,
+          fxUsdToEur: 1,
+        },
+        prices,
+      ),
+    );
+
+    expect(categorySummariesMatchPortfolioAggregate(perCategory, portfolio)).toBe(true);
   });
 
   it('devuelve hasData false en cartera si falta alguna categoría', () => {

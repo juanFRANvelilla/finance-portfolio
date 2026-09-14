@@ -8,8 +8,14 @@ import { FinanceApiService } from '../../core/services/finance-api.service';
 import { InvestmentApiService } from '../../core/services/investment-api.service';
 import { MarketPriceApiService } from '../../core/services/market-price-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
-import { CategoryDetailResponse } from '../../core/models/investment.model';
+import { CategoryDetailResponse, InvestmentOverviewResponse } from '../../core/models/investment.model';
 import { MarketPriceResponse } from '../../core/models/market-price.model';
+import {
+  computePortfolioLiveSummaryFromDetails,
+  LiveInvestmentSummary,
+  marketPricesToMap,
+  round2,
+} from '../../core/utils/live-investment-summary';
 import { Entity } from '../../core/models/entity.model';
 import {
   EntityBalanceInput,
@@ -72,7 +78,7 @@ export class DashboardComponent {
   readonly editing = signal<boolean>(false);
 
   readonly livePatrimonyMode = signal(false);
-  readonly liveInvestedEur = signal<number | null>(null);
+  readonly livePortfolioSummary = signal<LiveInvestmentSummary | null>(null);
   readonly livePatrimonyLoading = signal(false);
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
@@ -101,8 +107,9 @@ export class DashboardComponent {
   readonly canImportJson = computed(() => this.isPastMonth() && !this.hasFullRecord());
 
   readonly displayInvestedEur = computed(() => {
-    if (this.livePatrimonyMode() && this.liveInvestedEur() !== null) {
-      return this.liveInvestedEur()!;
+    const liveSummary = this.livePortfolioSummary();
+    if (this.livePatrimonyMode() && liveSummary?.hasData) {
+      return liveSummary.marketValueEur;
     }
     return this.recordResponse()?.record?.total_invested ?? 0;
   });
@@ -117,21 +124,19 @@ export class DashboardComponent {
   );
 
   readonly livePatrimonyProfitEur = computed(() => {
-    const liveInvested = this.liveInvestedEur();
-    const recordedInvested = this.recordResponse()?.record?.total_invested;
-    if (!this.livePatrimonyMode() || liveInvested === null || recordedInvested === undefined) {
+    const liveSummary = this.livePortfolioSummary();
+    if (!this.livePatrimonyMode() || !liveSummary?.hasData) {
       return null;
     }
-    return this.round2(liveInvested - recordedInvested);
+    return liveSummary.profitEur;
   });
 
   readonly livePatrimonyProfitPct = computed(() => {
-    const profit = this.livePatrimonyProfitEur();
-    const recordedInvested = this.recordResponse()?.record?.total_invested;
-    if (profit === null || !recordedInvested || recordedInvested <= 0) {
+    const liveSummary = this.livePortfolioSummary();
+    if (!this.livePatrimonyMode() || !liveSummary?.hasData) {
       return null;
     }
-    return this.round2((profit / recordedInvested) * 100);
+    return liveSummary.profitPct;
   });
 
   constructor() {
@@ -148,7 +153,7 @@ export class DashboardComponent {
       this.periodStorage.save(year, month);
       this.editing.set(false);
       this.livePatrimonyMode.set(false);
-      this.liveInvestedEur.set(null);
+      this.livePortfolioSummary.set(null);
       this.stopLivePatrimonyPoll();
 
       if (periodChanged || !this.recordResponse()) {
@@ -185,7 +190,7 @@ export class DashboardComponent {
       return;
     }
     this.stopLivePatrimonyPoll();
-    this.liveInvestedEur.set(null);
+    this.livePortfolioSummary.set(null);
   }
 
   private startLivePatrimonyPoll(): void {
@@ -219,12 +224,18 @@ export class DashboardComponent {
         switchMap((overview) => {
           const categoryIds = overview.categories.map((cat) => cat.category_id);
           if (categoryIds.length === 0) {
-            return of<{ details: CategoryDetailResponse[]; prices: MarketPriceResponse[] }>({
+            return of<{
+              overview: InvestmentOverviewResponse;
+              details: CategoryDetailResponse[];
+              prices: MarketPriceResponse[];
+            }>({
+              overview,
               details: [],
               prices: [],
             });
           }
           return forkJoin({
+            overview: of(overview),
             details: forkJoin(
               categoryIds.map((categoryId) =>
                 this.investmentApi.getCategoryDetail(year, month, categoryId),
@@ -233,52 +244,35 @@ export class DashboardComponent {
             prices: this.marketPriceApi.getMarketPrices().pipe(catchError(() => of([]))),
           });
         }),
-        catchError(() => of<{ details: CategoryDetailResponse[]; prices: MarketPriceResponse[] } | null>(null)),
+        catchError(
+          () =>
+            of<{
+              overview: InvestmentOverviewResponse;
+              details: CategoryDetailResponse[];
+              prices: MarketPriceResponse[];
+            } | null>(null),
+        ),
       )
       .subscribe((payload) => {
         this.livePatrimonyLoading.set(false);
         if (!payload || !this.livePatrimonyMode()) {
           return;
         }
-        this.liveInvestedEur.set(this.computeLiveInvestedEur(payload.details, payload.prices));
+        const summary = computePortfolioLiveSummaryFromDetails(
+          payload.overview.categories.map((cat) => ({
+            categoryId: cat.category_id,
+            investedEur: cat.amount_eur,
+          })),
+          payload.details,
+          marketPricesToMap(payload.prices),
+          payload.overview.total_invested,
+        );
+        this.livePortfolioSummary.set(summary.hasData ? summary : null);
       });
   }
 
-  private computeLiveInvestedEur(
-    details: CategoryDetailResponse[],
-    prices: MarketPriceResponse[],
-  ): number {
-    const pricesByAssetId = new Map(prices.map((price) => [price.asset_type_id, price]));
-    let total = 0;
-
-    for (const detail of details) {
-      const fx = detail.fx_usd_to_eur ?? 1;
-      for (const asset of detail.assets) {
-        const live = pricesByAssetId.get(asset.asset_type_id);
-        if (live && asset.units !== null && asset.units > 0) {
-          total += asset.units * this.amountToEur(live.price, live.currency, fx);
-        } else {
-          total += asset.amount_eur;
-        }
-      }
-      total += detail.others_amount_eur;
-    }
-
-    return this.round2(total);
-  }
-
-  private amountToEur(amount: number, currency: string, fxRate: number): number {
-    if (currency === 'EUR') {
-      return amount;
-    }
-    if (currency === 'USD' || currency === 'USDT') {
-      return this.round2(amount * fxRate);
-    }
-    return amount;
-  }
-
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    return round2(value);
   }
 
   private loadRecord(): void {
