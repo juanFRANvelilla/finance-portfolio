@@ -21,6 +21,15 @@ import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
 import { parseDecimalInput } from '../../core/utils/parse-decimal';
 import { readCssVar } from '../../core/utils/read-css-var';
+import {
+  aggregatePortfolioLiveSummary,
+  amountToEur,
+  assetMarketValueEur as computeAssetMarketValueEur,
+  computeCategoryLiveSummary,
+  LiveInvestmentSummary,
+  LivePriceByAssetId,
+  round2,
+} from '../../core/utils/live-investment-summary';
 
 /** Sondeo de precios en vivo: cada 35s, arranca al montar el componente. */
 const MARKET_PRICE_POLL_MS = 35_000;
@@ -33,24 +42,6 @@ interface LivePriceMetrics {
   marketValue: number | null;
   profit: number | null;
   profitPct: number | null;
-}
-
-/** Resumen agregado de P/L en vivo de una categoría (siempre en EUR). */
-interface CategoryLiveSummary {
-  marketValueEur: number;
-  profitEur: number;
-  profitPct: number;
-  assetCount: number;
-  hasData: boolean;
-}
-
-/** Resumen de cartera según precios de mercado actuales (siempre en EUR). */
-interface PortfolioLiveSummary {
-  marketValueEur: number;
-  profitEur: number;
-  profitPct: number;
-  assetCount: number;
-  hasData: boolean;
 }
 
 const FALLBACK_DEFAULTS = ['#f59e0b', '#6366f1', '#22c55e', '#ec4899', '#06b6d4', '#eab308', '#f43f5e'];
@@ -334,34 +325,24 @@ export class InvestmentDetailComponent {
   }
 
   /** Valor de mercado total en EUR y balance vs total invertido registrado. */
-  portfolioLiveSummary(): PortfolioLiveSummary {
+  portfolioLiveSummary(): LiveInvestmentSummary {
     const overview = this.overview();
     if (!overview) {
       return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    let totalMarketEur = 0;
-    let assetCount = 0;
+    const prices = this.livePricesMap();
+    const categorySummaries: LiveInvestmentSummary[] = [];
 
     for (const cat of overview.categories) {
       const detail = this.panel(cat.category_id).detail;
       if (!detail) {
         return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
       }
-
-      for (const asset of detail.assets) {
-        totalMarketEur += this.assetPortfolioValueEur(asset, cat.category_id);
-        assetCount += 1;
-      }
-      totalMarketEur += detail.others_amount_eur;
+      categorySummaries.push(this.buildCategoryLiveSummary(cat.category_id, cat.amount_eur, detail, prices));
     }
 
-    const totalInvestedEur = overview.total_invested;
-    const marketValueEur = this.round2(totalMarketEur);
-    const profitEur = this.round2(marketValueEur - totalInvestedEur);
-    const profitPct =
-      totalInvestedEur > 0 ? this.round2((profitEur / totalInvestedEur) * 100) : 0;
-    return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
+    return aggregatePortfolioLiveSummary(categorySummaries, overview.total_invested);
   }
 
   toggleCategoryProfitInfo(event: Event, categoryId: string): void {
@@ -381,7 +362,7 @@ export class InvestmentDetailComponent {
   }
 
   /** Valor de mercado de la categoría y balance vs total invertido de la categoría. */
-  categoryLiveSummary(categoryId: string): CategoryLiveSummary {
+  categoryLiveSummary(categoryId: string): LiveInvestmentSummary {
     const overview = this.overview();
     const detail = this.panel(categoryId).detail;
     const category = overview?.categories.find((cat) => cat.category_id === categoryId);
@@ -389,41 +370,45 @@ export class InvestmentDetailComponent {
       return { marketValueEur: 0, profitEur: 0, profitPct: 0, assetCount: 0, hasData: false };
     }
 
-    let totalMarketEur = detail.others_amount_eur;
-    let assetCount = 0;
+    return this.buildCategoryLiveSummary(
+      categoryId,
+      category.amount_eur,
+      detail,
+      this.livePricesMap(),
+    );
+  }
 
-    for (const asset of detail.assets) {
-      totalMarketEur += this.assetPortfolioValueEur(asset, categoryId);
-      assetCount += 1;
-    }
+  private buildCategoryLiveSummary(
+    categoryId: string,
+    investedEur: number,
+    detail: CategoryDetailResponse,
+    prices: LivePriceByAssetId,
+  ): LiveInvestmentSummary {
+    return computeCategoryLiveSummary(
+      {
+        investedEur,
+        othersAmountEur: detail.others_amount_eur,
+        assets: detail.assets,
+        fxUsdToEur: this.panel(categoryId).fxUsdToEur ?? 1,
+      },
+      prices,
+    );
+  }
 
-    const totalInvestedEur = category.amount_eur;
-    const marketValueEur = this.round2(totalMarketEur);
-    const profitEur = this.round2(marketValueEur - totalInvestedEur);
-    const profitPct =
-      totalInvestedEur > 0 ? this.round2((profitEur / totalInvestedEur) * 100) : 0;
-    return { marketValueEur, profitEur, profitPct, assetCount, hasData: true };
+  private livePricesMap(): LivePriceByAssetId {
+    const record = this.marketPrices();
+    return new Map(
+      Object.entries(record).map(([assetTypeId, quote]) => [
+        assetTypeId,
+        { price: quote.price, currency: quote.currency },
+      ]),
+    );
   }
 
   /** Valor de mercado de un activo en EUR (precio en vivo × títulos). */
   private assetMarketValueEur(asset: AssetInvestmentDetail, categoryId: string): number | null {
-    const live = this.livePriceFor(asset.asset_type_id);
-    const units = asset.units;
-    if (!live || units === null || units <= 0) {
-      return null;
-    }
-
     const fx = this.panel(categoryId).fxUsdToEur ?? 1;
-    return this.round2(units * this.amountToEur(live.price, live.currency, fx));
-  }
-
-  /**
-   * Contribución al valor de mercado agregado: títulos × precio en EUR si hay cotización;
-   * si no, importe registrado en EUR (misma regla que el patrimonio en vivo del dashboard).
-   */
-  private assetPortfolioValueEur(asset: AssetInvestmentDetail, categoryId: string): number {
-    const liveMarket = this.assetMarketValueEur(asset, categoryId);
-    return liveMarket !== null ? liveMarket : asset.amount_eur;
+    return computeAssetMarketValueEur(asset, fx, this.livePricesMap());
   }
 
   /** P/L de un activo siempre normalizado a EUR (para agregados de categoría). */
@@ -432,7 +417,7 @@ export class InvestmentDetailComponent {
     if (marketEur === null) {
       return null;
     }
-    return this.round2(marketEur - asset.amount_eur);
+    return round2(marketEur - asset.amount_eur);
   }
 
   private ensureAllCategoryDetailsLoaded(): void {
@@ -467,7 +452,7 @@ export class InvestmentDetailComponent {
     const showEur = showEurToggle && this.isLivePriceEurMode(assetTypeId);
 
     const nativePrice = live.price;
-    const displayPrice = showEur ? this.amountToEur(nativePrice, live.currency, fx) : nativePrice;
+    const displayPrice = showEur ? amountToEur(nativePrice, live.currency, fx) : nativePrice;
     const displayCurrency = showEur ? 'EUR' : quoteCurrency;
 
     const unitCount = units ?? null;
@@ -482,29 +467,29 @@ export class InvestmentDetailComponent {
       };
     }
 
-    const marketValue = this.round2(unitCount * displayPrice);
+    const marketValue = round2(unitCount * displayPrice);
 
     let profit: number;
     let profitBasis: number;
 
     if (showEur) {
-      const marketEur = this.round2(unitCount * this.amountToEur(nativePrice, live.currency, fx));
-      profit = this.round2(marketEur - costEur);
+      const marketEur = round2(unitCount * amountToEur(nativePrice, live.currency, fx));
+      profit = round2(marketEur - costEur);
       profitBasis = costEur;
     } else if (quoteCurrency === assetCurrency) {
-      profit = this.round2(marketValue - costNative);
+      profit = round2(marketValue - costNative);
       profitBasis = costNative;
     } else if (this.isUsdLikeCurrency(live.currency)) {
       const costInQuote = assetCurrency === 'EUR' ? costEur / fx : costNative;
-      profit = this.round2(marketValue - costInQuote);
+      profit = round2(marketValue - costInQuote);
       profitBasis = costInQuote;
     } else {
-      const marketEur = this.round2(unitCount * this.amountToEur(nativePrice, live.currency, fx));
-      profit = this.round2(marketEur - costEur);
+      const marketEur = round2(unitCount * amountToEur(nativePrice, live.currency, fx));
+      profit = round2(marketEur - costEur);
       profitBasis = costEur;
     }
 
-    const profitPct = profitBasis > 0 ? this.round2((profit / profitBasis) * 100) : 0;
+    const profitPct = profitBasis > 0 ? round2((profit / profitBasis) * 100) : 0;
 
     return {
       price: displayPrice,
@@ -514,20 +499,6 @@ export class InvestmentDetailComponent {
       profit,
       profitPct,
     };
-  }
-
-  private amountToEur(amount: number, currency: string, fxRate: number): number {
-    if (currency === 'EUR') {
-      return amount;
-    }
-    if (currency === 'USD' || currency === 'USDT') {
-      return this.round2(amount * fxRate);
-    }
-    return amount;
-  }
-
-  private round2(value: number): number {
-    return Math.round(value * 100) / 100;
   }
 
   private loadOverview(): void {

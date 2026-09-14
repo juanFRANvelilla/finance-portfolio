@@ -68,13 +68,33 @@ ng build
 
 This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
 
-## Running unit tests
+## Tests unitarios
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+Usamos [Vitest](https://vitest.dev/) vía Angular CLI (`ng test`).
+
+**Requisito:** tener dependencias instaladas (`npm install` en esta carpeta).
+
+### Ejecutar todos los tests (una pasada y salir)
+
+En terminal interactiva, `ng test` se queda en modo watch. Para CI o una sola ejecución:
 
 ```bash
-ng test
+CI=true npm test
 ```
+
+### Modo watch (se re-ejecutan al guardar)
+
+```bash
+npm test
+```
+
+### Solo los tests de resúmenes en vivo (valor de mercado / balance)
+
+```bash
+npx vitest run src/app/core/utils/live-investment-summary.spec.ts
+```
+
+Los ficheros de test siguen el patrón `**/*.spec.ts` (por ejemplo `src/app/core/utils/live-investment-summary.spec.ts`).
 
 ## Running end-to-end tests
 
