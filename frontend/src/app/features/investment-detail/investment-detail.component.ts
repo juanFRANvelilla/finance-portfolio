@@ -860,16 +860,13 @@ export class InvestmentDetailComponent {
   }
 
   onAssetSaleSaved(categoryId: string): void {
+    this.closeAssetSaleDialog();
     this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
-      next: (detail) => {
-        this.applyDetail(categoryId, detail);
-        this.closeAssetSaleDialog();
-      },
+      next: (detail) => this.applyDetail(categoryId, detail),
       error: () => {
         this.updatePanel(categoryId, {
           errorMessage: 'Venta registrada, pero no se pudo refrescar el detalle.',
         });
-        this.closeAssetSaleDialog();
       },
     });
   }

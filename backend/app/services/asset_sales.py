@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,10 +12,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.asset_sale import AssetSale
+from app.models.asset_transaction import AssetTransaction
 from app.models.asset_type import AssetType
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
 from app.services.asset_transactions import transaction_totals_by_asset_type
-from app.services.fx_converter import eur_to_native
+from app.services.fx_converter import amount_to_eur, eur_to_native
 
 
 def _to_decimal(value: Decimal | float | int) -> Decimal:
@@ -30,15 +33,30 @@ def _round8(value: Decimal | float | int) -> float:
     return float(_to_decimal(value).quantize(Decimal("0.00000001")))
 
 
-def _units_sold_through_period(
-    db: Session, asset_type_id: UUID, year: int, month: int
-) -> Decimal:
-    stmt = select(func.coalesce(func.sum(AssetSale.units), 0)).where(
-        AssetSale.asset_type_id == asset_type_id,
-        (AssetSale.sale_year < year)
-        | ((AssetSale.sale_year == year) & (AssetSale.sale_month <= month)),
+def has_asset_sale_in_month(db: Session, asset_type_id: UUID, year: int, month: int) -> bool:
+    stmt = (
+        select(AssetSale.id)
+        .where(
+            AssetSale.asset_type_id == asset_type_id,
+            AssetSale.sale_year == year,
+            AssetSale.sale_month == month,
+        )
+        .limit(1)
     )
-    return Decimal(str(db.scalar(stmt) or 0))
+    return db.scalar(stmt) is not None
+
+
+def asset_type_ids_with_sale_in_month(
+    db: Session, asset_type_ids: list[UUID], year: int, month: int
+) -> set[UUID]:
+    if not asset_type_ids:
+        return set()
+    stmt = select(AssetSale.asset_type_id).where(
+        AssetSale.asset_type_id.in_(asset_type_ids),
+        AssetSale.sale_year == year,
+        AssetSale.sale_month == month,
+    )
+    return set(db.scalars(stmt).all())
 
 
 def _position_at_month(
@@ -85,12 +103,12 @@ def get_sale_context(db: Session, asset_type_id: UUID, year: int, month: int) ->
             detail="El activo no tiene posición vendible en este mes",
         )
 
-    sold = _units_sold_through_period(db, asset_type_id, year, month)
-    available = position_dec - sold
+    # Títulos según el registro mensual / ledger; tras una venta el usuario actualiza a mano.
+    available = position_dec
     if available <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No quedan títulos disponibles para vender (ya registradas ventas previas)",
+            detail="El activo no tiene títulos registrados para este mes",
         )
 
     cost_dec = Decimal(str(cost_native))
@@ -106,6 +124,52 @@ def get_sale_context(db: Session, asset_type_id: UUID, year: int, month: int) ->
         "available_units": _round8(available),
         "avg_buy_price": avg_buy_price,
         "cost_basis_total": _round4(cost_native),
+        "position_cost_basis": _round4(cost_native),
+        "has_sale_this_month": has_asset_sale_in_month(db, asset_type_id, year, month),
+    }
+
+
+def _resolve_cost_basis(
+    *,
+    units: Decimal,
+    pmp_avg_price: Decimal,
+    position_cost_basis: Decimal,
+    cost_basis: float | None,
+) -> tuple[Decimal, Decimal]:
+    """Devuelve (cost_basis imputado, avg_buy_price unitario)."""
+    if cost_basis is not None:
+        cost_dec = Decimal(str(cost_basis))
+        if cost_dec <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El coste de adquisición imputado debe ser mayor que 0",
+            )
+        if cost_dec > position_cost_basis:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El coste imputado supera el capital total de la posición",
+            )
+        avg = cost_dec / units
+        return cost_dec, avg
+
+    cost_dec = pmp_avg_price * units
+    return cost_dec, pmp_avg_price
+
+
+def _sale_metrics(
+    units: Decimal, sale_price: Decimal, fee: Decimal, cost_basis: Decimal
+) -> dict:
+    net_liquidity = sale_price * units - fee
+    profit = net_liquidity - cost_basis
+    avg = cost_basis / units if units > 0 else Decimal("0")
+    profit_pct = (profit / cost_basis * Decimal("100")) if cost_basis > 0 else Decimal("0")
+    return {
+        "avg_buy_price": _round4(avg),
+        "net_liquidity": _round4(net_liquidity),
+        "cost_basis": _round4(cost_basis),
+        "gross_profit": _round4(profit + fee),
+        "profit": _round4(profit),
+        "profit_percentage": _round4(profit_pct),
     }
 
 
@@ -117,22 +181,35 @@ def preview_sale(
     *,
     units: float,
     sale_price: float,
+    fee: float = 0,
+    cost_basis: float | None = None,
 ) -> dict:
     context = get_sale_context(db, asset_type_id, year, month)
     units_dec = Decimal(str(units))
     available = Decimal(str(context["available_units"]))
     if units_dec <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Las unidades deben ser mayores que 0")
-    if units_dec > available:
+    position_units = Decimal(str(context["position_units"]))
+    if units_dec > position_units:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo puedes vender hasta {context['available_units']} títulos",
+            detail=f"Solo puedes vender hasta {context['position_units']} títulos (según el registro del mes)",
         )
 
-    avg = Decimal(str(context["avg_buy_price"]))
     sale = Decimal(str(sale_price))
-    profit = (sale - avg) * units_dec
-    profit_pct = ((sale - avg) / avg * Decimal("100")) if avg > 0 else Decimal("0")
+    fee_dec = Decimal(str(fee))
+    if fee_dec < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La comisión no puede ser negativa")
+
+    position_cost = Decimal(str(context["position_cost_basis"]))
+    pmp_avg = Decimal(str(context["avg_buy_price"]))
+    cost_dec, avg = _resolve_cost_basis(
+        units=units_dec,
+        pmp_avg_price=pmp_avg,
+        position_cost_basis=position_cost,
+        cost_basis=cost_basis,
+    )
+    metrics = _sale_metrics(units_dec, sale, fee_dec, cost_dec)
     share_pct = (units_dec / Decimal(str(context["position_units"])) * Decimal("100")) if context[
         "position_units"
     ] > 0 else Decimal("0")
@@ -140,9 +217,13 @@ def preview_sale(
     return {
         "units": _round8(units_dec),
         "sale_price": _round4(sale),
-        "avg_buy_price": float(avg),
-        "profit": _round4(profit),
-        "profit_percentage": _round4(profit_pct),
+        "fee": _round4(fee_dec),
+        "avg_buy_price": metrics["avg_buy_price"],
+        "cost_basis": metrics["cost_basis"],
+        "net_liquidity": metrics["net_liquidity"],
+        "gross_profit": metrics["gross_profit"],
+        "profit": metrics["profit"],
+        "profit_percentage": metrics["profit_percentage"],
         "position_share_pct": _round4(share_pct),
     }
 
@@ -155,17 +236,59 @@ def create_asset_sale(
     *,
     units: float,
     sale_price: float,
+    fee: float = 0,
+    cost_basis: float | None = None,
+    sale_date: date,
 ) -> AssetSale:
-    preview = preview_sale(db, asset_type_id, year, month, units=units, sale_price=sale_price)
+    asset = db.get(AssetType, asset_type_id)
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activo no encontrado")
+
+    preview = preview_sale(
+        db,
+        asset_type_id,
+        year,
+        month,
+        units=units,
+        sale_price=sale_price,
+        fee=fee,
+        cost_basis=cost_basis,
+    )
+
+    sale_id = uuid.uuid4()
     sale = AssetSale(
+        id=sale_id,
         asset_type_id=asset_type_id,
         units=preview["units"],
         sale_year=year,
         sale_month=month,
+        sale_date=sale_date,
         avg_buy_price=preview["avg_buy_price"],
         sale_price=preview["sale_price"],
+        fee=preview["fee"],
     )
     db.add(sale)
-    db.commit()
+
+    cost_basis_native = float(preview["cost_basis"])
+    invested_eur = -amount_to_eur(cost_basis_native, asset.currency, year, month)
+
+    db.add(
+        AssetTransaction(
+            asset_type_id=asset_type_id,
+            transaction_date=sale_date,
+            invested_amount=invested_eur,
+            asset_amount=-float(preview["units"]),
+            execution_price=float(preview["sale_price"]),
+            fee_amount=float(preview["fee"]),
+            exchange_trade_id=f"manual-sale-{sale_id}",
+        )
+    )
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(sale)
     return sale

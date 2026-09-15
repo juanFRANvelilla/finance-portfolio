@@ -172,6 +172,8 @@ class AssetInvestmentDetail(BaseModel):
     """Previsión de títulos desde asset_transactions cuando aplica."""
     has_transactions: bool = False
     """True si el activo tiene operaciones en asset_transactions hasta fin del mes consultado."""
+    has_sale_this_month: bool = False
+    """True si hay al menos una venta en asset_sales para este activo y mes."""
 
 
 class CategoryDetailResponse(BaseModel):

@@ -1,7 +1,7 @@
 import uuid
-from datetime import date, datetime
+from datetime import date
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Date, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +25,5 @@ class AssetTransaction(Base):
     execution_price: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
     fee_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
     exchange_trade_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
     asset_type: Mapped["AssetType"] = relationship()

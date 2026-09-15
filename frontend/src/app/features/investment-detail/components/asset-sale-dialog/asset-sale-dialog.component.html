@@ -1,11 +1,24 @@
 @if (open() && asset()) {
-  <div class="asset-edit-backdrop" (click)="close.emit()">
-    <div class="asset-edit-dialog" (click)="$event.stopPropagation()">
-      <div class="asset-edit-header">
-        <h3 class="asset-edit-title">Vender · {{ asset()!.name }}</h3>
-        <p class="asset-edit-subtitle">
-          Mes {{ month() }}/{{ year() }} · precios en {{ context()?.currency ?? asset()!.currency }}
-        </p>
+  <div class="asset-edit-backdrop">
+    <div class="asset-edit-dialog max-w-lg">
+      <div class="asset-edit-header flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="asset-edit-title">Vender · {{ asset()!.name }}</h3>
+          <p class="asset-edit-subtitle">
+            Mes {{ month() }}/{{ year() }} · importes en {{ context()?.currency ?? asset()!.currency }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
+          aria-label="Cerrar"
+          title="Cerrar"
+          (click)="close.emit()"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+          </svg>
+        </button>
       </div>
 
       <div class="asset-edit-body">
@@ -17,15 +30,25 @@
           <p class="asset-edit-hint">Cargando posición...</p>
         } @else if (context(); as ctx) {
           <div class="rounded-xl bg-slate-900/50 px-3 py-2 ring-1 ring-white/5">
-            <p class="asset-edit-label">Precio medio de compra</p>
+            <p class="asset-edit-label">Precio medio (PMP) de cartera</p>
             <p class="text-lg font-semibold tabular-nums text-white">
               {{ ctx.avg_buy_price | number: '1.2-4' }} {{ ctx.currency }}
             </p>
             <p class="asset-edit-hint mt-2">
-              Posición: {{ ctx.position_units | number: '1.0-8' }} títulos · disponibles:
-              {{ ctx.available_units | number: '1.0-8' }}
+              Capital en posición: {{ (ctx.position_cost_basis ?? ctx.cost_basis_total) | number: '1.2-4' }}
+              {{ ctx.currency }} · {{ ctx.available_units | number: '1.0-8' }} tít. disponibles
             </p>
           </div>
+
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Fecha de la venta</span>
+            <input
+              type="date"
+              class="asset-edit-input"
+              [ngModel]="saleDateInput()"
+              (ngModelChange)="onSaleDateChange($event)"
+            />
+          </label>
 
           <label class="asset-edit-field">
             <span class="asset-edit-label">Títulos a vender</span>
@@ -45,7 +68,7 @@
           </label>
 
           <label class="asset-edit-field">
-            <span class="asset-edit-label">Precio de venta ({{ ctx.currency }})</span>
+            <span class="asset-edit-label">Precio de ejecución ({{ ctx.currency }})</span>
             <input
               type="text"
               inputmode="decimal"
@@ -56,24 +79,101 @@
             />
           </label>
 
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Comisión del broker ({{ ctx.currency }})</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="asset-edit-input"
+              [ngModel]="feeInput()"
+              (ngModelChange)="onFeeChange($event)"
+              placeholder="0"
+            />
+          </label>
+
+          <div class="asset-edit-field">
+            <span class="asset-edit-label">Método de coste de adquisición</span>
+            <div class="mt-1 flex flex-col gap-2">
+              <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+                <input
+                  type="radio"
+                  name="costMethod"
+                  class="mt-1"
+                  [checked]="costMethod() === 'pmp'"
+                  (change)="setCostMethod('pmp')"
+                />
+                <span>
+                  <strong class="text-slate-200">Usar precio medio (PMP)</strong><br />
+                  <span class="text-xs text-slate-500">Coste = títulos × PMP ({{ ctx.avg_buy_price | number: '1.2-4' }})</span>
+                </span>
+              </label>
+              <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+                <input
+                  type="radio"
+                  name="costMethod"
+                  class="mt-1"
+                  [checked]="costMethod() === 'broker'"
+                  (change)="setCostMethod('broker')"
+                />
+                <span>
+                  <strong class="text-slate-200">Importe remanente según broker (FIFO)</strong><br />
+                  <span class="text-xs text-slate-500">Coste = capital en posición − remanente que indica el banco</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          @if (costMethod() === 'broker') {
+            <label class="asset-edit-field">
+              <span class="asset-edit-label">Capital invertido remanente en el broker ({{ ctx.currency }})</span>
+              <input
+                type="text"
+                inputmode="decimal"
+                class="asset-edit-input"
+                [ngModel]="brokerRemainderInput()"
+                (ngModelChange)="onBrokerRemainderChange($event)"
+                placeholder="Ej. 1333.73"
+              />
+              <span class="asset-edit-hint">
+                Tras la venta, el broker muestra este capital; la app resta del total en posición
+                ({{ (ctx.position_cost_basis ?? ctx.cost_basis_total) | number: '1.2-4' }} {{ ctx.currency }}).
+              </span>
+            </label>
+          }
+
           @if (preview(); as p) {
             <div class="rounded-xl bg-slate-900/50 px-3 py-3 ring-1 ring-white/5">
-              <p class="asset-edit-label">Resultado estimado</p>
-              <p class="mt-1 text-sm text-slate-400">
-                {{ parsedUnits() | number: '1.0-8' }} tít. ×
-                {{ parsedSalePrice() | number: '1.2-4' }} {{ ctx.currency }}
-                <span class="text-slate-500">({{ p.sharePct | number: '1.2-2' }}% de la posición)</span>
+              <p class="asset-edit-label">Resumen fiscal (neto)</p>
+              <p class="mt-1 text-xs text-slate-500">
+                Precio unitario imputado: {{ p.avgBuyPrice | number: '1.2-4' }} {{ ctx.currency }}
+                ({{ p.sharePct | number: '1.2-2' }}% de la posición)
               </p>
-              <p class="mt-2 text-xl font-semibold tabular-nums" [class]="profitClass(p.profit)">
-                {{ p.profit >= 0 ? '+' : '' }}{{ p.profit | number: '1.2-2' }} {{ ctx.currency }}
-                <span class="text-base">({{ p.profitPct >= 0 ? '+' : '' }}{{ p.profitPct | number: '1.2-2' }}%)</span>
-              </p>
-              <p class="asset-edit-hint mt-1">
-                Importe bruto de venta: {{ p.proceeds | number: '1.2-2' }} {{ ctx.currency }}
-              </p>
+              <ul class="mt-3 space-y-2 text-sm text-slate-300">
+                <li class="flex justify-between gap-4">
+                  <span>Liquidez neta</span>
+                  <span class="tabular-nums font-medium text-white">
+                    {{ p.netLiquidity | number: '1.2-4' }} {{ ctx.currency }}
+                  </span>
+                </li>
+                <li class="flex justify-between gap-4">
+                  <span>Coste de adquisición imputado</span>
+                  <span class="tabular-nums font-medium text-white">
+                    {{ p.costBasis | number: '1.2-4' }} {{ ctx.currency }}
+                  </span>
+                </li>
+                <li class="flex justify-between gap-4 border-t border-white/10 pt-2">
+                  <span>Beneficio neto</span>
+                  <span class="tabular-nums text-base font-semibold" [class]="profitClass(p.netProfit)">
+                    {{ p.netProfit >= 0 ? '+' : '' }}{{ p.netProfit | number: '1.2-4' }} {{ ctx.currency }}
+                    ({{ p.profitPct >= 0 ? '+' : '' }}{{ p.profitPct | number: '1.2-4' }}%)
+                  </span>
+                </li>
+              </ul>
             </div>
-          } @else if (parsedUnits() !== null && parsedUnits()! > (context()?.available_units ?? 0)) {
+          } @else if (parsedUnits() !== null && parsedUnits()! > ctx.available_units) {
             <p class="asset-edit-error">Supera los títulos disponibles.</p>
+          } @else if (costMethod() === 'broker' && brokerRemainderInput().trim() !== '') {
+            <p class="asset-edit-error">Revisa el remanente del broker (debe ser menor que el capital en posición).</p>
           }
         }
       </div>

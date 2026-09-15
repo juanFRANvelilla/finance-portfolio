@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.database import check_db_connection
 from app.core.scheduler import run_kucoin_sync_on_startup, shutdown_scheduler, start_scheduler
 from app.routers import asset_sales, contributions, entities, investments, ledger, market_prices, records
+from app.routers.asset_sales import v1_router as asset_sales_v1_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +56,7 @@ app.include_router(records.router)
 app.include_router(contributions.router)
 app.include_router(investments.router)
 app.include_router(asset_sales.router)
+app.include_router(asset_sales_v1_router)
 app.include_router(ledger.router)
 app.include_router(market_prices.router)
 

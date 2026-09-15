@@ -126,6 +126,8 @@ export interface AssetInvestmentDetail {
   suggested_amount: number | null;
   suggested_units: number | null;
   has_transactions: boolean;
+  /** Venta registrada en asset_sales para este mes (el registro mensual no se altera solo). */
+  has_sale_this_month?: boolean;
 }
 
 export interface AssetSaleContextResponse {
@@ -138,11 +140,17 @@ export interface AssetSaleContextResponse {
   available_units: number;
   avg_buy_price: number;
   cost_basis_total: number;
+  position_cost_basis: number;
+  has_sale_this_month: boolean;
 }
 
 export interface AssetSaleCreate {
   units: number;
   sale_price: number;
+  fee?: number;
+  sale_date: string;
+  /** Si se omite, el backend usa PMP × unidades. */
+  cost_basis?: number;
 }
 
 export interface AssetSaleRead {
@@ -151,8 +159,10 @@ export interface AssetSaleRead {
   units: number;
   sale_year: number;
   sale_month: number;
+  sale_date: string | null;
   avg_buy_price: number;
   sale_price: number;
+  fee: number;
   profit: number;
   profit_percentage: number;
   currency: string;

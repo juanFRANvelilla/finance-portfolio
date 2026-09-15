@@ -27,6 +27,7 @@ from app.schemas.investment import (
     LinkedInvestedTotalResponse,
     AssetTransactionPreviewResponse,
 )
+from app.services.asset_sales import asset_type_ids_with_sale_in_month
 from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
 from app.services.fx_converter import amount_to_eur, eur_to_native, get_usd_to_eur_rate
@@ -535,6 +536,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         }
 
     tx_totals_by_asset = transaction_totals_by_asset_type(db, asset_type_ids, year=year, month=month)
+    asset_ids_with_sale = asset_type_ids_with_sale_in_month(db, asset_type_ids, year, month)
 
     assets_detail: list[AssetInvestmentDetail] = []
     allocated = Decimal("0")
@@ -574,6 +576,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 suggested_amount=suggested_amount,
                 suggested_units=suggested_units,
                 has_transactions=tx_totals is not None,
+                has_sale_this_month=asset.id in asset_ids_with_sale,
             )
         )
 

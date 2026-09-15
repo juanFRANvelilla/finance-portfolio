@@ -5,7 +5,19 @@ import { FormsModule } from '@angular/forms';
 import { AssetInvestmentDetail, AssetSaleContextResponse } from '../../../../core/models/investment.model';
 import { InvestmentApiService } from '../../../../core/services/investment-api.service';
 import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
-import { round2 } from '../../../../core/utils/live-investment-summary';
+
+export type SaleCostMethod = 'pmp' | 'broker';
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 @Component({
   selector: 'app-asset-sale-dialog',
@@ -31,28 +43,90 @@ export class AssetSaleDialogComponent {
 
   readonly unitsInput = signal('');
   readonly salePriceInput = signal('');
+  readonly feeInput = signal('');
+  readonly saleDateInput = signal(todayIsoDate());
+  readonly costMethod = signal<SaleCostMethod>('pmp');
+  readonly brokerRemainderInput = signal('');
 
   readonly parsedUnits = computed(() => parseDecimalInput(this.unitsInput()) ?? null);
   readonly parsedSalePrice = computed(() => parseDecimalInput(this.salePriceInput()) ?? null);
+  readonly parsedFee = computed(() => {
+    const raw = this.feeInput().trim();
+    if (raw === '') {
+      return 0;
+    }
+    const value = parseDecimalInput(raw);
+    return value === null || value < 0 ? null : value;
+  });
+
+  readonly parsedBrokerRemainder = computed(() => {
+    if (this.costMethod() !== 'broker') {
+      return null;
+    }
+    const value = parseDecimalInput(this.brokerRemainderInput());
+    return value === null || value < 0 ? null : value;
+  });
+
+  readonly imputedCostBasis = computed(() => {
+    const ctx = this.context();
+    const units = this.parsedUnits();
+    if (!ctx || units === null || units <= 0) {
+      return null;
+    }
+
+    if (this.costMethod() === 'pmp') {
+      return round4(units * ctx.avg_buy_price);
+    }
+
+    const remainder = this.parsedBrokerRemainder();
+    if (remainder === null) {
+      return null;
+    }
+    const positionCost = ctx.position_cost_basis ?? ctx.cost_basis_total;
+    const cost = round4(positionCost - remainder);
+    if (cost <= 0 || remainder > positionCost) {
+      return null;
+    }
+    return cost;
+  });
 
   readonly preview = computed(() => {
     const ctx = this.context();
     const units = this.parsedUnits();
     const salePrice = this.parsedSalePrice();
-    if (!ctx || units === null || units <= 0 || salePrice === null || salePrice < 0) {
+    const fee = this.parsedFee();
+    const costBasis = this.imputedCostBasis();
+    if (
+      !ctx ||
+      units === null ||
+      units <= 0 ||
+      salePrice === null ||
+      salePrice < 0 ||
+      fee === null ||
+      costBasis === null
+    ) {
       return null;
     }
     if (units > ctx.available_units) {
       return null;
     }
-    const profit = round2((salePrice - ctx.avg_buy_price) * units);
-    const profitPct =
-      ctx.avg_buy_price > 0
-        ? round2(((salePrice - ctx.avg_buy_price) / ctx.avg_buy_price) * 100)
-        : 0;
+
+    const netLiquidity = round4(units * salePrice - fee);
+    const netProfit = round4(netLiquidity - costBasis);
+    const avgBuyPrice = round4(costBasis / units);
+    const profitPct = costBasis > 0 ? round4((netProfit / costBasis) * 100) : 0;
     const sharePct =
-      ctx.position_units > 0 ? round2((units / ctx.position_units) * 100) : 0;
-    return { profit, profitPct, sharePct, proceeds: round2(salePrice * units) };
+      ctx.position_units > 0 ? round4((units / ctx.position_units) * 100) : 0;
+
+    return {
+      netLiquidity,
+      costBasis,
+      netProfit,
+      avgBuyPrice,
+      profitPct,
+      sharePct,
+      fee,
+    };
   });
 
   constructor() {
@@ -61,6 +135,10 @@ export class AssetSaleDialogComponent {
         this.context.set(null);
         this.unitsInput.set('');
         this.salePriceInput.set('');
+        this.feeInput.set('');
+        this.brokerRemainderInput.set('');
+        this.costMethod.set('pmp');
+        this.saleDateInput.set(todayIsoDate());
         this.errorMessage.set(null);
         return;
       }
@@ -96,6 +174,25 @@ export class AssetSaleDialogComponent {
     this.salePriceInput.set(value);
   }
 
+  onFeeChange(value: string): void {
+    this.feeInput.set(value);
+  }
+
+  onBrokerRemainderChange(value: string): void {
+    this.brokerRemainderInput.set(value);
+  }
+
+  onSaleDateChange(value: string): void {
+    this.saleDateInput.set(value);
+  }
+
+  setCostMethod(method: SaleCostMethod): void {
+    this.costMethod.set(method);
+    if (method === 'pmp') {
+      this.brokerRemainderInput.set('');
+    }
+  }
+
   sellMaxUnits(): void {
     const ctx = this.context();
     if (ctx) {
@@ -112,24 +209,43 @@ export class AssetSaleDialogComponent {
 
   confirmSale(): void {
     const asset = this.asset();
-    const ctx = this.context();
     const units = this.parsedUnits();
     const salePrice = this.parsedSalePrice();
-    if (!asset || !ctx || units === null || units <= 0 || salePrice === null || this.saving()) {
+    const fee = this.parsedFee();
+    const costBasis = this.imputedCostBasis();
+    const preview = this.preview();
+    if (
+      !asset ||
+      units === null ||
+      units <= 0 ||
+      salePrice === null ||
+      fee === null ||
+      costBasis === null ||
+      !preview ||
+      this.saving()
+    ) {
       return;
     }
-    if (units > ctx.available_units) {
+
+    const ctx = this.context();
+    if (ctx && units > ctx.available_units) {
       this.errorMessage.set(`Máximo ${ctx.available_units} títulos disponibles.`);
       return;
     }
 
     this.saving.set(true);
     this.errorMessage.set(null);
+
+    const payload = {
+      units,
+      sale_price: salePrice,
+      fee,
+      sale_date: this.saleDateInput(),
+      cost_basis: this.costMethod() === 'broker' ? costBasis : undefined,
+    };
+
     this.investmentApi
-      .registerAssetSale(this.year(), this.month(), asset.asset_type_id, {
-        units,
-        sale_price: salePrice,
-      })
+      .registerAssetSale(this.year(), this.month(), asset.asset_type_id, payload)
       .subscribe({
         next: () => {
           this.saving.set(false);
