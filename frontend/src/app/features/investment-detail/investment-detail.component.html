@@ -319,14 +319,6 @@
                                       @if (formatMonthlyContribution(asset.monthly_contribution, asset.currency); as contributionLabel) {
                                         <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
                                       }
-                                      @if (asset.has_sale_this_month) {
-                                        <span
-                                          class="ml-2 text-xs text-amber-400/90"
-                                          title="Venta registrada este mes: actualiza títulos e importe a mano si hace falta"
-                                        >
-                                          · venta registrada
-                                        </span>
-                                      }
                                     </span>
                                     @if (canSellAsset(asset)) {
                                       <button
