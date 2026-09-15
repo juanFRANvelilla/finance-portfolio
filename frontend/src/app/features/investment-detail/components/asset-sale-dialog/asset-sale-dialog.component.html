@@ -1,0 +1,96 @@
+@if (open() && asset()) {
+  <div class="asset-edit-backdrop" (click)="close.emit()">
+    <div class="asset-edit-dialog" (click)="$event.stopPropagation()">
+      <div class="asset-edit-header">
+        <h3 class="asset-edit-title">Vender · {{ asset()!.name }}</h3>
+        <p class="asset-edit-subtitle">
+          Mes {{ month() }}/{{ year() }} · precios en {{ context()?.currency ?? asset()!.currency }}
+        </p>
+      </div>
+
+      <div class="asset-edit-body">
+        @if (errorMessage()) {
+          <div class="asset-edit-error">{{ errorMessage() }}</div>
+        }
+
+        @if (loading()) {
+          <p class="asset-edit-hint">Cargando posición...</p>
+        } @else if (context(); as ctx) {
+          <div class="rounded-xl bg-slate-900/50 px-3 py-2 ring-1 ring-white/5">
+            <p class="asset-edit-label">Precio medio de compra</p>
+            <p class="text-lg font-semibold tabular-nums text-white">
+              {{ ctx.avg_buy_price | number: '1.2-4' }} {{ ctx.currency }}
+            </p>
+            <p class="asset-edit-hint mt-2">
+              Posición: {{ ctx.position_units | number: '1.0-8' }} títulos · disponibles:
+              {{ ctx.available_units | number: '1.0-8' }}
+            </p>
+          </div>
+
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Títulos a vender</span>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                inputmode="decimal"
+                class="asset-edit-input flex-1"
+                [ngModel]="unitsInput()"
+                (ngModelChange)="onUnitsChange($event)"
+                placeholder="0"
+              />
+              <button type="button" class="asset-edit-btn asset-edit-btn--ghost shrink-0" (click)="sellMaxUnits()">
+                Máximo
+              </button>
+            </div>
+          </label>
+
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Precio de venta ({{ ctx.currency }})</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="asset-edit-input"
+              [ngModel]="salePriceInput()"
+              (ngModelChange)="onSalePriceChange($event)"
+              placeholder="0"
+            />
+          </label>
+
+          @if (preview(); as p) {
+            <div class="rounded-xl bg-slate-900/50 px-3 py-3 ring-1 ring-white/5">
+              <p class="asset-edit-label">Resultado estimado</p>
+              <p class="mt-1 text-sm text-slate-400">
+                {{ parsedUnits() | number: '1.0-8' }} tít. ×
+                {{ parsedSalePrice() | number: '1.2-4' }} {{ ctx.currency }}
+                <span class="text-slate-500">({{ p.sharePct | number: '1.2-2' }}% de la posición)</span>
+              </p>
+              <p class="mt-2 text-xl font-semibold tabular-nums" [class]="profitClass(p.profit)">
+                {{ p.profit >= 0 ? '+' : '' }}{{ p.profit | number: '1.2-2' }} {{ ctx.currency }}
+                <span class="text-base">({{ p.profitPct >= 0 ? '+' : '' }}{{ p.profitPct | number: '1.2-2' }}%)</span>
+              </p>
+              <p class="asset-edit-hint mt-1">
+                Importe bruto de venta: {{ p.proceeds | number: '1.2-2' }} {{ ctx.currency }}
+              </p>
+            </div>
+          } @else if (parsedUnits() !== null && parsedUnits()! > (context()?.available_units ?? 0)) {
+            <p class="asset-edit-error">Supera los títulos disponibles.</p>
+          }
+        }
+      </div>
+
+      <div class="asset-edit-footer">
+        <button type="button" class="asset-edit-btn asset-edit-btn--ghost" (click)="close.emit()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="asset-edit-btn asset-edit-btn--primary"
+          [disabled]="saving() || loading() || !preview()"
+          (click)="confirmSale()"
+        >
+          {{ saving() ? 'Guardando…' : 'Registrar venta' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

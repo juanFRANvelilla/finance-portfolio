@@ -128,6 +128,36 @@ export interface AssetInvestmentDetail {
   has_transactions: boolean;
 }
 
+export interface AssetSaleContextResponse {
+  asset_type_id: string;
+  asset_name: string;
+  currency: string;
+  year: number;
+  month: number;
+  position_units: number;
+  available_units: number;
+  avg_buy_price: number;
+  cost_basis_total: number;
+}
+
+export interface AssetSaleCreate {
+  units: number;
+  sale_price: number;
+}
+
+export interface AssetSaleRead {
+  id: string;
+  asset_type_id: string;
+  units: number;
+  sale_year: number;
+  sale_month: number;
+  avg_buy_price: number;
+  sale_price: number;
+  profit: number;
+  profit_percentage: number;
+  currency: string;
+}
+
 export interface CategoryDetailResponse {
   year: number;
   month: number;

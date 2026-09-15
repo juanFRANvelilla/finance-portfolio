@@ -16,6 +16,7 @@ import {
 } from '../../core/models/investment.model';
 import { MarketPriceResponse } from '../../core/models/market-price.model';
 import { AssetEditDialogComponent } from './components/asset-edit-dialog/asset-edit-dialog.component';
+import { AssetSaleDialogComponent } from './components/asset-sale-dialog/asset-sale-dialog.component';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
@@ -117,7 +118,14 @@ function createPanelState(): CategoryPanelState {
 
 @Component({
   selector: 'app-investment-detail',
-  imports: [CurrencyPipe, DecimalPipe, EurCurrencyPipe, SegmentDonutChartComponent, AssetEditDialogComponent],
+  imports: [
+    CurrencyPipe,
+    DecimalPipe,
+    EurCurrencyPipe,
+    SegmentDonutChartComponent,
+    AssetEditDialogComponent,
+    AssetSaleDialogComponent,
+  ],
   templateUrl: './investment-detail.component.html',
   styleUrl: './investment-detail.component.scss',
 })
@@ -143,6 +151,10 @@ export class InvestmentDetailComponent {
   readonly assetEditDialogOpen = signal(false);
   readonly assetEditCategoryId = signal<string | null>(null);
   readonly assetEditTarget = signal<AssetInvestmentDetail | null>(null);
+
+  readonly assetSaleDialogOpen = signal(false);
+  readonly assetSaleCategoryId = signal<string | null>(null);
+  readonly assetSaleTarget = signal<AssetInvestmentDetail | null>(null);
   /** Clave `${categoryId}:${assetTypeId}` mientras se recalcula desde asset_transactions. */
   readonly transactionReloadLoading = signal<Record<string, boolean>>({});
 
@@ -822,10 +834,44 @@ export class InvestmentDetailComponent {
     this.updatePanel(categoryId, { assetRows: rows });
   }
 
+  canSellAsset(asset: AssetInvestmentDetail): boolean {
+    if ((asset.units ?? 0) > 0) {
+      return true;
+    }
+    return asset.has_transactions;
+  }
+
   openAssetEditDialog(categoryId: string, asset: AssetInvestmentDetail): void {
     this.assetEditCategoryId.set(categoryId);
     this.assetEditTarget.set(asset);
     this.assetEditDialogOpen.set(true);
+  }
+
+  openAssetSaleDialog(categoryId: string, asset: AssetInvestmentDetail): void {
+    this.assetSaleCategoryId.set(categoryId);
+    this.assetSaleTarget.set(asset);
+    this.assetSaleDialogOpen.set(true);
+  }
+
+  closeAssetSaleDialog(): void {
+    this.assetSaleDialogOpen.set(false);
+    this.assetSaleCategoryId.set(null);
+    this.assetSaleTarget.set(null);
+  }
+
+  onAssetSaleSaved(categoryId: string): void {
+    this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
+      next: (detail) => {
+        this.applyDetail(categoryId, detail);
+        this.closeAssetSaleDialog();
+      },
+      error: () => {
+        this.updatePanel(categoryId, {
+          errorMessage: 'Venta registrada, pero no se pudo refrescar el detalle.',
+        });
+        this.closeAssetSaleDialog();
+      },
+    });
   }
 
   closeAssetEditDialog(): void {

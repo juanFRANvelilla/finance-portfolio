@@ -14,6 +14,9 @@ import {
   InvestmentOverviewResponse,
   LinkedInvestedTotalResponse,
   AssetTransactionPreviewResponse,
+  AssetSaleContextResponse,
+  AssetSaleCreate,
+  AssetSaleRead,
 } from '../models/investment.model';
 import { EntityGroup, LedgerProfitRequest, LedgerProfitResponse } from '../models/ledger.model';
 
@@ -91,6 +94,28 @@ export class InvestmentApiService {
   ): Observable<AssetTransactionPreviewResponse> {
     return this.http.get<AssetTransactionPreviewResponse>(
       `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/transaction-preview`,
+    );
+  }
+
+  getAssetSaleContext(
+    year: number,
+    month: number,
+    assetTypeId: string,
+  ): Observable<AssetSaleContextResponse> {
+    return this.http.get<AssetSaleContextResponse>(
+      `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/sale-context`,
+    );
+  }
+
+  registerAssetSale(
+    year: number,
+    month: number,
+    assetTypeId: string,
+    payload: AssetSaleCreate,
+  ): Observable<AssetSaleRead> {
+    return this.http.post<AssetSaleRead>(
+      `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/sales`,
+      payload,
     );
   }
 
