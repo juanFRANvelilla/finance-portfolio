@@ -40,7 +40,7 @@
       Cargando datos de {{ monthNames[month() - 1] }} {{ year() }}...
     </div>
   } @else if (hasFullRecord() && !editing() && recordResponse()?.record) {
-    <section class="grid gap-6 md:grid-cols-3">
+    <section class="grid items-stretch gap-6 md:grid-cols-3">
       <div class="dashboard-donut-panel flex flex-col rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10 md:col-span-2">
         <div class="mb-4 flex min-h-[2rem] items-center justify-between gap-3">
           @if (livePatrimonyMode()) {
