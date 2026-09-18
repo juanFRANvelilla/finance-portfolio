@@ -59,3 +59,23 @@ class AssetSaleRead(BaseModel):
     profit: float
     profit_percentage: float
     currency: str
+
+
+class AssetSaleListItem(BaseModel):
+    id: UUID
+    asset_type_id: UUID
+    asset_name: str
+    currency: str
+    sale_year: int
+    sale_month: int
+    sale_date: date | None = None
+    units: float
+    sale_price: float
+    profit: float
+    profit_percentage: float
+    profit_eur: float
+
+
+class AssetSalesListResponse(BaseModel):
+    total_profit_eur: float
+    sales: list[AssetSaleListItem]

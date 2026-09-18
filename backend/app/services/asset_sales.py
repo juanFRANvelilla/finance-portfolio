@@ -8,8 +8,8 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.asset_sale import AssetSale
 from app.models.asset_transaction import AssetTransaction
@@ -292,3 +292,51 @@ def create_asset_sale(
 
     db.refresh(sale)
     return sale
+
+
+def list_asset_sales(db: Session) -> dict:
+    """Todas las ventas (histórico) y beneficio neto acumulado en EUR."""
+    stmt = (
+        select(AssetSale)
+        .options(joinedload(AssetSale.asset_type))
+        .order_by(
+            AssetSale.sale_year.desc(),
+            AssetSale.sale_month.desc(),
+            AssetSale.sale_date.desc().nullslast(),
+            AssetSale.created_at.desc(),
+        )
+    )
+    sales = db.scalars(stmt).unique().all()
+
+    total_profit_eur = Decimal("0")
+    items: list[dict] = []
+
+    for sale in sales:
+        asset = sale.asset_type
+        currency = asset.currency if asset else "EUR"
+        name = asset.name if asset else "—"
+        profit_native = Decimal(str(sale.profit))
+        profit_eur = Decimal(str(amount_to_eur(float(profit_native), currency, sale.sale_year, sale.sale_month)))
+        total_profit_eur += profit_eur
+
+        items.append(
+            {
+                "id": sale.id,
+                "asset_type_id": sale.asset_type_id,
+                "asset_name": name,
+                "currency": currency,
+                "sale_year": sale.sale_year,
+                "sale_month": sale.sale_month,
+                "sale_date": sale.sale_date,
+                "units": _round8(sale.units),
+                "sale_price": _round4(sale.sale_price),
+                "profit": _round4(profit_native),
+                "profit_percentage": _round4(sale.profit_percentage),
+                "profit_eur": _round4(profit_eur),
+            }
+        )
+
+    return {
+        "total_profit_eur": _round4(total_profit_eur),
+        "sales": items,
+    }

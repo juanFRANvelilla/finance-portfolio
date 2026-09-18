@@ -8,7 +8,11 @@ import { FinanceApiService } from '../../core/services/finance-api.service';
 import { InvestmentApiService } from '../../core/services/investment-api.service';
 import { MarketPriceApiService } from '../../core/services/market-price-api.service';
 import { PeriodStorageService } from '../../core/services/period-storage.service';
-import { CategoryDetailResponse, InvestmentOverviewResponse } from '../../core/models/investment.model';
+import {
+  AssetSalesListResponse,
+  CategoryDetailResponse,
+  InvestmentOverviewResponse,
+} from '../../core/models/investment.model';
 import { MarketPriceResponse } from '../../core/models/market-price.model';
 import {
   computePortfolioLiveSummaryFromDetails,
@@ -27,6 +31,7 @@ import {
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutChartComponent } from './components/donut-chart/donut-chart.component';
+import { AssetSalesListDialogComponent } from './components/asset-sales-list-dialog/asset-sales-list-dialog.component';
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
 import { BalanceFormComponent, BalanceFormSubmission, HybridFormSubmission } from './components/balance-form/balance-form.component';
 import { JsonImportDialogComponent } from './components/json-import-dialog/json-import-dialog.component';
@@ -41,6 +46,7 @@ const LIVE_PATRIMONY_POLL_MS = 35_000;
     DecimalPipe,
     DonutChartComponent,
     DiffBadgeComponent,
+    AssetSalesListDialogComponent,
     BalanceFormComponent,
     JsonImportDialogComponent,
     TimelineChartComponent,
@@ -71,6 +77,8 @@ export class DashboardComponent {
   readonly showDeleteConfirm = signal<boolean>(false);
   readonly importing = signal<boolean>(false);
   readonly showImportDialog = signal<boolean>(false);
+  readonly showAssetSalesDialog = signal<boolean>(false);
+  readonly assetSalesList = signal<AssetSalesListResponse | null>(null);
   readonly importErrorMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly timelinePoints = signal<TimelinePoint[]>([]);
@@ -162,6 +170,7 @@ export class DashboardComponent {
 
     this.loadEntities();
     this.loadTimeline();
+    this.loadAssetSales();
   }
 
   private loadEntities(): void {
@@ -290,6 +299,21 @@ export class DashboardComponent {
         );
       },
     });
+  }
+
+  private loadAssetSales(): void {
+    this.investmentApi.getAssetSalesList().subscribe({
+      next: (response) => this.assetSalesList.set(response),
+      error: () => this.assetSalesList.set(null),
+    });
+  }
+
+  openAssetSalesDialog(): void {
+    this.showAssetSalesDialog.set(true);
+  }
+
+  closeAssetSalesDialog(): void {
+    this.showAssetSalesDialog.set(false);
   }
 
   private loadTimeline(): void {

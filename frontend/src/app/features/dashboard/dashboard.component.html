@@ -99,6 +99,9 @@
         [diff]="recordResponse()!.record!.monthly_diff"
         [investedDiff]="recordResponse()!.record!.invested_diff"
         [previousNetWorth]="recordResponse()!.previous_net_worth"
+        [totalSalesProfitEur]="assetSalesList()?.total_profit_eur ?? 0"
+        [salesCount]="assetSalesList()?.sales?.length ?? 0"
+        (openDetail)="openAssetSalesDialog()"
       />
     </section>
 
@@ -191,6 +194,12 @@
   [errorMessage]="importErrorMessage()"
   (close)="closeImportDialog()"
   (importPayload)="onImportJson($event)"
+/>
+
+<app-asset-sales-list-dialog
+  [open]="showAssetSalesDialog()"
+  [sales]="assetSalesList()?.sales ?? []"
+  (close)="closeAssetSalesDialog()"
 />
 
 @if (showDeleteConfirm()) {

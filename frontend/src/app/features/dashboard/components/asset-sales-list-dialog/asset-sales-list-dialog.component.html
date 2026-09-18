@@ -1,0 +1,60 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
+    <div class="flex max-h-[min(85vh,720px)] w-full max-w-4xl flex-col rounded-2xl bg-slate-900 p-6 ring-1 ring-white/10 shadow-2xl">
+      <div class="mb-4 flex shrink-0 items-start justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold text-white">Ventas de activos</h3>
+          <p class="mt-1 text-sm text-slate-400">Histórico de operaciones registradas en asset_sales.</p>
+        </div>
+        <button
+          type="button"
+          (click)="close.emit()"
+          class="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+          aria-label="Cerrar"
+        >
+          ✕
+        </button>
+      </div>
+
+      @if (sales().length === 0) {
+        <p class="py-8 text-center text-sm text-slate-500">No hay ventas registradas.</p>
+      } @else {
+        <div class="min-h-0 flex-1 overflow-auto rounded-xl ring-1 ring-white/5">
+          <table class="w-full min-w-[640px] text-left text-sm">
+            <thead class="sticky top-0 bg-slate-900/95 text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th class="px-3 py-2.5 font-medium">Activo</th>
+                <th class="px-3 py-2.5 font-medium">Mes</th>
+                <th class="px-3 py-2.5 font-medium">Año</th>
+                <th class="px-3 py-2.5 font-medium text-right">Precio venta</th>
+                <th class="px-3 py-2.5 font-medium text-right">Beneficio</th>
+                <th class="px-3 py-2.5 font-medium text-right">%</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5 text-slate-200">
+              @for (row of sales(); track row.id) {
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="px-3 py-2.5 font-medium text-white">{{ row.asset_name }}</td>
+                  <td class="px-3 py-2.5 text-slate-300">{{ monthNames[row.sale_month - 1] }}</td>
+                  <td class="px-3 py-2.5 tabular-nums text-slate-300">{{ row.sale_year }}</td>
+                  <td class="px-3 py-2.5 text-right tabular-nums">
+                    {{ row.sale_price | number: '1.2-4' }}
+                    <span class="text-xs text-slate-500">{{ row.currency }}</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right tabular-nums" [class]="profitClass(row.profit)">
+                    {{ row.profit > 0 ? '+' : '' }}{{ row.profit | number: '1.2-2' }}
+                    <span class="text-xs text-slate-500">{{ row.currency }}</span>
+                    <span class="mt-0.5 block text-xs text-slate-500">≈ {{ row.profit_eur | eurCurrency }}</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right tabular-nums" [class]="profitClass(row.profit)">
+                    {{ row.profit_percentage > 0 ? '+' : '' }}{{ row.profit_percentage | number: '1.1-2' }}%
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+}

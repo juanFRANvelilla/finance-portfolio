@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 import { EurCurrencyPipe } from '../../../../core/pipes/eur-currency.pipe';
 
@@ -13,10 +13,16 @@ export class DiffBadgeComponent {
   readonly diff = input<number | null>(null);
   readonly investedDiff = input<number | null>(null);
   readonly previousNetWorth = input<number | null>(null);
+  readonly totalSalesProfitEur = input<number>(0);
+  readonly salesCount = input<number>(0);
+
+  readonly openDetail = output<void>();
 
   readonly isPositive = computed(() => (this.diff() ?? 0) >= 0);
   readonly isInvestedPositive = computed(() => (this.investedDiff() ?? 0) >= 0);
   readonly hasPrevious = computed(() => this.previousNetWorth() !== null);
+  readonly isSalesProfitPositive = computed(() => this.totalSalesProfitEur() > 0);
+  readonly hasAnySales = computed(() => this.salesCount() > 0);
 
   readonly percentageChange = computed(() => {
     const diff = this.diff();

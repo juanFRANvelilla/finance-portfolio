@@ -8,8 +8,10 @@ from app.models.asset_type import AssetType
 from app.schemas.asset_sale import (
     AssetSaleContextResponse,
     AssetSaleCreate,
+    AssetSaleListItem,
     AssetSalePreview,
     AssetSaleRead,
+    AssetSalesListResponse,
 )
 from app.services import asset_sales as asset_sales_service
 
@@ -30,6 +32,15 @@ def _sale_to_read(sale, currency: str) -> AssetSaleRead:
         profit=float(sale.profit),
         profit_percentage=float(sale.profit_percentage),
         currency=currency,
+    )
+
+
+@router.get("/asset-sales", response_model=AssetSalesListResponse)
+def list_all_asset_sales(db: Session = Depends(get_db)) -> AssetSalesListResponse:
+    data = asset_sales_service.list_asset_sales(db)
+    return AssetSalesListResponse(
+        total_profit_eur=data["total_profit_eur"],
+        sales=[AssetSaleListItem(**row) for row in data["sales"]],
     )
 
 

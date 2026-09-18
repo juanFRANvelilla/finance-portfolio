@@ -17,6 +17,7 @@ import {
   AssetSaleContextResponse,
   AssetSaleCreate,
   AssetSaleRead,
+  AssetSalesListResponse,
 } from '../models/investment.model';
 import { EntityGroup, LedgerProfitRequest, LedgerProfitResponse } from '../models/ledger.model';
 
@@ -95,6 +96,10 @@ export class InvestmentApiService {
     return this.http.get<AssetTransactionPreviewResponse>(
       `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/transaction-preview`,
     );
+  }
+
+  getAssetSalesList(): Observable<AssetSalesListResponse> {
+    return this.http.get<AssetSalesListResponse>(`${this.baseUrl}/asset-sales`);
   }
 
   getAssetSaleContext(

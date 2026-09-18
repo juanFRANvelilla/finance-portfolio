@@ -168,6 +168,26 @@ export interface AssetSaleRead {
   currency: string;
 }
 
+export interface AssetSaleListItem {
+  id: string;
+  asset_type_id: string;
+  asset_name: string;
+  currency: string;
+  sale_year: number;
+  sale_month: number;
+  sale_date: string | null;
+  units: number;
+  sale_price: number;
+  profit: number;
+  profit_percentage: number;
+  profit_eur: number;
+}
+
+export interface AssetSalesListResponse {
+  total_profit_eur: number;
+  sales: AssetSaleListItem[];
+}
+
 export interface CategoryDetailResponse {
   year: number;
   month: number;
