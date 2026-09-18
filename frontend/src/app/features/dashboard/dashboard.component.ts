@@ -26,7 +26,6 @@ import {
 } from '../../core/models/monthly-record.model';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
-import { environment } from '../../../environments/environment';
 import { DonutChartComponent } from './components/donut-chart/donut-chart.component';
 import { DiffBadgeComponent } from './components/diff-badge/diff-badge.component';
 import { BalanceFormComponent, BalanceFormSubmission, HybridFormSubmission } from './components/balance-form/balance-form.component';
@@ -287,7 +286,7 @@ export class DashboardComponent {
         this.recordResponse.set(null);
         this.loading.set(false);
         this.errorMessage.set(
-          `No se pudo conectar con la API. Comprueba que el backend está arrancado en ${environment.apiUrl.replace('/api', '')}.`,
+          'No se pudo conectar con la API. Comprueba que el backend está arrancado.',
         );
       },
     });

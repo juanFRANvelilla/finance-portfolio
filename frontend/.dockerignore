@@ -1,0 +1,47 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Angular
+.angular/
+dist/
+tmp/
+out-tsc/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kubernetes
+k8s/
+
+# Documentation
+*.md
+README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+run.sh
