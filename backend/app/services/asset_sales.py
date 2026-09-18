@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -12,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.asset_sale import AssetSale
-from app.models.asset_transaction import AssetTransaction
 from app.models.asset_type import AssetType
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
 from app.services.asset_transactions import transaction_totals_by_asset_type
@@ -255,9 +253,7 @@ def create_asset_sale(
         cost_basis=cost_basis,
     )
 
-    sale_id = uuid.uuid4()
     sale = AssetSale(
-        id=sale_id,
         asset_type_id=asset_type_id,
         units=preview["units"],
         sale_year=year,
@@ -268,21 +264,6 @@ def create_asset_sale(
         fee=preview["fee"],
     )
     db.add(sale)
-
-    cost_basis_native = float(preview["cost_basis"])
-    invested_eur = -amount_to_eur(cost_basis_native, asset.currency, year, month)
-
-    db.add(
-        AssetTransaction(
-            asset_type_id=asset_type_id,
-            transaction_date=sale_date,
-            invested_amount=invested_eur,
-            asset_amount=-float(preview["units"]),
-            execution_price=float(preview["sale_price"]),
-            fee_amount=float(preview["fee"]),
-            exchange_trade_id=f"manual-sale-{sale_id}",
-        )
-    )
 
     try:
         db.commit()
