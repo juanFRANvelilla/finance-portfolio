@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE = 'ghcr.io/juanfranvelilla/finance-portfolio-backend'
+        GHCR_CREDENTIALS_ID = 'ghcr-credentials'
+    }
+
+    parameters {
+        choice(
+            name: 'TAG',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Tag de imagen en GHCR'
+        )
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('backend') {
+                    sh """
+                        docker build \\
+                            -t ${IMAGE}:${params.TAG} \\
+                            -t ${IMAGE}:${env.BUILD_NUMBER} \\
+                            .
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: "${GHCR_CREDENTIALS_ID}",
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh """
+                        echo \$DOCKER_PASSWORD | docker login ghcr.io -u \$DOCKER_USERNAME --password-stdin
+                        docker push ${IMAGE}:${params.TAG}
+                        docker push ${IMAGE}:${env.BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout ghcr.io || true'
+        }
+        success {
+            echo "Imagen publicada: ${IMAGE}:${params.TAG}"
+        }
+        failure {
+            echo 'Fallo en build o push del backend.'
+        }
+    }
+}
