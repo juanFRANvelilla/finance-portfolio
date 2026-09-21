@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 
 from fastapi import FastAPI
@@ -6,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import check_db_connection
-from app.core.scheduler import run_kucoin_sync_on_startup, shutdown_scheduler, start_scheduler
+from app.core.scheduler import start_kucoin_sync_background, shutdown_scheduler, start_scheduler
 from app.routers import asset_sales, contributions, entities, investments, ledger, market_prices, records
 from app.routers.asset_sales import v1_router as asset_sales_v1_router
 
@@ -29,10 +30,17 @@ async def lifespan(app: FastAPI):
         logger.warning("PostgreSQL no disponible al arrancar: %s", exc)
 
     start_scheduler()
-    await run_kucoin_sync_on_startup()
+    app.state.kucoin_sync_task = start_kucoin_sync_background()
 
     yield
 
+    task = getattr(app.state, "kucoin_sync_task", None)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     shutdown_scheduler()
 
 

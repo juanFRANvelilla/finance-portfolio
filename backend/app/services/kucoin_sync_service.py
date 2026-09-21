@@ -135,6 +135,7 @@ def _fetch_kucoin_fills(start_date: datetime, end_date: datetime) -> list[dict]:
             "secret": secret,
             "password": passphrase,
             "enableRateLimit": True,
+            "timeout": 10_000,
         }
     )
 
@@ -163,9 +164,10 @@ def _fetch_kucoin_fills(start_date: datetime, end_date: datetime) -> list[dict]:
                 )
         except Exception as exc:
             logger.warning(
-                "Error en ventana KuCoin %s → %s: %s",
+                "Error en ventana KuCoin %s → %s: %s: %s",
                 current_start.date(),
                 current_end.date(),
+                type(exc).__name__,
                 exc,
             )
 

@@ -33,6 +33,9 @@ async def _kucoin_sync_job() -> None:
             )
         else:
             logger.warning("Sync KuCoin terminó con error: %s", result.error)
+    except asyncio.CancelledError:
+        logger.info("Sync KuCoin cancelada")
+        raise
     except Exception:
         logger.exception("Error inesperado en la tarea programada de KuCoin")
     finally:
@@ -75,7 +78,7 @@ def shutdown_scheduler() -> None:
         logger.info("Scheduler detenido (tarea KuCoin cancelada)")
 
 
-async def run_kucoin_sync_on_startup() -> None:
-    """Ejecuta una sincronización inmediata al arrancar el servidor."""
-    logger.info("Primera ejecución de sync KuCoin al iniciar el backend...")
-    await _kucoin_sync_job()
+def start_kucoin_sync_background() -> asyncio.Task:
+    """Lanza la sync de arranque en segundo plano para no retrasar el API."""
+    logger.info("Primera ejecución de sync KuCoin en segundo plano...")
+    return asyncio.create_task(_kucoin_sync_job(), name="kucoin-sync-startup")
