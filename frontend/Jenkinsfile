@@ -1,9 +1,31 @@
 pipeline {
-    agent any
-
-    environment {
-        IMAGE = 'ghcr.io/juanfranvelilla/finance-portfolio-frontend'
-        GHCR_CREDENTIALS_ID = 'ghcr-credentials'
+    agent {
+        kubernetes {
+            yaml """
+            apiVersion: v1
+            kind: Pod
+            spec:
+              containers:
+              - name: kaniko
+                image: gcr.io/kaniko-project/executor:debug
+                command: ['sleep', 'infinity']
+                volumeMounts:
+                - name: kaniko-secret
+                  mountPath: /kaniko/.docker
+                - name: cache-volume
+                  mountPath: /kaniko/cache
+                  subPath: kaniko
+              volumes:
+              - name: kaniko-secret
+                secret:
+                  secretName: regcred
+                  items: [{key: .dockerconfigjson, path: config.json}]
+              - name: cache-volume
+                hostPath:
+                  path: /home/juanfran/jenkins-cache
+                  type: DirectoryOrCreate
+            """
+        }
     }
 
     parameters {
@@ -14,49 +36,45 @@ pipeline {
         )
     }
 
+    environment {
+        IMAGE_NAME  = 'ghcr.io/juanfranvelilla/finance-portfolio-frontend'
+        APP_VERSION = "v${env.BUILD_NUMBER}"
+    }
+
     stages {
-        stage('Checkout') {
+        stage('Build and Push') {
             steps {
-                checkout scm
-            }
-        }
+                container('kaniko') {
+                    script {
+                        def tag = params.TAG ?: 'dev'
+                        def statusCode = sh(
+                            script: """
+                            /kaniko/executor \
+                            --context=${WORKSPACE}/frontend \
+                            --dockerfile=${WORKSPACE}/frontend/Dockerfile \
+                            --destination=${IMAGE_NAME}:${APP_VERSION} \
+                            --destination=${IMAGE_NAME}:${tag} \
+                            --cache=true \
+                            --cache-dir=/kaniko/cache
+                            """,
+                            returnStatus: true
+                        )
 
-        stage('Build Docker Image') {
-            steps {
-                dir('frontend') {
-                    sh """
-                        docker build \\
-                            -t ${IMAGE}:${params.TAG} \\
-                            -t ${IMAGE}:${env.BUILD_NUMBER} \\
-                            .
-                    """
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "${GHCR_CREDENTIALS_ID}",
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )]) {
-                    sh """
-                        echo \$DOCKER_PASSWORD | docker login ghcr.io -u \$DOCKER_USERNAME --password-stdin
-                        docker push ${IMAGE}:${params.TAG}
-                        docker push ${IMAGE}:${env.BUILD_NUMBER}
-                    """
+                        // -1: el wrapper de Jenkins pierde el proceso al terminar Kaniko, aunque el push haya ido bien
+                        if (statusCode == 0 || statusCode == -1) {
+                            echo "--- IMAGEN SUBIDA CON ÉXITO (Status: ${statusCode}) ---"
+                        } else {
+                            error "Fallo real en Kaniko. Status: ${statusCode}"
+                        }
+                    }
                 }
             }
         }
     }
 
     post {
-        always {
-            sh 'docker logout ghcr.io || true'
-        }
         success {
-            echo "Imagen publicada: ${IMAGE}:${params.TAG}"
+            echo "Imagen publicada: ${IMAGE_NAME}:${APP_VERSION} y :${params.TAG ?: 'dev'}"
         }
         failure {
             echo 'Fallo en build o push del frontend.'
