@@ -42,4 +42,4 @@ ingress:
 
 # Sustituye el host de DATABASE_URL (el secret puede llevar la misma URL que el .env del Mac)
 database:
-  host: "svc-postgres-local.podio-test-back.svc.cluster.local"
+  host: "postgres-service.postgres.svc.cluster.local"
