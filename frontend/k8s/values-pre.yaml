@@ -1,9 +1,9 @@
-namespace: finance-portfolio
+namespace: pre-finance-portfolio-front
 replicaCount: 1
 registry: ghcr.io/juanfranvelilla/finance-portfolio-frontend
 image:
-  tag: "dev"
-  pullPolicy: Always
+  tag: ""   # lo sobrescribe Jenkins con --set image.tag=<BUILD_NUMBER>
+  pullPolicy: IfNotPresent
 service:
   type: ClusterIP
   port: 80
@@ -37,5 +37,6 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-set-header: X-Real-IP $remote_addr
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
   class: "nginx"
-  host: "finance.local"
+  # Mismo host que el backend: / al frontend, /api y /health al backend
+  host: "finance.pre.local"
   tls: false
