@@ -1,10 +1,10 @@
-namespace: finance-portfolio
+namespace: pre-finance-portfolio-back
 # El scheduler de KuCoin corre dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
 replicaCount: 1
 registry: ghcr.io/juanfranvelilla/finance-portfolio-backend
 image:
-  tag: "dev"
-  pullPolicy: Always
+  tag: ""   # lo sobrescribe Jenkins con --set image.tag=<BUILD_NUMBER>
+  pullPolicy: IfNotPresent
 service:
   type: ClusterIP
   port: 8000
@@ -15,8 +15,9 @@ extraEnv:
 - name: "TZ"
   value: "UTC"
 - name: "CORS_ORIGINS"
-  value: "http://finance.local"
+  value: "http://finance.pre.local"
 # DATABASE_URL, KUCOIN_API_KEY, KUCOIN_SECRET, KUCOIN_PASSPHRASE
+# El DATABASE_URL del secret debe apuntar a la base de datos finance_portfolio_pre
 extraEnvFrom:
 - secretRef:
     name: backend-secrets
@@ -35,7 +36,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   class: "nginx"
   # Mismo host que el frontend: el Ingress envía /api al backend y el resto al frontend
-  host: "finance.local"
+  host: "finance.pre.local"
   path: /api
   tls: false
 
