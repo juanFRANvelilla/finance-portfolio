@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+        {{- include "app.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      securityContext:
+        fsGroup: 65532
+      automountServiceAccountToken: false
+      containers:
+        - name: '{{ include "app.fullname" . }}-container'
+          image: "{{ .Values.registry }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- with .Values.extraEnv }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            {{- with .Values.extraEnvFrom }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+              protocol: TCP
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 30
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 5
+            initialDelaySeconds: 5
+          volumeMounts:
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always

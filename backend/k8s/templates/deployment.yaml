@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+        {{- include "app.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      securityContext:
+        fsGroup: 1001
+      automountServiceAccountToken: false
+      containers:
+        - name: '{{ include "app.fullname" . }}-container'
+          image: "{{ .Values.registry }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- with .Values.database.host }}
+            - name: DATABASE_HOST
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            {{- with .Values.extraEnvFrom }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+              protocol: TCP
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+      restartPolicy: Always

@@ -1,0 +1,44 @@
+namespace: finance-portfolio
+# El scheduler de KuCoin corre dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
+replicaCount: 1
+registry: ghcr.io/juanfranvelilla/finance-portfolio-backend
+image:
+  tag: "dev"
+  pullPolicy: Always
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+probes:
+  path: /api/health
+extraEnv:
+- name: "TZ"
+  value: "UTC"
+- name: "CORS_ORIGINS"
+  value: "http://finance.local"
+# DATABASE_URL, KUCOIN_API_KEY, KUCOIN_SECRET, KUCOIN_PASSPHRASE
+extraEnvFrom:
+- secretRef:
+    name: backend-secrets
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: 100m
+  limits:
+    memory: "512Mi"
+    cpu: 500m
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-set-header: X-Real-IP $remote_addr
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  class: "nginx"
+  # Mismo host que el frontend: el Ingress envía /api al backend y el resto al frontend
+  host: "finance.local"
+  path: /api
+  tls: false
+
+# Sustituye el host de DATABASE_URL (el secret puede llevar la misma URL que el .env del Mac)
+database:
+  host: "svc-postgres-local.podio-test-back.svc.cluster.local"
