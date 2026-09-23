@@ -35,9 +35,11 @@ ingress:
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   class: "nginx"
-  # Mismo host que el frontend: el Ingress envía /api al backend y el resto al frontend
+  # Mismo host que el frontend: /api y /health al backend; / al frontend cuando exista
   host: "finance.pre.local"
   path: /api
+  extraPaths:
+    - /health
   tls: false
 
 # Sustituye el host de DATABASE_URL (el secret puede llevar la misma URL que el .env del Mac)

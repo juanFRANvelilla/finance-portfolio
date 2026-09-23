@@ -69,6 +69,7 @@ app.include_router(ledger.router)
 app.include_router(market_prices.router)
 
 
+@app.get("/health", tags=["health"])
 @app.get("/api/health", tags=["health"])
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
