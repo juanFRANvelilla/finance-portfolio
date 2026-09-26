@@ -1,12 +1,19 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import make_url
 
-# Ruta absoluta al .env del backend (independiente del working directory de PyCharm/uvicorn)
+# Ruta absoluta al directorio raíz del backend (independiente del cwd de PyCharm/uvicorn)
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-ENV_FILE = BACKEND_ROOT / ".env"
+
+# APP_PROFILE selecciona el archivo .env a cargar:
+#   (sin definir o "local")  →  .env           →  PostgreSQL en localhost
+#   "server"                 →  .env.server    →  PostgreSQL en db.postgres.local:30432 (pre)
+_profile = os.environ.get("APP_PROFILE", "local").strip().lower()
+_env_file_name = ".env.server" if _profile == "server" else ".env"
+ENV_FILE = BACKEND_ROOT / _env_file_name
 
 
 class Settings(BaseSettings):
