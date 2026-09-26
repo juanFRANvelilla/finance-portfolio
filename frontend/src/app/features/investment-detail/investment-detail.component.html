@@ -1,4 +1,4 @@
-<main class="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 pb-16">
+<main class="mx-auto flex w-full max-w-5xl flex-col gap-4 overflow-x-hidden px-4 py-5 pb-16 sm:gap-6 sm:px-6 sm:py-8">
   @if (errorMessage()) {
     <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
       {{ errorMessage() }}
@@ -295,8 +295,8 @@
                   }
 
                   @if (panel(cat.category_id).detail!.assets.length > 0) {
-                    <div class="overflow-hidden rounded-xl ring-1 ring-white/5" [class.mt-4]="assetSegmentsFor(cat.category_id).length > 0">
-                      <table class="w-full text-sm">
+                    <div class="overflow-x-auto rounded-xl ring-1 ring-white/5" [class.mt-4]="assetSegmentsFor(cat.category_id).length > 0">
+                      <table class="w-full min-w-[600px] text-sm">
                         <thead>
                           <tr class="bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
                             <th class="px-3 py-2 font-medium">Activo</th>

@@ -1,9 +1,19 @@
 .dashboard-donut-panel {
-  min-height: 26.5rem;
+  min-height: 20rem;
+  min-width: 0;
+  width: 100%;
+
+  @media (min-width: 768px) {
+    min-height: 26.5rem;
+  }
 }
 
 .dashboard-donut-panel__chart {
-  min-height: 20.5rem;
+  min-height: 16rem;
+
+  @media (min-width: 768px) {
+    min-height: 20.5rem;
+  }
 }
 
 .live-patrimony-summary {
@@ -38,16 +48,22 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  min-width: 9.5rem;
+  min-width: 7rem;
   border: 1px solid rgb(16 185 129 / 0.3);
   border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
+  padding: 0.35rem 0.625rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #6ee7b7;
   background-color: rgb(16 185 129 / 0.1);
   cursor: pointer;
   transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+
+  @media (min-width: 400px) {
+    min-width: 9.5rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+  }
 
   &:hover:not(:disabled) {
     border-color: rgb(52 211 153 / 0.4);

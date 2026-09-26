@@ -45,6 +45,7 @@
 
 /* Scrollbar horizontal fino para tablas anchas en pantallas pequeñas. */
 .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgb(255 255 255 / 0.15) transparent;
 

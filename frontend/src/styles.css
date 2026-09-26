@@ -3,6 +3,8 @@
 html,
 body {
   height: 100%;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -15,4 +17,23 @@ body {
     Roboto,
     sans-serif;
   background-color: #0f172a;
+  /* Smooth scroll en iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Evitar zoom involuntario al rotar en iOS */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Evitar que iOS haga zoom en inputs al enfocar (font-size >= 16px requerido por iOS Safari) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (min-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: inherit;
+  }
 }
