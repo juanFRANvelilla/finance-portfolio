@@ -56,8 +56,23 @@ Solo se evalúa para filas **recién insertadas** en `asset_transactions` (no
 para las que `insert_transactions_batch` descarta por `exchange_trade_id`
 duplicado).
 
-1. Se agrupan los fills insertados por `(asset_type_id, año, mes)` según su
-   `transaction_date`.
+### Solo el mes natural actual (automatización)
+
+Al aplicar transacciones nuevas a `monthly_asset_investments`, **solo** se
+consideran fills cuya `transaction_date` (Fecha Operación) cae en el **mismo
+año/mes que la fecha natural de hoy** (`date.today()`).
+
+- Compra del mes actual → puede actualizar la foto de ese mes (con la regla de
+  `last_update` de abajo).
+- Compra de un mes pasado o futuro → se inserta en `asset_transactions` si es
+  nueva, pero **no se toca ninguna fila** de `monthly_asset_investments` (ni
+  la del mes de la operación ni la del mes en curso).
+
+Los meses pasados cerrados se corrigen a mano si hace falta; la apertura de
+mes (`ensure_current_month_snapshots`) sigue siendo independiente.
+
+1. Se agrupan los fills insertados **del mes actual** por `(asset_type_id,
+   año, mes)` según su `transaction_date`.
 2. Por cada grupo:
    - **No existe fila** en `monthly_asset_investments` para ese año/mes/activo:
      - Se crea copiando `amount`/`units` del mes anterior de ese activo (si
