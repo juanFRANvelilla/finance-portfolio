@@ -18,6 +18,7 @@ from app.repositories.asset_transactions import (
     load_kucoin_asset_name_map,
     resolve_sync_start_datetime,
 )
+from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,10 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
                 result.messages.append("No hay operaciones válidas para insertar.")
                 return result
 
-            inserted, skipped = insert_transactions_batch(db, fills)
+            inserted, skipped, inserted_fills = insert_transactions_batch(db, fills)
             result.inserted = inserted
             result.skipped_duplicate = skipped
+            apply_transactions_to_monthly_snapshot(db, inserted_fills)
 
         logger.info(
             "KuCoin sync OK: %s insertados, %s duplicados omitidos (desde %s)",
@@ -243,7 +245,8 @@ def _transform_fills(
             continue
 
         created_at_ms = int(fill.get("createdAt", 0))
-        transaction_date: date = datetime.utcfromtimestamp(created_at_ms / 1000).date()
+        executed_at: datetime = datetime.utcfromtimestamp(created_at_ms / 1000)
+        transaction_date: date = executed_at.date()
         funds = float(fill.get("funds", 0))
         size = float(fill.get("size", 0))
         fee = float(fill.get("fee", 0))
@@ -265,6 +268,7 @@ def _transform_fills(
                 "exchange_trade_id": str(exchange_trade_id),
                 "asset_type_id": asset_type_id,
                 "transaction_date": transaction_date,
+                "executed_at": executed_at,
                 "invested_amount": Decimal(str(round(invested_amount_eur, 8))),
                 "asset_amount": Decimal(str(size)),
                 "execution_price": Decimal(str(round(execution_price_eur, 8))),

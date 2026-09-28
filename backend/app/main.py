@@ -10,6 +10,7 @@ from app.core.database import check_db_connection
 from app.core.scheduler import (
     shutdown_scheduler,
     start_kucoin_sync_background,
+    start_monthly_snapshot_rollover_background,
     start_myinvestor_sync_background,
     start_scheduler,
 )
@@ -37,10 +38,11 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     app.state.kucoin_sync_task = start_kucoin_sync_background()
     app.state.myinvestor_sync_task = start_myinvestor_sync_background()
+    app.state.monthly_snapshot_rollover_task = start_monthly_snapshot_rollover_background()
 
     yield
 
-    for task_name in ("kucoin_sync_task", "myinvestor_sync_task"):
+    for task_name in ("kucoin_sync_task", "myinvestor_sync_task", "monthly_snapshot_rollover_task"):
         task = getattr(app.state, task_name, None)
         if task is not None and not task.done():
             task.cancel()

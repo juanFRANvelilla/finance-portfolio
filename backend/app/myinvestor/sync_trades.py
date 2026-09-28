@@ -60,15 +60,20 @@ def _print_result(result) -> None:
     print(f"  Omitidos (sin parsear) : {result.skipped_unparsed}")
     print(f"  Omitidos (sin activo)  : {result.skipped_unknown_asset}")
     print(f"  Omitidos (divisa)      : {result.skipped_currency}")
+    print(f"  Snapshot (grupos)      : {result.snapshot_groups_processed}")
+    print(
+        f"  Snapshot omit. (≠ mes) : {result.snapshot_fills_skipped_not_current_month} "
+        "(operación fuera del mes natural actual)"
+    )
     print(f"{'=' * 52}\n")
     for message in result.messages:
         print(message)
 
 
-def main() -> None:
+def main(*, dump_unparsed_bodies: bool = True) -> None:
     from app.services.myinvestor_sync_service import sync_myinvestor_transactions
 
-    result = sync_myinvestor_transactions()
+    result = sync_myinvestor_transactions(dump_unparsed_bodies=dump_unparsed_bodies)
     _print_result(result)
     if not result.success:
         raise SystemExit(1)
@@ -82,6 +87,11 @@ if __name__ == "__main__":
         default=STANDALONE_PROFILE,
         help="server usa .env.server; local usa .env (default: %(default)s)",
     )
+    parser.add_argument(
+        "--no-dump-unparsed",
+        action="store_true",
+        help="no imprimir el cuerpo completo de correos que no se puedan parsear",
+    )
     args = parser.parse_args()
     env_path = _activate_standalone_profile(args.profile)
     if str(BACKEND_ROOT) not in sys.path:
@@ -93,4 +103,4 @@ if __name__ == "__main__":
 
     db_url = make_url(get_settings().resolved_database_url)
     print(f"Entorno {env_path.name} → {db_url.host}:{db_url.port}/{db_url.database}")
-    main()
+    main(dump_unparsed_bodies=not args.no_dump_unparsed)

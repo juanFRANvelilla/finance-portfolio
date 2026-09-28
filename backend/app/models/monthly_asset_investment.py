@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +15,10 @@ class MonthlyAssetInvestment(Base):
     `amount` se guarda en la divisa definida en asset_types (EUR o USD).
     `units` (nº de títulos/participaciones) es opcional para cualquier activo.
     La conversión a EUR se calcula al vuelo, nunca se persiste aquí.
+
+    `amount`/`units` son una FOTO en directo: nacen del cierre del mes anterior
+    y se les suman las compras que van llegando durante el mes (ver
+    `app/services/monthly_asset_snapshot.py` y la regla de `last_update`).
     """
 
     __tablename__ = "monthly_asset_investments"
@@ -29,5 +34,8 @@ class MonthlyAssetInvestment(Base):
     )
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     units: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
+    last_update: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    """Última vez que se tocó esta fila: a mano (momento del guardado) o por una
+    automatización (fecha/hora de EJECUCIÓN de la transacción, no la de hoy)."""
 
     asset_type: Mapped["AssetType"] = relationship()

@@ -82,25 +82,29 @@ def load_kucoin_asset_name_map(db: Session) -> dict[str, str]:
     return {row.name.upper(): str(row.id) for row in rows}
 
 
-def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int]:
+def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int, list[dict]]:
     """Inserta fills con ON CONFLICT (exchange_trade_id) DO NOTHING.
 
-    Devuelve (insertados, omitidos_por_conflicto).
+    Devuelve (insertados, omitidos_por_conflicto, fills_insertados).
+    `fills_insertados` es el subconjunto de `fills` que sí se llegó a insertar
+    (los duplicados por `exchange_trade_id` no salen en esa lista). Se usa para
+    actualizar monthly_asset_investments solo con lo que es realmente nuevo.
     """
     import uuid
 
     insertados = 0
     omitidos = 0
+    fills_insertados: list[dict] = []
 
     for fill in fills:
         result = db.execute(
             text(
                 """
                 INSERT INTO public.asset_transactions
-                    (id, asset_type_id, transaction_date, invested_amount,
+                    (id, asset_type_id, transaction_date, executed_at, invested_amount,
                      asset_amount, execution_price, fee_amount, exchange_trade_id)
                 VALUES
-                    (:id, :asset_type_id, :transaction_date, :invested_amount,
+                    (:id, :asset_type_id, :transaction_date, :executed_at, :invested_amount,
                      :asset_amount, :execution_price, :fee_amount, :exchange_trade_id)
                 ON CONFLICT (exchange_trade_id) DO NOTHING
                 """
@@ -109,6 +113,7 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int]
                 "id": str(uuid.uuid4()),
                 "asset_type_id": fill["asset_type_id"],
                 "transaction_date": fill["transaction_date"],
+                "executed_at": fill.get("executed_at"),
                 "invested_amount": fill["invested_amount"],
                 "asset_amount": fill["asset_amount"],
                 "execution_price": fill["execution_price"],
@@ -120,6 +125,7 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int]
             omitidos += 1
         else:
             insertados += 1
+            fills_insertados.append(fill)
 
     db.commit()
-    return insertados, omitidos
+    return insertados, omitidos, fills_insertados

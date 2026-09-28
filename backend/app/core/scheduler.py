@@ -8,6 +8,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
+from app.services.monthly_asset_snapshot import run_ensure_current_month_snapshots
 from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,8 @@ _scheduler: AsyncIOScheduler | None = None
 KUCOIN_SYNC_INTERVAL_HOURS = 4
 # Confirmaciones MyInvestor por IMAP. Independiente del job de KuCoin.
 MYINVESTOR_SYNC_INTERVAL_HOURS = 4
+# Apertura del mes natural en monthly_asset_investments. Idempotente, corre a diario.
+MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS = 24
 
 
 async def _kucoin_sync_job() -> None:
@@ -69,6 +72,28 @@ async def _myinvestor_sync_job() -> None:
         logger.info("--- Fin tarea programada: sync MyInvestor ---")
 
 
+async def _monthly_snapshot_rollover_job() -> None:
+    """Wrapper async: abre el mes natural actual en monthly_asset_investments si falta.
+
+    Independiente de KuCoin/MyInvestor: no trae transacciones nuevas, solo se
+    asegura de que el mes en curso tenga fila (copiando el cierre anterior).
+    """
+    logger.info("--- Inicio tarea programada: apertura de mes en monthly_asset_investments ---")
+    try:
+        created = await asyncio.to_thread(run_ensure_current_month_snapshots)
+        if created:
+            logger.info("Apertura de mes: %s fila(s) nueva(s) creada(s)", created)
+        else:
+            logger.info("Apertura de mes: no hacía falta crear filas nuevas")
+    except asyncio.CancelledError:
+        logger.info("Apertura de mes cancelada")
+        raise
+    except Exception:
+        logger.exception("Error inesperado abriendo el mes en monthly_asset_investments")
+    finally:
+        logger.info("--- Fin tarea programada: apertura de mes ---")
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """Arranca el scheduler y registra las tareas periódicas."""
     global _scheduler
@@ -96,6 +121,15 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
     )
+    _scheduler.add_job(
+        _monthly_snapshot_rollover_job,
+        trigger="interval",
+        hours=MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS,
+        id="monthly_snapshot_rollover",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
 
     _scheduler.start()
     logger.info(
@@ -105,6 +139,10 @@ def start_scheduler() -> AsyncIOScheduler:
     logger.info(
         "Tarea programada MyInvestor activa: se ejecutará al arrancar y luego cada %s horas",
         MYINVESTOR_SYNC_INTERVAL_HOURS,
+    )
+    logger.info(
+        "Tarea programada de apertura de mes activa: se ejecutará al arrancar y luego cada %s horas",
+        MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS,
     )
     return _scheduler
 
@@ -128,3 +166,9 @@ def start_myinvestor_sync_background() -> asyncio.Task:
     """Lanza la sync IMAP de arranque en segundo plano para no retrasar el API."""
     logger.info("Primera ejecución de sync MyInvestor en segundo plano...")
     return asyncio.create_task(_myinvestor_sync_job(), name="myinvestor-sync-startup")
+
+
+def start_monthly_snapshot_rollover_background() -> asyncio.Task:
+    """Lanza la apertura de mes de arranque en segundo plano para no retrasar el API."""
+    logger.info("Primera comprobación de apertura de mes en segundo plano...")
+    return asyncio.create_task(_monthly_snapshot_rollover_job(), name="monthly-snapshot-rollover-startup")

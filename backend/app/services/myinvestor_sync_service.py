@@ -15,10 +15,13 @@ from app.core.database import SessionLocal
 from app.myinvestor.mail import fetch_mailbox_messages
 from app.myinvestor.parse_trade import (
     amounts_for_asset_currency,
+    diagnose_myinvestor_parse,
+    is_purchase_side,
     looks_like_trade_confirmation,
     parse_myinvestor_trade,
 )
 from app.repositories.asset_transactions import insert_transactions_batch, load_asset_match_index
+from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +59,17 @@ class MyInvestorSyncResult:
     skipped_unparsed: int = 0
     skipped_unknown_asset: int = 0
     skipped_currency: int = 0
+    snapshot_fills_skipped_not_current_month: int = 0
+    snapshot_groups_processed: int = 0
     success: bool = True
     error: str | None = None
     messages: list[str] = field(default_factory=list)
 
 
-def sync_myinvestor_transactions() -> MyInvestorSyncResult:
+def sync_myinvestor_transactions(
+    *,
+    dump_unparsed_bodies: bool = False,
+) -> MyInvestorSyncResult:
     """Lee la etiqueta IMAP de MyInvestor e inserta compras en asset_transactions."""
     result = MyInvestorSyncResult()
     settings = get_settings()
@@ -102,17 +110,31 @@ def sync_myinvestor_transactions() -> MyInvestorSyncResult:
                 trade = parse_myinvestor_trade(message.body)
                 if trade is None:
                     result.skipped_unparsed += 1
+                    reasons = diagnose_myinvestor_parse(message.body)
                     logger.warning(
-                        "Correo MyInvestor no interpretable (UID=%s, asunto=%r)",
+                        "Correo MyInvestor no interpretable (UID=%s, asunto=%r): %s",
                         message.uid,
                         message.subject,
+                        "; ".join(reasons) if reasons else "motivo desconocido",
                     )
+                    if dump_unparsed_bodies:
+                        print(f"\n{'=' * 60}")
+                        print(f"CORREO NO INTERPRETABLE  UID={message.uid}")
+                        print(f"Asunto: {message.subject}")
+                        if reasons:
+                            print("Diagnóstico:")
+                            for reason in reasons:
+                                print(f"  - {reason}")
+                        print(f"{'-' * 60}")
+                        print("Cuerpo exacto:")
+                        print(message.body)
+                        print(f"{'=' * 60}\n")
                     continue
 
-                if trade.side != "COMPRA":
+                if not is_purchase_side(trade.side):
                     result.skipped_not_buy += 1
                     logger.info(
-                        "Operación %s %s omitida (solo se importan compras)",
+                        "Operación %s %s omitida (solo se importan compras y suscripciones)",
                         trade.side,
                         trade.reference,
                     )
@@ -154,6 +176,7 @@ def sync_myinvestor_transactions() -> MyInvestorSyncResult:
                         "exchange_trade_id": exchange_trade_id,
                         "asset_type_id": asset.asset_type_id,
                         "transaction_date": trade.transaction_date,
+                        "executed_at": trade.execution_datetime,
                         "invested_amount": amounts.invested_amount,
                         "asset_amount": amounts.asset_amount,
                         "execution_price": amounts.execution_price,
@@ -166,9 +189,12 @@ def sync_myinvestor_transactions() -> MyInvestorSyncResult:
                 result.messages.append("No hay operaciones válidas para insertar.")
                 return result
 
-            inserted, skipped = insert_transactions_batch(db, fills)
+            inserted, skipped, inserted_fills = insert_transactions_batch(db, fills)
             result.inserted = inserted
             result.skipped_duplicate = skipped
+            snapshot_result = apply_transactions_to_monthly_snapshot(db, inserted_fills)
+            result.snapshot_fills_skipped_not_current_month = snapshot_result.fills_skipped_not_current_month
+            result.snapshot_groups_processed = snapshot_result.groups_processed
 
         logger.info(
             "MyInvestor sync OK: %s insertados, %s duplicados omitidos (%s correos)",
