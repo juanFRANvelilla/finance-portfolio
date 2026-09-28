@@ -34,6 +34,7 @@ class AssetTransactionLedgerRow(BaseModel):
 class AssetLedgerGroup(BaseModel):
     asset_type_id: str
     exchange_ticker: str
+    """Nombre del activo en catálogo (campo legacy; no es el ticker de mercado)."""
     currency: str
     """Divisa nativa del activo (EUR o USD según asset_types)."""
     total_asset_acumulado: float = 0

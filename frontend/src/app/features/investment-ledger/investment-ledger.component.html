@@ -37,7 +37,7 @@
         </div>
       }
 
-      <!-- ==================== Tablas de activos (una por ticker) ==================== -->
+      <!-- ==================== Tablas de activos (una por activo) ==================== -->
       @if (entity.assets.length > 0) {
         <div class="flex flex-col gap-5">
           @for (asset of entity.assets; track asset.exchange_ticker) {
