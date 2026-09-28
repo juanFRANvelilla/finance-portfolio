@@ -1,0 +1,138 @@
+---
+description: Diseño y reglas de sincronización entre asset_transactions y monthly_asset_investments (KuCoin + MyInvestor), incluyendo el campo last_update y el cierre/apertura de mes.
+globs: backend/app/models/monthly_asset_investment.py,backend/app/models/asset_transaction.py,backend/app/services/kucoin_sync_service.py,backend/app/services/myinvestor_sync_service.py,backend/app/repositories/asset_transactions.py,backend/app/services/asset_transactions.py,backend/app/myinvestor/parse_trade.py,backend/app/core/scheduler.py
+alwaysApply: false
+---
+
+# Sincronización `asset_transactions` → `monthly_asset_investments`
+
+Documento de diseño. Si vas a tocar alguno de los archivos listados en `globs`,
+lee esto primero: la lógica tiene reglas concretas para no duplicar importes ni
+pisar cambios manuales.
+
+## Las dos tablas son independientes y tienen roles distintos
+
+- **`asset_transactions`**: histórico de operaciones reales (una fila por
+  compra/venta). La rellenan las automatizaciones (KuCoin, MyInvestor) o, en
+  el futuro, podría insertarse a mano. Nunca se recalcula ni se borra sola.
+- **`monthly_asset_investments`**: foto en directo del total que tienes de un
+  activo, mes a mes. `amount`/`units` de un mes arrancan siendo el cierre del
+  mes anterior, y se les suma cada compra a lo largo del mes (se restará en
+  ventas, cuando exista esa lógica). Al cerrar el mes, esa foto "nace" igual
+  en el mes siguiente.
+
+Ninguna pantalla debe fabricar la foto de un mes sumando `asset_transactions`
+al vuelo (eso hacía antes `suggested_amount` en el front); la foto vive
+siempre en `monthly_asset_investments` y la actualiza el propio backend
+cuando entra una transacción nueva.
+
+## Campo nuevo: `monthly_asset_investments.last_update`
+
+- Tipo `timestamp`, nullable.
+- Última vez que esa fila (año + mes + activo) se tocó, a mano desde el front
+  o por una automatización.
+- Guardado a mano desde el front → `last_update` = momento del guardado (ahora).
+- Guardado por una automatización → `last_update` = la fecha/hora de
+  **ejecución** de la operación (la que viene del correo o de KuCoin), nunca
+  la fecha de "hoy" en que corre el script.
+
+## Campo nuevo: `asset_transactions.executed_at`
+
+- `transaction_date` (Date) no cambia de significado: sigue siendo el día de
+  negocio usado para cortes de mes, ledger, etc.
+- Se añade `executed_at` (timestamp) con la fecha y hora exacta de la
+  operación:
+  - **KuCoin**: `createdAt` del fill (ya viene en ms; hoy se trunca a día al
+    calcular `transaction_date`. Hay que conservar también la hora).
+  - **MyInvestor**: el grupo "Fecha y Hora Ejecución" del correo (hoy
+    `parse_trade.py` solo usa "Fecha Operación" para `transaction_date`; hay
+    que capturar también la hora de ejecución, hoy sin usar en el dataclass).
+- Esta hora es la que se compara contra `last_update`. El día solo no basta:
+  un cambio a mano y una automatización pueden caer el mismo día.
+
+## Regla de actualización
+
+Solo se evalúa para filas **recién insertadas** en `asset_transactions` (no
+para las que `insert_transactions_batch` descarta por `exchange_trade_id`
+duplicado).
+
+1. Se agrupan los fills insertados por `(asset_type_id, año, mes)` según su
+   `transaction_date`.
+2. Por cada grupo:
+   - **No existe fila** en `monthly_asset_investments` para ese año/mes/activo:
+     - Se crea copiando `amount`/`units` del mes anterior de ese activo (si
+       tampoco existe el mes anterior, se parte de 0 y se loggea un aviso:
+       caso extremo, a revisar a mano).
+     - Se suma el importe/títulos de **todos** los fills del grupo (son
+       todos nuevos; no hay nada que comparar).
+     - `last_update` = el `executed_at` más tardío del grupo.
+   - **Ya existe fila**:
+     - Se filtran del grupo solo los fills cuyo `executed_at` sea
+       **estrictamente posterior** al `last_update` actual (o cualquiera, si
+       `last_update` es `NULL`).
+     - Si no queda ninguno tras el filtro → **no se toca la fila** (se asume
+       que ya se aplicó a mano o en una pasada anterior).
+     - Si queda alguno → se suman sus importes/títulos a `amount`/`units`
+       existentes y `last_update` pasa a ser el `executed_at` más tardío del
+       subconjunto aplicado.
+
+La comparación es contra el `last_update` que había **antes** de este batch,
+no uno que se vaya actualizando fill a fill (el resultado es el mismo porque
+la suma es conmutativa; se hace así para resolverlo en una sola pasada por
+grupo).
+
+## Casos que esto ya cubre
+
+- **Editaste a mano el 25/09** (`last_update = 25/09 xx:xx`) y llega una
+  compra ejecutada el 24/09 → `24 < 25`, no es estrictamente posterior → no
+  se toca. Se asume que el ajuste manual ya la incluía.
+- **Borraste filas de `asset_transactions` y relanzaste el sync**; se
+  reinsertan con el mismo `executed_at` de siempre → `executed_at ==
+  last_update`, no es estrictamente posterior → no se vuelve a sumar. Sin
+  doble contabilización.
+- **Fila recién creada o `last_update IS NULL`** → cualquier fill cuenta.
+
+## Caso extremo aceptado (no se resuelve solo)
+
+Si `last_update` ya avanzó por una transacción del día 27 y luego aparece una
+transacción del día 23 que nunca se había aplicado (p. ej. un fill que el
+exchange tardó en exponer), esa transacción entra en `asset_transactions` pero
+**no** se refleja en `monthly_asset_investments` (`23 < 27`). Aceptado como
+caso raro, corregible a mano si aparece.
+
+## KuCoin y MyInvestor comparten la misma lógica de snapshot
+
+No hay reglas distintas por proveedor: los dos pasan por
+`insert_transactions_batch` (o el helper que lo envuelva) y de ahí sale el
+mismo post-proceso. La única diferencia entre proveedores es cómo cada uno
+arma el `fill` (divisa, `executed_at`), no cómo se aplica a
+`monthly_asset_investments`.
+
+- **KuCoin** sigue arrancando su ventana desde `MAX(transaction_date)` en BD
+  (o el fallback fijo si la tabla está vacía). No se toca esa lógica: ya hay
+  histórico cargado.
+- **MyInvestor** no usa ventanas: cada corrida lee toda la etiqueta IMAP
+  configurada (son pocos correos). Los duplicados los frena
+  `exchange_trade_id`, igual que en KuCoin.
+
+## Cierre / apertura de mes
+
+Para que un mes nuevo nazca siempre con fila (y el front deje de tener que
+"adivinar" un valor por defecto):
+
+- Función `ensure_current_month_snapshots(db)`: para cada `asset_type` con al
+  menos una fila histórica en `monthly_asset_investments`, comprueba si existe
+  fila para el mes natural actual. Si no existe, la crea copiando
+  `amount`/`units` de la última fila anterior existente (avanzando mes a mes
+  si hiciera falta rellenar más de uno, p. ej. tras un tiempo parado) y pone
+  `last_update` al primer instante de ese mes (`datetime(year, month, 1)`).
+- Corre en un job propio del scheduler (diario, idempotente), separado de los
+  jobs de KuCoin/MyInvestor, para no mezclar "traer transacciones nuevas" con
+  "abrir el mes".
+- El front sigue permitiendo editar a mano cualquier mes; esto solo evita que
+  nazca sin fila.
+
+## Fuera de alcance (de momento)
+
+- Ventas (`asset_sales`) no participan en este snapshot todavía.
+- El front no cambia en esta fase.
