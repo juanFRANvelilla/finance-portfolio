@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 
 TRADE_ID_PREFIX = "myinvestor:"
 
+# Identificador del correo (ISIN o ticker) → ticker guardado en asset_types.
+# El oro de MyInvestor llega como ISIN; en Yahoo el precio que cuadra es el de Stuttgart.
+MYINVESTOR_ID_ALIASES = {
+    "FR0013416716": "FR0013416716.SG",
+}
+
+
+def myinvestor_asset_lookup_keys(ticker: str, isin: str) -> list[str]:
+    """Claves de búsqueda: ticker e ISIN del correo, y el alias explícito si existe."""
+    keys: list[str] = []
+    for raw in (ticker, isin):
+        normalized = (raw or "").upper()
+        if not normalized:
+            continue
+        if normalized not in keys:
+            keys.append(normalized)
+        alias = MYINVESTOR_ID_ALIASES.get(normalized)
+        if alias and alias not in keys:
+            keys.append(alias)
+    return keys
+
 
 @dataclass
 class MyInvestorSyncResult:
@@ -97,7 +118,14 @@ def sync_myinvestor_transactions() -> MyInvestorSyncResult:
                     )
                     continue
 
-                asset = asset_index.get(trade.ticker)
+                asset = next(
+                    (
+                        asset_index[key]
+                        for key in myinvestor_asset_lookup_keys(trade.ticker, trade.isin)
+                        if key in asset_index
+                    ),
+                    None,
+                )
                 if asset is None:
                     result.skipped_unknown_asset += 1
                     logger.warning(
