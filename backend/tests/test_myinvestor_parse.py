@@ -103,8 +103,8 @@ class ParseMyInvestorTradeTest(unittest.TestCase):
         amounts = amounts_for_asset_currency(trade, "USD")
         self.assertIsNotNone(amounts)
         assert amounts is not None
-        self.assertEqual(amounts.invested_amount, Decimal("441.00000000"))
-        self.assertEqual(amounts.execution_price, Decimal("110.25000000"))
+        self.assertEqual(amounts.invested_amount, Decimal("444.40000000"))
+        self.assertEqual(amounts.execution_price, Decimal("111.10000000"))
         self.assertEqual(amounts.fee_amount, Decimal("3.40000000"))
         self.assertEqual(amounts.asset_amount, Decimal("4"))
 
@@ -114,11 +114,10 @@ class ParseMyInvestorTradeTest(unittest.TestCase):
         amounts = amounts_for_asset_currency(trade, "EUR")
         self.assertIsNotNone(amounts)
         assert amounts is not None
+        self.assertEqual(amounts.invested_amount, Decimal("391.89000000"))
         rate = Decimal("391.89") / Decimal("444.40")
-        invested = Decimal("441.00") * rate
-        self.assertEqual(amounts.invested_amount, invested.quantize(Decimal("0.00000001")))
         self.assertEqual(amounts.fee_amount, (Decimal("3.40") * rate).quantize(Decimal("0.00000001")))
-        self.assertEqual(amounts.execution_price, (invested / Decimal("4")).quantize(Decimal("0.00000001")))
+        self.assertEqual(amounts.execution_price, (Decimal("391.89") / Decimal("4")).quantize(Decimal("0.00000001")))
 
     def test_venta_is_parsed_but_marked_as_sale(self) -> None:
         trade = parse_myinvestor_trade(SAMPLE.replace("COMPRA", "VENTA"))
@@ -149,6 +148,15 @@ class ParseMyInvestorTradeTest(unittest.TestCase):
         self.assertEqual(trade.net_trade_amount, Decimal("434.65"))
         self.assertEqual(trade.settlement_amount, Decimal("434.65"))
         self.assertEqual(trade.execution_datetime.isoformat(), "2026-09-28T10:13:10")
+
+    def test_gold_eur_invested_uses_net_including_commission(self) -> None:
+        trade = parse_myinvestor_trade(SAMPLE_GOLD_EUR)
+        assert trade is not None
+        amounts = amounts_for_asset_currency(trade, "EUR")
+        self.assertIsNotNone(amounts)
+        assert amounts is not None
+        self.assertEqual(amounts.invested_amount, Decimal("434.65000000"))
+        self.assertEqual(amounts.execution_price, (Decimal("434.65") / Decimal("3")).quantize(Decimal("0.00000001")))
 
     def test_fund_suscripcion(self) -> None:
         trade = parse_myinvestor_trade(SAMPLE_FUND_SUSCRIPCION)

@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -639,9 +640,11 @@ def upsert_category_assets(
                 MonthlyAssetInvestment.asset_type_id == item.asset_type_id,
             )
         ).first()
+        manual_touch = datetime.now()
         if existing is not None:
             existing.amount = item.amount
             existing.units = item.units
+            existing.last_update = manual_touch
         else:
             db.add(
                 MonthlyAssetInvestment(
@@ -650,6 +653,7 @@ def upsert_category_assets(
                     asset_type_id=item.asset_type_id,
                     amount=item.amount,
                     units=item.units,
+                    last_update=manual_touch,
                 )
             )
 

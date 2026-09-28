@@ -328,17 +328,18 @@ def parse_myinvestor_trade(body: str) -> ParsedMyInvestorTrade | None:
 def amounts_for_asset_currency(trade: ParsedMyInvestorTrade, asset_currency: str) -> TradeAmounts | None:
     """Expresa coste, precio y comisión en la divisa de asset_types.
 
-    Si la operación ya está en esa divisa, se usa el importe bruto.
-    Si no, se aplica el tipo implícito del correo (neto en divisa de liquidación / neto de la operación).
+    El importe invertido sigue el efectivo neto del correo (Importe Efectivo Neto),
+    alineado con MyInvestor: incluye comisiones respecto al bruto. El precio unitario
+    se recalcula como invertido / títulos.
     """
     currency = asset_currency.upper()
     if trade.trade_currency == currency:
-        invested = trade.gross_amount
+        invested = trade.net_trade_amount
         fee = trade.fee_amount
-        price = trade.gross_price
+        price = invested / trade.asset_amount
     elif trade.settlement_currency == currency and trade.net_trade_amount > 0:
+        invested = trade.settlement_amount
         rate = trade.settlement_amount / trade.net_trade_amount
-        invested = trade.gross_amount * rate
         fee = trade.fee_amount * rate
         price = invested / trade.asset_amount
     else:
