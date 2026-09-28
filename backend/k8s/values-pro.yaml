@@ -1,5 +1,5 @@
 namespace: pro-finance-portfolio-back
-# El scheduler de KuCoin corre dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
+# Los schedulers de KuCoin y MyInvestor corren dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
 replicaCount: 1
 registry: ghcr.io/juanfranvelilla/finance-portfolio-backend
 image:

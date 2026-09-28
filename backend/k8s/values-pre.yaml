@@ -1,5 +1,5 @@
 namespace: pre-finance-portfolio-back
-# El scheduler de KuCoin corre dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
+# Los schedulers de KuCoin y MyInvestor corren dentro del proceso: con más de una réplica se duplicarían las sincronizaciones
 replicaCount: 1
 registry: ghcr.io/juanfranvelilla/finance-portfolio-backend
 image:
@@ -16,7 +16,7 @@ extraEnv:
   value: "UTC"
 - name: "CORS_ORIGINS"
   value: "http://finance.pre.local"
-# DATABASE_URL, KUCOIN_API_KEY, KUCOIN_SECRET, KUCOIN_PASSPHRASE
+# DATABASE_URL, KUCOIN_API_KEY, KUCOIN_SECRET, KUCOIN_PASSPHRASE, IMAP_USER, IMAP_PASSWORD
 # El DATABASE_URL del secret debe apuntar a la base de datos finance_portfolio_pre
 extraEnvFrom:
 - secretRef:

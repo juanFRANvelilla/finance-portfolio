@@ -20,7 +20,7 @@ class AssetTransaction(Base):
     )
     transaction_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     invested_amount: Mapped[float] = mapped_column(Numeric(16, 8), nullable=False)
-    """Importe invertido en EUR."""
+    """Importe invertido en la divisa de asset_types.currency (la fila no guarda divisa)."""
     asset_amount: Mapped[float] = mapped_column(Numeric(16, 8), nullable=False)
     execution_price: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
     fee_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)

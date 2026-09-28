@@ -203,8 +203,15 @@ def _asset_preview_from_transactions(
     include_units: bool,
 ) -> tuple[float, float | None]:
     """P1: suma de asset_transactions; P2: mes anterior + aportación mensual."""
-    if tx_totals and tx_totals.get("invested_amount_eur", 0) > 0:
-        suggested_amount = eur_to_native(tx_totals["invested_amount_eur"], currency, year, month)
+    if tx_totals and (
+        tx_totals.get("invested_amount_native", 0) > 0 or tx_totals.get("invested_amount_eur", 0) > 0
+    ):
+        native = tx_totals.get("invested_amount_native")
+        suggested_amount = (
+            native
+            if native is not None
+            else eur_to_native(tx_totals["invested_amount_eur"], currency, year, month)
+        )
         suggested_units = tx_totals.get("asset_amount") if include_units else None
         return suggested_amount, suggested_units
 
@@ -334,13 +341,14 @@ def get_asset_transaction_preview(
 
     invested_eur = tx_totals.get("invested_amount_eur", 0)
     units = tx_totals.get("asset_amount", 0)
-    if invested_eur <= 0 and units <= 0:
+    amount_native = tx_totals.get("invested_amount_native")
+    if amount_native is None:
+        amount_native = eur_to_native(invested_eur, asset.currency, year, month)
+    if invested_eur <= 0 and amount_native <= 0 and units <= 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El activo no tiene operaciones en asset_transactions",
         )
-
-    amount_native = eur_to_native(invested_eur, asset.currency, year, month)
     return AssetTransactionPreviewResponse(
         asset_type_id=asset_type_id,
         year=year,

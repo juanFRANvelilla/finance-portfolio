@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     kucoin_api_key: str | None = None
     kucoin_secret: str | None = None
     kucoin_passphrase: str | None = None
+    imap_host: str = "imap.gmail.com"
+    imap_port: int = 993
+    imap_user: str | None = None
+    imap_password: str | None = None
+    imap_mailbox: str = "MyInvestor/Movimientos"
 
     model_config = SettingsConfigDict(env_file=str(ENV_FILE), extra="ignore")
 

@@ -78,8 +78,11 @@ def _position_at_month(
 
     if tx_totals and Decimal(str(tx_totals.get("asset_amount", 0))) > 0:
         units = Decimal(str(tx_totals["asset_amount"]))
-        invested_eur = Decimal(str(tx_totals.get("invested_amount_eur", 0)))
-        cost_native = Decimal(str(eur_to_native(float(invested_eur), asset.currency, year, month)))
+        if tx_totals.get("invested_amount_native") is not None:
+            cost_native = Decimal(str(tx_totals["invested_amount_native"]))
+        else:
+            invested_eur = Decimal(str(tx_totals.get("invested_amount_eur", 0)))
+            cost_native = Decimal(str(eur_to_native(float(invested_eur), asset.currency, year, month)))
         return _round8(units), _round4(cost_native)
 
     raise HTTPException(
