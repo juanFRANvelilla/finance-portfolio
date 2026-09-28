@@ -20,21 +20,23 @@ def calculate_ledger_profit(
     year: int,
     month: int,
 ) -> tuple[float, float, float]:
-    """Calcula beneficio y % siempre en EUR.
+    """Calcula beneficio y % en EUR.
 
-    El precio unitario se interpreta en `currency` (EUR o USD).
-    Valor de mercado en EUR = acumulado × precio (convirtiendo USD→EUR si aplica).
-    Coste = euros_totales (ya en EUR).
+    Precio y coste (`euros_totales`) llegan en `currency`, la divisa del activo.
+    Si ya es EUR, no hay conversión. Si es USD, mercado y coste usan el mismo tipo
+    solo para devolver el beneficio en euros.
     """
     units = Decimal(str(asset_acumulado))
     unit_price = Decimal(str(price))
-    cost_eur = Decimal(str(euros_totales))
+    cost = Decimal(str(euros_totales))
 
     market_native = units * unit_price
     if currency == "EUR":
         market_eur = market_native
+        cost_eur = cost
     else:
-        market_eur = Decimal(str(amount_to_eur(float(market_native), "USD", year, month)))
+        market_eur = Decimal(str(amount_to_eur(float(market_native), currency, year, month)))
+        cost_eur = Decimal(str(amount_to_eur(float(cost), currency, year, month)))
 
     profit_eur = market_eur - cost_eur
     profit_pct = (profit_eur / cost_eur * Decimal("100")) if cost_eur > 0 else Decimal("0")

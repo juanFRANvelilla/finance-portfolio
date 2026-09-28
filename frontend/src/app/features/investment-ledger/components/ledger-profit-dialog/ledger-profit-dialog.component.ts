@@ -58,19 +58,8 @@ export class LedgerProfitDialogComponent {
     this.profit.set(null);
     this.profitPercentage.set(null);
     this.currency.set(asset.currency === 'USD' ? 'USD' : 'EUR');
-
-    this.api
-      .getLedgerUnitPrice(this.year(), this.month(), asset.last_precio_compra, this.currency())
-      .subscribe({
-        next: (response) => {
-          this.priceInput.set(this.formatPriceInput(response.price));
-          this.recalculate();
-        },
-        error: () => {
-          this.priceInput.set(this.formatPriceInput(asset.last_precio_compra));
-          this.recalculate();
-        },
-      });
+    this.priceInput.set(this.formatPriceInput(asset.last_precio_compra));
+    this.recalculate();
   }
 
   onPriceChange(value: string): void {

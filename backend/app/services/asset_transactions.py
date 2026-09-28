@@ -26,7 +26,11 @@ def month_end_date(year: int, month: int) -> date:
 def transaction_totals_by_asset_type(
     db: Session, asset_type_ids: list[UUID], *, year: int, month: int
 ) -> dict[UUID, dict[str, float]]:
-    """Suma invested_amount (EUR) y asset_amount por activo hasta fin de mes (inclusive)."""
+    """Suma invested_amount y títulos por activo hasta fin de mes (inclusive).
+
+    `invested_amount_native` es la suma del número guardado. La divisa no está
+    en la fila: es `asset_types.currency`. Aquí no se convierte.
+    """
     if not asset_type_ids:
         return {}
 
@@ -46,7 +50,7 @@ def transaction_totals_by_asset_type(
     )
     return {
         asset_type_id: {
-            "invested_amount_eur": _round2(Decimal(str(invested))),
+            "invested_amount_native": _round2(Decimal(str(invested))),
             "asset_amount": _round8(Decimal(str(units))),
         }
         for asset_type_id, invested, units in db.execute(stmt).all()

@@ -90,9 +90,9 @@ class AssetTransactionPreviewResponse(BaseModel):
     month: int
     currency: str
     amount: float
-    """Importe acumulado en la divisa nativa del activo (EUR o USD)."""
+    """Suma de invested_amount. La divisa es `currency` (asset_types); no se convierte."""
     amount_eur: float
-    """Equivalente en EUR de la suma de asset_transactions."""
+    """Mismo número que amount. Se mantiene por compatibilidad; no es un cambio a euros."""
     units: float
     """Cantidad acumulada (SUM asset_amount)."""
 

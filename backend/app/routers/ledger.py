@@ -41,7 +41,7 @@ def get_default_unit_price(
 
 @router.post("/ledger/profit", response_model=LedgerProfitResponse)
 def calculate_asset_profit(payload: LedgerProfitRequest) -> LedgerProfitResponse:
-    """Beneficio en EUR = valor de mercado (precio en EUR/USD) − coste acumulado en EUR."""
+    """Beneficio en EUR. Precio y coste llegan en la divisa del activo."""
     profit, profit_pct, fx_rate = calculate_ledger_profit(
         asset_acumulado=payload.asset_acumulado,
         euros_totales=payload.euros_totales,

@@ -16,13 +16,13 @@ class FiatDepositRow(BaseModel):
 class AssetTransactionLedgerRow(BaseModel):
     fecha: date | None = None
     precio_promedio: float
-    """Coste medio acumulado (euros_totales / asset_acumulado) hasta esta fila."""
+    """Coste medio acumulado (importe total / títulos) en la divisa del activo."""
     precio_compra: float
-    """Precio de ejecución de esta operación concreta (execution_price, en EUR)."""
+    """Precio de ejecución de esta operación (execution_price, divisa del activo)."""
     euros_metidos: float
-    """Importe en EUR de esta operación."""
+    """Importe de esta operación. Es el número guardado; la divisa es la del activo."""
     euros_totales: float
-    """Importe en EUR acumulado invertido en este activo hasta esta fila."""
+    """Importe acumulado en este activo. Misma divisa que el activo, sin convertir."""
     asset_comprado: float
     """Unidades del activo compradas en esta operación."""
     asset_acumulado: float
@@ -36,9 +36,9 @@ class AssetLedgerGroup(BaseModel):
     """Divisa nativa del activo (EUR o USD según asset_types)."""
     total_asset_acumulado: float = 0
     total_euros_metidos: float = 0
-    """Coste acumulado en EUR (suma de asset_transactions)."""
+    """Coste acumulado (suma de asset_transactions) en la divisa del activo."""
     last_precio_compra: float = 0
-    """Precio de la última operación (execution_price en EUR)."""
+    """Precio de la última operación, en la divisa del activo."""
     transactions: list[AssetTransactionLedgerRow] = Field(default_factory=list)
 
 

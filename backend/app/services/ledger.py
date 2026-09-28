@@ -6,9 +6,8 @@ Reglas clave:
   transacciones reales; nunca se inventan filas.
 - Solo se listan activos (asset_types) que tengan >= 1 fila en asset_transactions.
   Un activo sin transacciones (p. ej. MSCI World sin operaciones registradas) no aparece.
-- Todos los importes en asset_transactions ya están en EUR (ver
-  register-legacy-crypto-trades.py: invested_amount / execution_price se calculan en EUR
-  en el momento de la ingesta), así que aquí no se hace ninguna conversión de divisa.
+- invested_amount y execution_price se muestran tal cual se guardaron.
+  La divisa es asset_types.currency; este libro mayor no convierte el importe.
 """
 
 from collections import defaultdict
@@ -92,24 +91,25 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
 
         asset_groups: list[AssetLedgerGroup] = []
         for asset in sorted(assets_by_entity.get(entity_id, []), key=lambda a: a.display_order):
-            running_eur = Decimal("0")
+            running_amount = Decimal("0")
             running_units = Decimal("0")
             transactions: list[AssetTransactionLedgerRow] = []
             for transaction_date, invested_amount, asset_amount, execution_price in tx_by_asset.get(
                 asset.id, []
             ):
                 invested = Decimal(str(invested_amount))
+                price = Decimal(str(execution_price or 0))
                 units = Decimal(str(asset_amount))
-                running_eur += invested
+                running_amount += invested
                 running_units += units
-                avg_price = (running_eur / running_units) if running_units > 0 else Decimal("0")
+                avg_price = (running_amount / running_units) if running_units > 0 else Decimal("0")
                 transactions.append(
                     AssetTransactionLedgerRow(
                         fecha=transaction_date,
                         precio_promedio=_round2(avg_price),
-                        precio_compra=_round2(execution_price or 0),
+                        precio_compra=_round2(price),
                         euros_metidos=_round2(invested),
-                        euros_totales=_round2(running_eur),
+                        euros_totales=_round2(running_amount),
                         asset_comprado=_round8(units),
                         asset_acumulado=_round8(running_units),
                     )

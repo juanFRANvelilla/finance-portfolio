@@ -14,7 +14,7 @@ from app.models.asset_sale import AssetSale
 from app.models.asset_type import AssetType
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
 from app.services.asset_transactions import transaction_totals_by_asset_type
-from app.services.fx_converter import amount_to_eur, eur_to_native
+from app.services.fx_converter import amount_to_eur
 
 
 def _to_decimal(value: Decimal | float | int) -> Decimal:
@@ -78,11 +78,7 @@ def _position_at_month(
 
     if tx_totals and Decimal(str(tx_totals.get("asset_amount", 0))) > 0:
         units = Decimal(str(tx_totals["asset_amount"]))
-        if tx_totals.get("invested_amount_native") is not None:
-            cost_native = Decimal(str(tx_totals["invested_amount_native"]))
-        else:
-            invested_eur = Decimal(str(tx_totals.get("invested_amount_eur", 0)))
-            cost_native = Decimal(str(eur_to_native(float(invested_eur), asset.currency, year, month)))
+        cost_native = Decimal(str(tx_totals.get("invested_amount_native", 0)))
         return _round8(units), _round4(cost_native)
 
     raise HTTPException(

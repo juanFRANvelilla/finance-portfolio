@@ -65,8 +65,8 @@
                         <th class="px-4 py-2.5">Fecha</th>
                         <th class="px-4 py-2.5 text-right">Precio promedio</th>
                         <th class="px-4 py-2.5 text-right">Precio compra</th>
-                        <th class="px-4 py-2.5 text-right">€ metidos</th>
-                        <th class="px-4 py-2.5 text-right">€ metidos total</th>
+                        <th class="px-4 py-2.5 text-right">Importe</th>
+                        <th class="px-4 py-2.5 text-right">Total</th>
                         <th class="px-4 py-2.5 text-right">Cantidad activo</th>
                         <th class="px-4 py-2.5 text-right">Acumulado activo</th>
                       </tr>
@@ -76,16 +76,16 @@
                         <tr class="border-t border-white/5 transition hover:bg-white/5">
                           <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                            {{ tx.precio_promedio | currency: 'EUR' : 'symbol' : '1.2-2' }}
+                            {{ tx.precio_promedio | currency: asset.currency : 'symbol' : '1.2-2' }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                            {{ tx.precio_compra | currency: 'EUR' : 'symbol' : '1.2-2' }}
+                            {{ tx.precio_compra | currency: asset.currency : 'symbol' : '1.2-2' }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-300">
-                            {{ tx.euros_metidos | currency: 'EUR' }}
+                            {{ tx.euros_metidos | currency: asset.currency }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums font-medium text-white">
-                            {{ tx.euros_totales | currency: 'EUR' }}
+                            {{ tx.euros_totales | currency: asset.currency }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-300">
                             {{ tx.asset_comprado | number: '1.2-8' }}

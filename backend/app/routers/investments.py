@@ -30,7 +30,7 @@ from app.schemas.investment import (
 from app.services.asset_sales import asset_type_ids_with_sale_in_month
 from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fiat_deposits import fiat_deposit_total_for_entity
-from app.services.fx_converter import amount_to_eur, eur_to_native, get_usd_to_eur_rate
+from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
 from app.services.linked_asset_investments import sum_linked_asset_investments_eur
 from app.services.market_price_service import market_price_service
 
@@ -197,23 +197,13 @@ def _asset_preview_from_transactions(
     tx_totals: dict[str, float] | None,
     previous_amount: float | None,
     monthly_contribution: float | None,
-    currency: str,
-    year: int,
-    month: int,
     include_units: bool,
 ) -> tuple[float, float | None]:
-    """P1: suma de asset_transactions; P2: mes anterior + aportación mensual."""
-    if tx_totals and (
-        tx_totals.get("invested_amount_native", 0) > 0 or tx_totals.get("invested_amount_eur", 0) > 0
-    ):
-        native = tx_totals.get("invested_amount_native")
-        suggested_amount = (
-            native
-            if native is not None
-            else eur_to_native(tx_totals["invested_amount_eur"], currency, year, month)
-        )
-        suggested_units = tx_totals.get("asset_amount") if include_units else None
-        return suggested_amount, suggested_units
+    """P1: suma de asset_transactions en la divisa del activo; P2: mes anterior + aportación."""
+    native = tx_totals.get("invested_amount_native", 0) if tx_totals else 0
+    if native > 0:
+        suggested_units = tx_totals.get("asset_amount") if include_units and tx_totals else None
+        return native, suggested_units
 
     return _asset_suggested_amount(previous_amount, monthly_contribution), None
 
@@ -339,12 +329,9 @@ def get_asset_transaction_preview(
             detail="El activo no tiene operaciones en asset_transactions",
         )
 
-    invested_eur = tx_totals.get("invested_amount_eur", 0)
+    amount_native = tx_totals.get("invested_amount_native", 0)
     units = tx_totals.get("asset_amount", 0)
-    amount_native = tx_totals.get("invested_amount_native")
-    if amount_native is None:
-        amount_native = eur_to_native(invested_eur, asset.currency, year, month)
-    if invested_eur <= 0 and amount_native <= 0 and units <= 0:
+    if amount_native <= 0 and units <= 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El activo no tiene operaciones en asset_transactions",
@@ -355,7 +342,7 @@ def get_asset_transaction_preview(
         month=month,
         currency=asset.currency,
         amount=amount_native,
-        amount_eur=invested_eur,
+        amount_eur=amount_native,
         units=units,
     )
 
@@ -562,9 +549,6 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
             tx_totals=tx_totals,
             previous_amount=prev_amount,
             monthly_contribution=monthly_contribution,
-            currency=asset.currency,
-            year=year,
-            month=month,
             include_units=True,
         )
         assets_detail.append(
