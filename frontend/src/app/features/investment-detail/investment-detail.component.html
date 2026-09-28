@@ -92,10 +92,12 @@
     <!-- ==================== CATEGORÍAS: FONDOS / ACCIONES / CRYPTO (desplegables) ==================== -->
     <section class="flex flex-col gap-4">
       @for (cat of overview()!.categories; track cat.category_id) {
-        <div
-          class="category-panel overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10"
-          [style.border-left-color]="cat.color"
-        >
+        <div class="category-panel overflow-hidden rounded-2xl border border-white/10 bg-slate-800/60">
+          <span
+            class="category-panel-accent"
+            aria-hidden="true"
+            [style.background-color]="cat.color"
+          ></span>
           <div class="flex items-center gap-1 pr-2">
             <button
               type="button"
@@ -341,7 +343,19 @@
                       [clickable]="false"
                     />
                   }
+                }
 
+                @if (isViewingPastMonth()) {
+                  <p class="category-period-notice category-period-notice--past">
+                    Este mes es pasado
+                  </p>
+                } @else if (isViewingFutureMonth()) {
+                  <p class="category-period-notice category-period-notice--future">
+                    Este mes es futuro y no se ha inicializado el registro mensual
+                  </p>
+                }
+
+                @if (!panel(cat.category_id).assetEditMode) {
                   @if (panel(cat.category_id).detail!.assets.length > 0) {
                     <div class="overflow-x-auto rounded-xl ring-1 ring-white/5" [class.mt-4]="assetSegmentsFor(cat.category_id).length > 0">
                       <table class="w-full min-w-[600px] text-sm">

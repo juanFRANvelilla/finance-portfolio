@@ -169,6 +169,30 @@ export class InvestmentDetailComponent {
 
   readonly monthLabel = computed(() => `${this.monthNames[this.month() - 1]} ${this.year()}`);
 
+  isViewingPastMonth(): boolean {
+    return this.compareViewingMonthToToday() < 0;
+  }
+
+  isViewingFutureMonth(): boolean {
+    return this.compareViewingMonthToToday() > 0;
+  }
+
+  /** Negativo = pasado, 0 = mes natural actual, positivo = futuro. */
+  private compareViewingMonthToToday(): number {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const viewedYear = this.year();
+    const viewedMonth = this.month();
+    if (viewedYear !== currentYear) {
+      return viewedYear < currentYear ? -1 : 1;
+    }
+    if (viewedMonth === currentMonth) {
+      return 0;
+    }
+    return viewedMonth < currentMonth ? -1 : 1;
+  }
+
   readonly categorySegments = computed<DonutSegment[]>(() => {
     const ov = this.overview();
     if (!ov) return [];
