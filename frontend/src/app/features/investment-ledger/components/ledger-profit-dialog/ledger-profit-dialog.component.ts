@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 
 import { AssetGroup } from '../../../../core/models/ledger.model';
 import { InvestmentApiService } from '../../../../core/services/investment-api.service';
+import { MarketPriceApiService } from '../../../../core/services/market-price-api.service';
 import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
 
 @Component({
@@ -14,6 +15,7 @@ import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
 })
 export class LedgerProfitDialogComponent {
   private readonly api = inject(InvestmentApiService);
+  private readonly marketPriceApi = inject(MarketPriceApiService);
 
   readonly open = input.required<boolean>();
   readonly asset = input.required<AssetGroup | null>();
@@ -57,9 +59,34 @@ export class LedgerProfitDialogComponent {
     this.errorMessage.set(null);
     this.profit.set(null);
     this.profitPercentage.set(null);
+    this.priceInput.set('');
+    this.loading.set(true);
+
+    this.marketPriceApi.getMarketPrices().subscribe({
+      next: (prices) => {
+        const live = prices.find((entry) => entry.asset_type_id === asset.asset_type_id);
+        if (live && live.price > 0) {
+          this.currency.set(this.quoteCurrencyForSelect(live.currency));
+          this.priceInput.set(this.formatPriceInput(live.price));
+        } else {
+          this.applyPurchasePriceFallback(asset);
+        }
+        this.recalculate();
+      },
+      error: () => {
+        this.applyPurchasePriceFallback(asset);
+        this.recalculate();
+      },
+    });
+  }
+
+  private applyPurchasePriceFallback(asset: AssetGroup): void {
     this.currency.set(asset.currency === 'USD' ? 'USD' : 'EUR');
     this.priceInput.set(this.formatPriceInput(asset.last_precio_compra));
-    this.recalculate();
+  }
+
+  private quoteCurrencyForSelect(currency: string): 'EUR' | 'USD' {
+    return currency === 'USD' || currency === 'USDT' ? 'USD' : 'EUR';
   }
 
   onPriceChange(value: string): void {
