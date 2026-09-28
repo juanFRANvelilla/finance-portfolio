@@ -191,71 +191,119 @@
               } @else if (panel(cat.category_id).detail) {
                 <!-- ---- Total de categoría ---- -->
                 <div class="mb-5">
-                  @if (!panel(cat.category_id).assetEditMode) {
-                    <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
-                      Total de la categoría
-                      @if (cat.entity_amount_eur > 0) {
-                        <span class="text-xs text-emerald-400">
-                          Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
-                        </span>
-                      } @else if (cat.monthly_contributions_eur > 0 || cat.previous_amount_eur !== null) {
-                        <span class="text-xs text-slate-500">
-                          Previsión: {{ suggestedAmount(cat) | eurCurrency }}
-                        </span>
-                      }
-                    </span>
+                  <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
+                    Total de la categoría
+                    @if (cat.entity_amount_eur > 0) {
+                      <span class="text-xs text-emerald-400">
+                        Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
+                      </span>
+                    } @else if (cat.monthly_contributions_eur > 0 || cat.previous_amount_eur !== null) {
+                      <span class="text-xs text-slate-500">
+                        Previsión: {{ suggestedAmount(cat) | eurCurrency }}
+                      </span>
+                    }
+                  </span>
+                  @if (!isCategoryTotalEditing(cat.category_id)) {
+                    <div class="flex items-center gap-2">
+                      <div
+                        class="relative min-w-0 flex-1 cursor-pointer rounded-xl ring-1 ring-white/10 transition hover:ring-white/20"
+                        role="button"
+                        tabindex="0"
+                        title="Editar total de categoría"
+                        (click)="startCategoryTotalEdit(cat.category_id)"
+                        (keydown.enter)="startCategoryTotalEdit(cat.category_id)"
+                      >
+                        <input
+                          type="text"
+                          readonly
+                          tabindex="-1"
+                          aria-hidden="true"
+                          class="pointer-events-none w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none"
+                          [value]="categoryTotalInputDisplay(cat.category_id)"
+                        />
+                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
+                      </div>
+                      <button
+                        type="button"
+                        title="Editar total de categoría"
+                        aria-label="Editar total de categoría"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 ring-1 ring-white/10 transition hover:bg-white/5 hover:text-indigo-300"
+                        (click)="startCategoryTotalEdit(cat.category_id)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                          <path d="m2.695 14.363 1.414-1.414 9.193 9.193-1.414 1.414-9.193-9.193ZM16.707 2.293a1 1 0 0 1 0 1.414l-8.25 8.25a1 1 0 0 1-.707.293H5a1 1 0 0 1-1-1v-2.75a1 1 0 0 1 .293-.707l8.25-8.25a1 1 0 0 1 1.414 0Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  } @else {
                     <div class="relative">
                       <input
                         type="text"
-                        readonly
-                        tabindex="-1"
-                        class="w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10"
+                        inputmode="decimal"
+                        placeholder="0,00"
+                        class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-2 ring-indigo-500"
                         [value]="categoryTotalInputDisplay(cat.category_id)"
+                        (input)="onCategoryTotalDraftChange(cat.category_id, $any($event.target).value)"
                       />
                       <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
                     </div>
-                    @if (categoryOthersDisplay(cat.category_id) > 0) {
-                      <p class="mt-2 text-xs text-slate-500">
-                        Incluye {{ categoryOthersDisplay(cat.category_id) | eurCurrency }} en «Otros»
-                        (activos desglosados: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }})
-                      </p>
-                    }
-                  } @else {
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <span class="mb-1 block text-xs font-medium text-slate-400">Suma de activos</span>
-                        <div
-                          class="flex h-[42px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-semibold tabular-nums text-slate-300 ring-1 ring-white/5"
+                    <p class="mt-1.5 text-xs text-slate-500">
+                      Suma de activos: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }}
+                    </p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        class="transaction-reload-btn"
+                        title="Igualar el total a la suma de activos desglosados"
+                        aria-label="Sincronizar total con suma de activos"
+                        [disabled]="panel(cat.category_id).savingCategoryTotal"
+                        (click)="syncCategoryTotalToAllocated(cat.category_id)"
+                      >
+                        <svg
+                          class="transaction-reload-btn-icon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
                         >
-                          {{ assetAllocatedFor(cat.category_id) | eurCurrency }}
-                        </div>
-                      </div>
-                      <label class="block">
-                        <span class="mb-1 block text-xs font-medium text-indigo-300">Total de categoría (≥ suma)</span>
-                        <div class="relative">
-                          <input
-                            type="text"
-                            inputmode="decimal"
-                            placeholder="0,00"
-                            class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
-                            [value]="categoryTotalInputDisplay(cat.category_id)"
-                            (input)="onCategoryTotalChange(cat.category_id, $any($event.target).value)"
-                            (blur)="onCategoryTotalBlur(cat.category_id)"
-                          />
-                          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
-                        </div>
-                      </label>
+                          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                          <path d="M21 3v6h-6" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        [disabled]="!canConfirmCategoryTotal(cat.category_id)"
+                        (click)="confirmCategoryTotal(cat.category_id)"
+                      >
+                        @if (panel(cat.category_id).savingCategoryTotal) {
+                          Guardando...
+                        } @else {
+                          Confirmar
+                        }
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        [disabled]="panel(cat.category_id).savingCategoryTotal"
+                        (click)="cancelCategoryTotalEdit(cat.category_id)"
+                      >
+                        Cancelar
+                      </button>
                     </div>
-                    @if (categoryOthersDisplay(cat.category_id) > 0) {
-                      <p class="mt-2 text-xs font-medium text-amber-300/90">
-                        Otros: {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
-                        (diferencia entre total y suma de activos)
-                      </p>
-                    } @else {
-                      <p class="mt-2 text-xs text-slate-500">
-                        Puedes subir el total por encima de la suma; el excedente aparecerá como «Otros».
-                      </p>
-                    }
+                  }
+                  @if (categoryOthersDisplay(cat.category_id) > 0) {
+                    <p class="mt-2 text-xs text-slate-500">
+                      Incluye {{ categoryOthersDisplay(cat.category_id) | eurCurrency }} en «Otros»
+                      (activos desglosados: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }})
+                    </p>
+                  } @else if (isCategoryTotalEditing(cat.category_id)) {
+                    <p class="mt-2 text-xs text-slate-500">
+                      Puedes subir el total por encima de la suma; el excedente aparecerá como «Otros».
+                    </p>
                   }
                   <div class="mt-2 flex items-center gap-3">
                     <input
@@ -418,10 +466,10 @@
                                   <div class="inline-flex items-center justify-end gap-0.5">
                                     <button
                                       type="button"
-                                      title="Editar activo"
-                                      aria-label="Editar activo"
+                                      title="Editar títulos e importe del mes"
+                                      aria-label="Editar títulos e importe del mes"
                                       class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-indigo-300"
-                                      (click)="openAssetEditDialog(cat.category_id, asset)"
+                                      (click)="openAssetMonthlyDialog(cat.category_id, asset)"
                                     >
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
                                         <path d="m2.695 14.363 1.414-1.414 9.193 9.193-1.414 1.414-9.193-9.193ZM16.707 2.293a1 1 0 0 1 0 1.414l-8.25 8.25a1 1 0 0 1-.707.293H5a1 1 0 0 1-1-1v-2.75a1 1 0 0 1 .293-.707l8.25-8.25a1 1 0 0 1 1.414 0Z" />
@@ -459,115 +507,32 @@
                     </p>
                   }
                 } @else {
-                  <!-- ---- Modo edición: formulario de activos ---- -->
-                  <p class="mb-3 text-sm font-semibold text-slate-300">Activos</p>
+                  <!-- ---- Modo edición: catálogo de activos ---- -->
+                  <p class="mb-1 text-sm font-semibold text-slate-300">Catálogo de activos</p>
+                  <p class="mb-3 text-xs text-slate-500">
+                    Títulos e importe del mes se editan con el lápiz en la tabla.
+                  </p>
 
                   <div class="flex flex-col gap-3">
                     @for (row of panel(cat.category_id).assetRows; track row.assetTypeId) {
-                      <div class="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
-                        <div class="mb-2 flex items-start justify-between gap-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
+                        <div class="min-w-0">
                           <p class="text-sm font-medium text-slate-300">
                             {{ row.name }}
                             <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
-                            @if (formatMonthlyContribution(row.monthlyContribution, row.currency); as contributionLabel) {
-                              <span class="ml-2 text-xs font-medium text-emerald-400">{{ contributionLabel }}</span>
-                            }
-                            @if (liveMetricsForRow(row, cat.category_id); as metrics) {
-                              <span class="live-price-inline ml-2">
-                                <span
-                                  class="live-price-badge"
-                                  title="Actualizado: {{ livePriceFor(row.assetTypeId)!.updated_at }}"
-                                >
-                                  <span class="live-price-dot"></span>
-                                  {{ metrics.price | currency: metrics.currency }}
-                                </span>
-                                @if (metrics.showEurToggle) {
-                                  <button
-                                    type="button"
-                                    class="live-price-eur-toggle"
-                                    [class.live-price-eur-toggle--active]="isLivePriceEurMode(row.assetTypeId)"
-                                    [title]="liveCurrencyToggleTitle(row.assetTypeId)"
-                                    (click)="toggleLivePriceEur(row.assetTypeId)"
-                                  >
-                                    {{ liveCurrencyToggleLabel(row.assetTypeId) }}
-                                  </button>
-                                }
-                                @if (metrics.marketValue !== null) {
-                                  <span class="live-price-value">
-                                    · Valor {{ metrics.marketValue | currency: metrics.currency }}
-                                  </span>
-                                  @if (metrics.profit !== null) {
-                                    <span [class]="liveProfitClass(metrics.profit)">
-                                      · {{ metrics.profit >= 0 ? '+' : '' }}{{ metrics.profit | currency: metrics.currency }}
-                                      ({{ metrics.profitPct | number:'1.2-2' }}%)
-                                    </span>
-                                  }
-                                }
-                              </span>
-                            }
                           </p>
-                          @if (row.hasTransactions) {
-                            <button
-                              type="button"
-                              title="Calcular títulos e importe desde transacciones"
-                              aria-label="Calcular títulos e importe desde transacciones"
-                              [disabled]="isLoadingTransactionReload(cat.category_id, row.assetTypeId)"
-                              (click)="applyTransactionTotals(cat.category_id, row.assetTypeId)"
-                              class="transaction-reload-btn"
-                            >
-                              <svg
-                                class="transaction-reload-btn-icon"
-                                [class.transaction-reload-btn-icon--spinning]="isLoadingTransactionReload(cat.category_id, row.assetTypeId)"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                                <path d="M21 3v6h-6" />
-                              </svg>
-                            </button>
+                          @if (row.ticker) {
+                            <p class="text-xs text-slate-500">{{ row.ticker }}</p>
                           }
                         </div>
-                        <div class="grid gap-2" [class]="assetGridCols(row.currency)">
-                          <label class="block">
-                            <span class="mb-1 block text-xs text-slate-400">Títulos</span>
-                            <input
-                              type="text"
-                              inputmode="decimal"
-                              class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
-                              [value]="row.units"
-                              (input)="onAssetUnitsChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
-                            />
-                          </label>
-                          <label class="block">
-                            <span class="mb-1 block text-xs text-slate-400">Importe ({{ row.currency }})</span>
-                            <input
-                              type="text"
-                              inputmode="decimal"
-                              class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
-                              [value]="row.amount"
-                              (input)="onAssetAmountChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
-                            />
-                          </label>
-                          @if (row.currency === 'USD') {
-                            <div class="block">
-                              <span class="mb-1 block text-xs text-slate-400">Valor EUR</span>
-                              <div
-                                class="flex h-[38px] items-center rounded-xl bg-slate-900/40 px-3 text-sm font-medium tabular-nums text-emerald-300 ring-1 ring-white/5"
-                              >
-                                {{ assetRowPreviewEur(cat.category_id, row) | eurCurrency }}
-                              </div>
-                            </div>
-                          }
-                        </div>
-                        @if (row.currency === 'EUR') {
-                          <p class="mt-1.5 text-right text-xs text-slate-500">
-                            Valor: {{ assetRowPreviewEur(cat.category_id, row) | eurCurrency }}
-                          </p>
+                        @if (assetDetailForRow(cat.category_id, row.assetTypeId); as assetDetail) {
+                          <button
+                            type="button"
+                            class="rounded-xl bg-slate-800/80 px-3 py-2 text-xs font-semibold text-indigo-300 ring-1 ring-white/10 transition hover:bg-slate-700/80"
+                            (click)="openAssetEditDialog(cat.category_id, assetDetail)"
+                          >
+                            Propiedades
+                          </button>
                         }
                       </div>
                     }
@@ -632,29 +597,13 @@
                       >
                         + Añadir activo nuevo
                       </button>
-                      <div class="ml-auto flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          [disabled]="!canSaveAssets(cat.category_id)"
-                          (click)="saveAssets(cat.category_id)"
-                          class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          @if (panel(cat.category_id).savingAssets) {
-                            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-                            </svg>
-                          }
-                          Guardar
-                        </button>
-                        <button
-                          type="button"
-                          (click)="toggleAssetEditMode(cat.category_id)"
-                          class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/20"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        (click)="toggleAssetEditMode(cat.category_id)"
+                        class="ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                      >
+                        Listo
+                      </button>
                     </div>
                   </div>
                 }
@@ -674,6 +623,23 @@
     [asset]="assetEditTarget()"
     (close)="closeAssetEditDialog()"
     (saved)="onAssetEditSaved(assetEditCategoryId()!)"
+  />
+}
+
+@if (assetMonthlyDialogOpen() && assetMonthlyTarget() && assetMonthlyCategoryId()) {
+  <app-asset-monthly-position-dialog
+    [open]="assetMonthlyDialogOpen()"
+    [categoryId]="assetMonthlyCategoryId()!"
+    [year]="year()"
+    [month]="month()"
+    [asset]="assetMonthlyTarget()"
+    [liveMetrics]="liveMetricsForMonthlyDialog()"
+    [livePriceUpdatedAt]="livePriceFor(assetMonthlyTarget()!.asset_type_id)?.updated_at ?? null"
+    [livePriceEurMode]="isLivePriceEurMode(assetMonthlyTarget()!.asset_type_id)"
+    (close)="closeAssetMonthlyDialog()"
+    (saved)="onAssetMonthlySaved(assetMonthlyCategoryId()!)"
+    (toggleEurMode)="toggleMonthlyDialogEurMode()"
+    (draftChange)="onAssetMonthlyDraftChange($event)"
   />
 }
 

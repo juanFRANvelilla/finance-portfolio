@@ -9,13 +9,13 @@ import { MarketPriceApiService } from '../../core/services/market-price-api.serv
 import { PeriodStorageService } from '../../core/services/period-storage.service';
 import {
   AssetInvestmentDetail,
-  AssetType,
   CategoryDetailResponse,
   CategoryOverview,
   InvestmentOverviewResponse,
 } from '../../core/models/investment.model';
 import { MarketPriceResponse } from '../../core/models/market-price.model';
 import { AssetEditDialogComponent } from './components/asset-edit-dialog/asset-edit-dialog.component';
+import { AssetMonthlyPositionDialogComponent } from './components/asset-monthly-position-dialog/asset-monthly-position-dialog.component';
 import { AssetSaleDialogComponent } from './components/asset-sale-dialog/asset-sale-dialog.component';
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
@@ -65,17 +65,6 @@ interface AssetRow {
   hasTransactions: boolean;
 }
 
-interface AssetEditSnapshotRow {
-  assetTypeId: string;
-  amount: string;
-  units: string;
-}
-
-interface AssetEditSnapshot {
-  assetRows: AssetEditSnapshotRow[];
-  categoryTotalInput: string;
-}
-
 interface CategoryPanelState {
   open: boolean;
   loadingDetail: boolean;
@@ -84,16 +73,15 @@ interface CategoryPanelState {
   assetEditMode: boolean;
   assetRows: AssetRow[];
   fxUsdToEur: number | null;
-  savingAssets: boolean;
   showAddAsset: boolean;
   newAssetName: string;
   newAssetTicker: string;
   newAssetCurrency: string;
   creatingAsset: boolean;
-  /** Total de categoría editable en modo edición (EUR). */
-  categoryTotalInput: string;
-  /** Estado al entrar en edición; sirve para detectar cambios pendientes. */
-  editSnapshot: AssetEditSnapshot | null;
+  /** Borrador mientras se edita el total de categoría inline. */
+  categoryTotalDraft: string;
+  categoryTotalEditing: boolean;
+  savingCategoryTotal: boolean;
 }
 
 function createPanelState(): CategoryPanelState {
@@ -105,14 +93,14 @@ function createPanelState(): CategoryPanelState {
     assetEditMode: false,
     assetRows: [],
     fxUsdToEur: null,
-    savingAssets: false,
     showAddAsset: false,
     newAssetName: '',
     newAssetTicker: '',
     newAssetCurrency: 'EUR',
     creatingAsset: false,
-    categoryTotalInput: '',
-    editSnapshot: null,
+    categoryTotalDraft: '',
+    categoryTotalEditing: false,
+    savingCategoryTotal: false,
   };
 }
 
@@ -124,6 +112,7 @@ function createPanelState(): CategoryPanelState {
     EurCurrencyPipe,
     SegmentDonutChartComponent,
     AssetEditDialogComponent,
+    AssetMonthlyPositionDialogComponent,
     AssetSaleDialogComponent,
   ],
   templateUrl: './investment-detail.component.html',
@@ -152,12 +141,15 @@ export class InvestmentDetailComponent {
   readonly assetEditCategoryId = signal<string | null>(null);
   readonly assetEditTarget = signal<AssetInvestmentDetail | null>(null);
 
+  readonly assetMonthlyDialogOpen = signal(false);
+  readonly assetMonthlyCategoryId = signal<string | null>(null);
+  readonly assetMonthlyTarget = signal<AssetInvestmentDetail | null>(null);
+  readonly assetMonthlyDraftAmount = signal('');
+  readonly assetMonthlyDraftUnits = signal('');
+
   readonly assetSaleDialogOpen = signal(false);
   readonly assetSaleCategoryId = signal<string | null>(null);
   readonly assetSaleTarget = signal<AssetInvestmentDetail | null>(null);
-  /** Clave `${categoryId}:${assetTypeId}` mientras se recalcula desde asset_transactions. */
-  readonly transactionReloadLoading = signal<Record<string, boolean>>({});
-
   /** Precios de mercado en vivo (GET /api/v1/market-prices), indexados por asset_type_id. */
   readonly marketPrices = signal<Record<string, MarketPriceResponse>>({});
 
@@ -273,17 +265,6 @@ export class InvestmentDetailComponent {
       asset.amount_eur,
       asset.amount,
       asset.currency,
-    );
-  }
-
-  liveMetricsForRow(row: AssetRow, categoryId: string): LivePriceMetrics | null {
-    return this.buildLiveMetrics(
-      row.assetTypeId,
-      categoryId,
-      parseDecimalInput(row.units),
-      this.assetRowPreviewEur(categoryId, row),
-      parseDecimalInput(row.amount) ?? 0,
-      row.currency,
     );
   }
 
@@ -575,8 +556,7 @@ export class InvestmentDetailComponent {
 
   private applyDetail(categoryId: string, detail: CategoryDetailResponse): void {
     const assetRows = this.buildAssetRows(detail);
-    const categoryTotalInput = this.initialCategoryTotalInput(detail);
-    const autoEdit = detail.allocated_amount_eur <= 0;
+    const autoEdit = detail.allocated_amount_eur <= 0 && detail.assets.length === 0;
 
     this.updatePanel(categoryId, {
       loadingDetail: false,
@@ -584,73 +564,14 @@ export class InvestmentDetailComponent {
       assetEditMode: autoEdit,
       assetRows,
       fxUsdToEur: detail.fx_usd_to_eur,
-      categoryTotalInput,
-      editSnapshot: null,
-    });
-
-    if (autoEdit) {
-      this.clampCategoryTotalToAllocated(categoryId);
-      this.refreshEditSnapshot(categoryId);
-    }
-  }
-
-  private refreshEditSnapshot(categoryId: string): void {
-    const detail = this.panel(categoryId).detail;
-    if (!detail) {
-      return;
-    }
-    this.updatePanel(categoryId, {
-      editSnapshot: this.snapshotFromSavedDetail(detail),
+      categoryTotalDraft: this.categoryTotalDisplayString(detail),
+      categoryTotalEditing: false,
+      savingCategoryTotal: false,
     });
   }
 
-  private initialCategoryTotalInput(detail: CategoryDetailResponse): string {
-    return toInputString(Math.max(detail.category_amount_eur, detail.allocated_amount_eur));
-  }
-
-  /** Baseline en BD (sin previsión de transacciones) para detectar cambios pendientes. */
-  private snapshotFromSavedDetail(detail: CategoryDetailResponse): AssetEditSnapshot {
-    return {
-      assetRows: detail.assets.map((asset) => ({
-        assetTypeId: asset.asset_type_id,
-        amount: toInputString(asset.amount),
-        units: toInputString(asset.units),
-      })),
-      categoryTotalInput: this.initialCategoryTotalInput(detail),
-    };
-  }
-
-  hasPendingAssetChanges(categoryId: string): boolean {
-    const p = this.panel(categoryId);
-    if (!p.assetEditMode || !p.editSnapshot) {
-      return false;
-    }
-
-    if (p.categoryTotalInput.trim() !== p.editSnapshot.categoryTotalInput.trim()) {
-      return true;
-    }
-
-    if (p.assetRows.length !== p.editSnapshot.assetRows.length) {
-      return true;
-    }
-
-    const snapshotById = new Map(p.editSnapshot.assetRows.map((row) => [row.assetTypeId, row]));
-    for (const row of p.assetRows) {
-      const previous = snapshotById.get(row.assetTypeId);
-      if (!previous) {
-        return true;
-      }
-      if (row.amount.trim() !== previous.amount.trim() || row.units.trim() !== previous.units.trim()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  canSaveAssets(categoryId: string): boolean {
-    const p = this.panel(categoryId);
-    return !p.savingAssets && this.hasPendingAssetChanges(categoryId);
+  private categoryTotalDisplayString(detail: CategoryDetailResponse): string {
+    return String(Math.max(detail.category_amount_eur, detail.allocated_amount_eur)).replace('.', ',');
   }
 
   /**
@@ -664,14 +585,6 @@ export class InvestmentDetailComponent {
       return cat.suggested_amount_eur;
     }
     return cat.previous_amount_eur ?? 0;
-  }
-
-  onAssetAmountChange(categoryId: string, assetTypeId: string, value: string): void {
-    const rows = this.panel(categoryId).assetRows.map((r) =>
-      r.assetTypeId === assetTypeId ? { ...r, amount: value } : r,
-    );
-    this.updatePanel(categoryId, { assetRows: rows });
-    this.clampCategoryTotalToAllocated(categoryId);
   }
 
   formatMonthlyContribution(value: number | null, currency: string): string | null {
@@ -689,12 +602,12 @@ export class InvestmentDetailComponent {
     return ((value / total) * 100).toFixed(1);
   }
 
-  /** Total de categoría declarado (sidebar / donut). En edición puede superar la suma de activos. */
+  /** Total de categoría declarado (sidebar / donut). */
   categoryTotalDisplay(categoryId: string): number {
     const p = this.panel(categoryId);
-    if (p.assetEditMode) {
-      const allocated = this.assetAllocatedFor(categoryId);
-      const parsed = parseDecimalInput(p.categoryTotalInput);
+    if (p.categoryTotalEditing) {
+      const allocated = p.detail?.allocated_amount_eur ?? 0;
+      const parsed = parseDecimalInput(p.categoryTotalDraft);
       const value = parsed === null ? allocated : parsed;
       return Math.max(value, allocated);
     }
@@ -703,38 +616,101 @@ export class InvestmentDetailComponent {
 
   categoryTotalInputDisplay(categoryId: string): string {
     const p = this.panel(categoryId);
-    if (p.assetEditMode) {
-      return p.categoryTotalInput;
+    if (p.categoryTotalEditing) {
+      return p.categoryTotalDraft;
     }
-    return String(this.categoryTotalDisplay(categoryId)).replace('.', ',');
+    const detail = p.detail;
+    return detail ? this.categoryTotalDisplayString(detail) : '';
   }
 
   categoryOthersDisplay(categoryId: string): number {
     const p = this.panel(categoryId);
-    if (p.assetEditMode) {
-      return Math.max(0, this.categoryTotalDisplay(categoryId) - this.assetAllocatedFor(categoryId));
+    const allocated = p.detail?.allocated_amount_eur ?? 0;
+    if (p.categoryTotalEditing) {
+      return Math.max(0, this.categoryTotalDisplay(categoryId) - allocated);
     }
     return p.detail?.others_amount_eur ?? 0;
   }
 
-  onCategoryTotalChange(categoryId: string, value: string): void {
-    this.updatePanel(categoryId, { categoryTotalInput: value });
+  isCategoryTotalEditing(categoryId: string): boolean {
+    return this.panel(categoryId).categoryTotalEditing;
   }
 
-  onCategoryTotalBlur(categoryId: string): void {
-    this.clampCategoryTotalToAllocated(categoryId);
-  }
-
-  private clampCategoryTotalToAllocated(categoryId: string): void {
-    const p = this.panel(categoryId);
-    if (!p.assetEditMode) {
+  startCategoryTotalEdit(categoryId: string): void {
+    const detail = this.panel(categoryId).detail;
+    if (!detail) {
       return;
     }
-    const allocated = Math.round(this.assetAllocatedFor(categoryId) * 100) / 100;
-    const parsed = parseDecimalInput(p.categoryTotalInput);
-    if (parsed === null || parsed < allocated) {
-      this.updatePanel(categoryId, { categoryTotalInput: toInputString(allocated) });
+    this.updatePanel(categoryId, {
+      categoryTotalEditing: true,
+      categoryTotalDraft: this.categoryTotalDisplayString(detail),
+      errorMessage: null,
+    });
+  }
+
+  cancelCategoryTotalEdit(categoryId: string): void {
+    const detail = this.panel(categoryId).detail;
+    this.updatePanel(categoryId, {
+      categoryTotalEditing: false,
+      categoryTotalDraft: detail ? this.categoryTotalDisplayString(detail) : '',
+    });
+  }
+
+  onCategoryTotalDraftChange(categoryId: string, value: string): void {
+    this.updatePanel(categoryId, { categoryTotalDraft: value });
+  }
+
+  syncCategoryTotalToAllocated(categoryId: string): void {
+    const allocated = this.panel(categoryId).detail?.allocated_amount_eur ?? 0;
+    this.updatePanel(categoryId, {
+      categoryTotalDraft: String(allocated).replace('.', ','),
+    });
+  }
+
+  hasCategoryTotalPendingChange(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    if (!p.detail || !p.categoryTotalEditing) {
+      return false;
     }
+    const saved = Math.round(p.detail.category_amount_eur * 100) / 100;
+    const draft = Math.round(this.categoryTotalDisplay(categoryId) * 100) / 100;
+    return Math.abs(draft - saved) >= 0.005;
+  }
+
+  canConfirmCategoryTotal(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    if (!p.detail || p.savingCategoryTotal || !this.hasCategoryTotalPendingChange(categoryId)) {
+      return false;
+    }
+    const allocated = p.detail.allocated_amount_eur;
+    const total = this.categoryTotalDisplay(categoryId);
+    return total + 0.001 >= allocated;
+  }
+
+  confirmCategoryTotal(categoryId: string): void {
+    const p = this.panel(categoryId);
+    if (!p.detail || !this.canConfirmCategoryTotal(categoryId)) {
+      return;
+    }
+
+    this.updatePanel(categoryId, { savingCategoryTotal: true, errorMessage: null });
+    this.api
+      .upsertCategoryAssets(this.year(), this.month(), categoryId, {
+        assets: [],
+        category_amount_eur: this.categoryTotalDisplay(categoryId),
+      })
+      .subscribe({
+        next: (response) => {
+          this.applyDetail(categoryId, response);
+          this.loadOverview();
+        },
+        error: (err) => {
+          this.updatePanel(categoryId, {
+            savingCategoryTotal: false,
+            errorMessage: this.extractError(err, 'No se pudo guardar el total de categoría.'),
+          });
+        },
+      });
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
@@ -751,42 +727,6 @@ export class InvestmentDetailComponent {
         monthlyContribution: asset.monthly_contribution,
         hasTransactions: asset.has_transactions ?? false,
       };
-    });
-  }
-
-  private transactionReloadKey(categoryId: string, assetTypeId: string): string {
-    return `${categoryId}:${assetTypeId}`;
-  }
-
-  isLoadingTransactionReload(categoryId: string, assetTypeId: string): boolean {
-    return this.transactionReloadLoading()[this.transactionReloadKey(categoryId, assetTypeId)] ?? false;
-  }
-
-  applyTransactionTotals(categoryId: string, assetTypeId: string): void {
-    const key = this.transactionReloadKey(categoryId, assetTypeId);
-    this.transactionReloadLoading.update((current) => ({ ...current, [key]: true }));
-
-    this.api.getAssetTransactionPreview(this.year(), this.month(), assetTypeId).subscribe({
-      next: (preview) => {
-        const rows = this.panel(categoryId).assetRows.map((row) =>
-          row.assetTypeId === assetTypeId
-            ? {
-                ...row,
-                amount: toInputString(preview.amount),
-                units: toInputString(preview.units),
-              }
-            : row,
-        );
-        this.updatePanel(categoryId, { assetRows: rows });
-        this.clampCategoryTotalToAllocated(categoryId);
-        this.transactionReloadLoading.update((current) => ({ ...current, [key]: false }));
-      },
-      error: () => {
-        this.transactionReloadLoading.update((current) => ({ ...current, [key]: false }));
-        this.updatePanel(categoryId, {
-          errorMessage: 'No se pudieron calcular los totales desde las transacciones del activo.',
-        });
-      },
     });
   }
 
@@ -807,33 +747,6 @@ export class InvestmentDetailComponent {
     return segments;
   }
 
-  assetAllocatedFor(categoryId: string): number {
-    return this.panel(categoryId).assetRows.reduce(
-      (sum, row) => sum + this.assetRowPreviewEur(categoryId, row),
-      0,
-    );
-  }
-
-  /** Equivalente en EUR usando el tipo de cambio del backend para el mes activo. */
-  assetRowPreviewEur(categoryId: string, row: AssetRow): number {
-    const value = parseDecimalInput(row.amount) ?? 0;
-    if (row.currency === 'EUR') return value;
-    const rate = this.panel(categoryId).fxUsdToEur ?? 1;
-    return Math.round(value * rate * 100) / 100;
-  }
-
-  assetGridCols(currency: string): string {
-    if (currency === 'USD') return 'sm:grid-cols-3';
-    return 'sm:grid-cols-2';
-  }
-
-  onAssetUnitsChange(categoryId: string, assetTypeId: string, value: string): void {
-    const rows = this.panel(categoryId).assetRows.map((r) =>
-      r.assetTypeId === assetTypeId ? { ...r, units: value } : r,
-    );
-    this.updatePanel(categoryId, { assetRows: rows });
-  }
-
   canSellAsset(asset: AssetInvestmentDetail): boolean {
     if ((asset.units ?? 0) > 0) {
       return true;
@@ -845,6 +758,67 @@ export class InvestmentDetailComponent {
     this.assetEditCategoryId.set(categoryId);
     this.assetEditTarget.set(asset);
     this.assetEditDialogOpen.set(true);
+  }
+
+  openAssetMonthlyDialog(categoryId: string, asset: AssetInvestmentDetail): void {
+    this.assetMonthlyCategoryId.set(categoryId);
+    this.assetMonthlyTarget.set(asset);
+    this.assetMonthlyDraftAmount.set(toInputString(asset.amount));
+    this.assetMonthlyDraftUnits.set(toInputString(asset.units));
+    this.assetMonthlyDialogOpen.set(true);
+  }
+
+  closeAssetMonthlyDialog(): void {
+    this.assetMonthlyDialogOpen.set(false);
+    this.assetMonthlyCategoryId.set(null);
+    this.assetMonthlyTarget.set(null);
+  }
+
+  onAssetMonthlyDraftChange(draft: { amount: string; units: string }): void {
+    this.assetMonthlyDraftAmount.set(draft.amount);
+    this.assetMonthlyDraftUnits.set(draft.units);
+  }
+
+  liveMetricsForMonthlyDialog(): LivePriceMetrics | null {
+    const asset = this.assetMonthlyTarget();
+    const categoryId = this.assetMonthlyCategoryId();
+    if (!asset || !categoryId) {
+      return null;
+    }
+    const amountNative = parseDecimalInput(this.assetMonthlyDraftAmount()) ?? 0;
+    const fx = this.panel(categoryId).fxUsdToEur ?? 1;
+    const costEur =
+      asset.currency === 'EUR' ? amountNative : Math.round(amountNative * fx * 100) / 100;
+    return this.buildLiveMetrics(
+      asset.asset_type_id,
+      categoryId,
+      parseDecimalInput(this.assetMonthlyDraftUnits()),
+      costEur,
+      amountNative,
+      asset.currency,
+    );
+  }
+
+  onAssetMonthlySaved(categoryId: string): void {
+    this.closeAssetMonthlyDialog();
+    this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
+      next: (detail) => {
+        this.applyDetail(categoryId, detail);
+        this.loadOverview();
+      },
+      error: () => {
+        this.updatePanel(categoryId, {
+          errorMessage: 'Se guardó la posición, pero no se pudo refrescar el detalle.',
+        });
+      },
+    });
+  }
+
+  toggleMonthlyDialogEurMode(): void {
+    const asset = this.assetMonthlyTarget();
+    if (asset) {
+      this.toggleLivePriceEur(asset.asset_type_id);
+    }
   }
 
   openAssetSaleDialog(categoryId: string, asset: AssetInvestmentDetail): void {
@@ -878,10 +852,14 @@ export class InvestmentDetailComponent {
   }
 
   onAssetEditSaved(categoryId: string): void {
+    const keepEditMode = this.panel(categoryId).assetEditMode;
     this.refreshMarketPrices(true);
     this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
       next: (detail) => {
         this.applyDetail(categoryId, detail);
+        if (keepEditMode) {
+          this.updatePanel(categoryId, { assetEditMode: true });
+        }
         this.closeAssetEditDialog();
       },
       error: () => {
@@ -898,80 +876,25 @@ export class InvestmentDetailComponent {
     const enteringEdit = !p.assetEditMode;
 
     if (enteringEdit && p.detail) {
-      const assetRows = this.buildAssetRows(p.detail);
-      const categoryTotalInput = this.initialCategoryTotalInput(p.detail);
       this.updatePanel(categoryId, {
         assetEditMode: true,
-        assetRows,
-        categoryTotalInput,
-        editSnapshot: null,
+        assetRows: this.buildAssetRows(p.detail),
         showAddAsset: false,
         errorMessage: null,
       });
-      this.clampCategoryTotalToAllocated(categoryId);
-      this.refreshEditSnapshot(categoryId);
       return;
     }
 
     this.updatePanel(categoryId, {
       assetEditMode: false,
-      editSnapshot: null,
       showAddAsset: false,
       errorMessage: null,
       assetRows: p.detail ? this.buildAssetRows(p.detail) : p.assetRows,
-      categoryTotalInput: p.detail ? this.initialCategoryTotalInput(p.detail) : p.categoryTotalInput,
     });
   }
 
-  saveAssets(categoryId: string): void {
-    const p = this.panel(categoryId);
-    if (!p.detail) return;
-
-    if (!this.hasPendingAssetChanges(categoryId)) {
-      return;
-    }
-
-    this.clampCategoryTotalToAllocated(categoryId);
-    const allocated = this.assetAllocatedFor(categoryId);
-    const total = this.categoryTotalDisplay(categoryId);
-    if (total + 0.001 < allocated) {
-      this.updatePanel(categoryId, {
-        errorMessage: `El total de categoría no puede ser inferior a la suma de activos (${allocated.toFixed(2)} €).`,
-      });
-      return;
-    }
-
-    this.updatePanel(categoryId, { savingAssets: true, errorMessage: null });
-    const payload = {
-      assets: p.assetRows.map((row) => ({
-        asset_type_id: row.assetTypeId,
-        amount: parseDecimalInput(row.amount) ?? 0,
-        units: parseDecimalInput(row.units),
-      })),
-      category_amount_eur: this.categoryTotalDisplay(categoryId),
-    };
-    this.api.upsertCategoryAssets(this.year(), this.month(), categoryId, payload).subscribe({
-      next: (response) => {
-        const assetRows = this.buildAssetRows(response);
-        const categoryTotalInput = this.initialCategoryTotalInput(response);
-        this.updatePanel(categoryId, {
-          detail: response,
-          savingAssets: false,
-          assetEditMode: false,
-          assetRows,
-          categoryTotalInput,
-          editSnapshot: null,
-          fxUsdToEur: response.fx_usd_to_eur,
-        });
-        this.loadOverview();
-      },
-      error: (err) => {
-        this.updatePanel(categoryId, {
-          savingAssets: false,
-          errorMessage: this.extractError(err, 'No se pudo guardar el reparto de activos.'),
-        });
-      },
-    });
+  assetDetailForRow(categoryId: string, assetTypeId: string): AssetInvestmentDetail | null {
+    return this.panel(categoryId).detail?.assets.find((a) => a.asset_type_id === assetTypeId) ?? null;
   }
 
   toggleAddAsset(categoryId: string): void {
@@ -1010,21 +933,22 @@ export class InvestmentDetailComponent {
         currency: p.newAssetCurrency,
       })
       .subscribe({
-        next: (asset: AssetType) => {
-          const rows = [
-            ...this.panel(categoryId).assetRows,
-            {
-              assetTypeId: asset.id,
-              name: asset.name,
-              ticker: asset.ticker,
-              currency: asset.currency,
-              amount: '0',
-              units: '',
-              monthlyContribution: asset.monthly_contribution,
-              hasTransactions: false,
+        next: () => {
+          const keepEditMode = this.panel(categoryId).assetEditMode;
+          this.updatePanel(categoryId, { creatingAsset: false, showAddAsset: false });
+          this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
+            next: (detail) => {
+              this.applyDetail(categoryId, detail);
+              if (keepEditMode) {
+                this.updatePanel(categoryId, { assetEditMode: true });
+              }
             },
-          ];
-          this.updatePanel(categoryId, { creatingAsset: false, showAddAsset: false, assetRows: rows });
+            error: () => {
+              this.updatePanel(categoryId, {
+                errorMessage: 'Activo creado, pero no se pudo refrescar el detalle.',
+              });
+            },
+          });
         },
         error: (err) => {
           this.updatePanel(categoryId, {

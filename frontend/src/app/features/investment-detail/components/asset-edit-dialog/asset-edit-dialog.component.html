@@ -3,17 +3,13 @@
     <div class="asset-edit-dialog">
       <div class="asset-edit-header">
         <h3 class="asset-edit-title">Editar activo · {{ current.name }}</h3>
-        <p class="asset-edit-subtitle">Datos del catálogo: ticker, divisa y entidad vinculada</p>
+        <p class="asset-edit-subtitle">Ticker, fuente de precio, divisa y entidad vinculada</p>
       </div>
 
       <div class="asset-edit-body">
         @if (errorMessage()) {
           <div class="asset-edit-error">{{ errorMessage() }}</div>
         }
-
-        <p class="asset-edit-hint">
-          Los importes y títulos del mes se editan con «Editar activos».
-        </p>
 
         <label class="asset-edit-field">
           <span class="asset-edit-label">Ticker</span>

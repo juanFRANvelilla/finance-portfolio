@@ -129,3 +129,91 @@
     }
   }
 }
+
+.live-price-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.live-price-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.125rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a7f3d0;
+  background-color: rgb(16 185 129 / 0.1);
+  box-shadow: 0 0 0 1px rgb(16 185 129 / 0.25);
+  white-space: nowrap;
+}
+
+.live-price-eur-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  background-color: rgb(15 23 42 / 0.6);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+
+  &:hover {
+    color: #e2e8f0;
+    border-color: rgb(255 255 255 / 0.25);
+  }
+
+  &--active {
+    color: #fde68a;
+    border-color: rgb(251 191 36 / 0.45);
+    background-color: rgb(251 191 36 / 0.12);
+  }
+}
+
+.live-price-value {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.live-price-profit {
+  font-weight: 600;
+
+  &--gain {
+    color: #6ee7b7;
+  }
+
+  &--loss {
+    color: #fda4af;
+  }
+
+  &--neutral {
+    color: #94a3b8;
+  }
+}
+
+.live-price-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: #34d399;
+  animation: live-price-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-price-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

@@ -1,0 +1,95 @@
+@if (open() && asset(); as current) {
+  <div class="asset-edit-backdrop">
+    <div class="asset-edit-dialog">
+      <div class="asset-edit-header">
+        <h3 class="asset-edit-title">Posición del mes · {{ current.name }}</h3>
+        <p class="asset-edit-subtitle">Títulos e importe de {{ year() }}/{{ month() }}</p>
+      </div>
+
+      <div class="asset-edit-body">
+        @if (errorMessage()) {
+          <div class="asset-edit-error">{{ errorMessage() }}</div>
+        }
+
+        @if (liveMetrics(); as metrics) {
+          <div class="rounded-xl bg-slate-900/50 px-3 py-2.5 ring-1 ring-white/5">
+            <p class="text-sm font-medium text-slate-200">{{ assetLabel() }}</p>
+            <p class="live-price-inline mt-1.5 text-sm">
+              <span
+                class="live-price-badge"
+                [title]="livePriceUpdatedAt() ? 'Actualizado: ' + livePriceUpdatedAt() : ''"
+              >
+                <span class="live-price-dot"></span>
+                {{ metrics.price | currency: metrics.currency }}
+              </span>
+              @if (metrics.showEurToggle) {
+                <button
+                  type="button"
+                  class="live-price-eur-toggle"
+                  [class.live-price-eur-toggle--active]="livePriceEurMode()"
+                  [title]="liveCurrencyToggleTitle()"
+                  (click)="toggleEurMode.emit()"
+                >
+                  {{ liveCurrencyToggleLabel() }}
+                </button>
+              }
+              @if (metrics.marketValue !== null) {
+                <span class="live-price-value text-slate-300">
+                  · Valor {{ metrics.marketValue | currency: metrics.currency }}
+                </span>
+                @if (metrics.profit !== null) {
+                  <span [class]="liveProfitClass(metrics.profit)">
+                    · {{ metrics.profit >= 0 ? '+' : '' }}{{ metrics.profit | currency: metrics.currency }}
+                    ({{ metrics.profitPct | number:'1.2-2' }}%)
+                  </span>
+                }
+              }
+            </p>
+          </div>
+        }
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Títulos</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="asset-edit-input"
+              [ngModel]="units()"
+              (ngModelChange)="onUnitsChange($event)"
+            />
+          </label>
+          <label class="asset-edit-field">
+            <span class="asset-edit-label">Importe ({{ displayCurrencyCode(current.currency) }})</span>
+            <input
+              type="text"
+              inputmode="decimal"
+              class="asset-edit-input"
+              [ngModel]="amount()"
+              (ngModelChange)="onAmountChange($event)"
+            />
+          </label>
+        </div>
+
+      </div>
+
+      <div class="asset-edit-footer">
+        <button type="button" class="asset-edit-btn asset-edit-btn--ghost" (click)="close.emit()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="asset-edit-btn asset-edit-btn--primary"
+          [disabled]="saving()"
+          (click)="save()"
+        >
+          @if (saving()) {
+            Guardando...
+          } @else {
+            Guardar
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
