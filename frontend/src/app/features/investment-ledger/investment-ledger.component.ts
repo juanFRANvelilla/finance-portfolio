@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, input, signal } from '@angular/core';
 
 import { AssetGroup, AssetTransactionRow, EntityGroup } from '../../core/models/ledger.model';
@@ -24,7 +24,7 @@ function round2(value: number): number {
  */
 @Component({
   selector: 'app-investment-ledger',
-  imports: [CurrencyPipe, DecimalPipe, DatePipe, LedgerProfitDialogComponent],
+  imports: [CurrencyPipe, DecimalPipe, DatePipe, NgTemplateOutlet, LedgerProfitDialogComponent],
   templateUrl: './investment-ledger.component.html',
   styleUrl: './investment-ledger.component.scss',
 })
@@ -38,6 +38,10 @@ export class InvestmentLedgerComponent {
 
   hasFiatDeposits(entity: EntityGroup): boolean {
     return !!entity.fiat_deposits && entity.fiat_deposits.length > 0;
+  }
+
+  hasAssetCategories(entity: EntityGroup): boolean {
+    return (entity.asset_categories?.length ?? 0) > 0;
   }
 
   hasTransactions(asset: AssetGroup): boolean {

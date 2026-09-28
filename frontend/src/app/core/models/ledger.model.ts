@@ -60,11 +60,21 @@ export interface LedgerProfitResponse {
   fx_usd_to_eur: number;
 }
 
+export interface CategoryLedgerGroup {
+  category_id: string;
+  category_name: string;
+  color: string | null;
+  assets: AssetGroup[];
+}
+
 export interface EntityGroup {
   entity_name: string;
   /** Histórico de ingresos fiat; ausente/vacío en entidades sin aportaciones registradas (p. ej. MyInvestor). */
   fiat_deposits?: FiatDeposit[];
+  /** Activos en lista plana cuando la entidad solo tiene una categoría. */
   assets: AssetGroup[];
+  /** Subgrupos por categoría cuando la entidad mezcla varios tipos (Fondos, Acciones, …). */
+  asset_categories?: CategoryLedgerGroup[];
 }
 
 export type DashboardData = EntityGroup[];

@@ -77,7 +77,17 @@ class LedgerUnitPriceResponse(BaseModel):
     fx_usd_to_eur: float
 
 
+class CategoryLedgerGroup(BaseModel):
+    category_id: str
+    category_name: str
+    color: str | None = None
+    assets: list[AssetLedgerGroup] = Field(default_factory=list)
+
+
 class EntityLedgerGroup(BaseModel):
     entity_name: str
     fiat_deposits: list[FiatDepositRow] = Field(default_factory=list)
+    """Lista plana cuando la entidad solo tiene activos de una categoría."""
     assets: list[AssetLedgerGroup] = Field(default_factory=list)
+    """Subgrupos por categoría cuando la entidad mezcla Fondos/Acciones/Crypto, etc."""
+    asset_categories: list[CategoryLedgerGroup] = Field(default_factory=list)

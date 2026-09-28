@@ -1,13 +1,10 @@
 """Agregación del "libro mayor" de inversiones: fiat_deposits + asset_transactions
-agrupados por entidad financiera, replicando el histórico completo (sin filtrar por mes).
+agrupados por entidad financiera.
 
-Reglas clave:
-- Solo se listan entidades que tengan al menos un depósito fiat o un activo con
-  transacciones reales; nunca se inventan filas.
-- Solo se listan activos (asset_types) que tengan >= 1 fila en asset_transactions.
-  Un activo sin transacciones (p. ej. MSCI World sin operaciones registradas) no aparece.
-- invested_amount y execution_price se muestran tal cual se guardaron.
-  La divisa es asset_types.currency; este libro mayor no convierte el importe.
+Dentro de cada entidad:
+- Depósitos fiat arriba.
+- Activos con transacciones: si hay más de una categoría, se agrupan por categoría
+  (orden global de categorías + display_order del activo); si solo hay una, lista plana.
 """
 
 from collections import defaultdict
@@ -21,7 +18,14 @@ from app.models.asset_transaction import AssetTransaction
 from app.models.asset_type import AssetType
 from app.models.entity import Entity
 from app.models.fiat_deposit import FiatDeposit
-from app.schemas.ledger import AssetLedgerGroup, AssetTransactionLedgerRow, EntityLedgerGroup, FiatDepositRow
+from app.models.investment_category import InvestmentCategory
+from app.schemas.ledger import (
+    AssetLedgerGroup,
+    AssetTransactionLedgerRow,
+    CategoryLedgerGroup,
+    EntityLedgerGroup,
+    FiatDepositRow,
+)
 
 
 def _round2(value) -> float:
@@ -32,12 +36,83 @@ def _round8(value) -> float:
     return float(Decimal(str(value)).quantize(Decimal("0.00000001")))
 
 
+def _build_asset_ledger_group(
+    asset: AssetType, tx_by_asset: dict[UUID, list[tuple]]
+) -> AssetLedgerGroup:
+    running_amount = Decimal("0")
+    running_units = Decimal("0")
+    transactions: list[AssetTransactionLedgerRow] = []
+    for transaction_date, invested_amount, asset_amount, execution_price in tx_by_asset.get(asset.id, []):
+        invested = Decimal(str(invested_amount))
+        price = Decimal(str(execution_price or 0))
+        units = Decimal(str(asset_amount))
+        running_amount += invested
+        running_units += units
+        avg_price = (running_amount / running_units) if running_units > 0 else Decimal("0")
+        transactions.append(
+            AssetTransactionLedgerRow(
+                fecha=transaction_date,
+                currency=asset.currency,
+                precio_promedio=_round2(avg_price),
+                precio_compra=_round2(price),
+                euros_metidos=_round2(invested),
+                euros_totales=_round2(running_amount),
+                asset_comprado=_round8(units),
+                asset_acumulado=_round8(running_units),
+            )
+        )
+    last_tx = transactions[-1] if transactions else None
+    return AssetLedgerGroup(
+        asset_type_id=str(asset.id),
+        exchange_ticker=asset.name,
+        currency=asset.currency,
+        total_asset_acumulado=last_tx.asset_acumulado if last_tx else 0,
+        total_euros_metidos=last_tx.euros_totales if last_tx else 0,
+        last_precio_compra=last_tx.precio_compra if last_tx else 0,
+        transactions=transactions,
+    )
+
+
+def _sort_assets(assets: list[AssetType]) -> list[AssetType]:
+    return sorted(assets, key=lambda a: (a.display_order, a.name))
+
+
+def _entity_asset_payload(
+    entity_assets: list[AssetType],
+    tx_by_asset: dict[UUID, list[tuple]],
+    categories_by_id: dict[str, InvestmentCategory],
+    category_order: list[InvestmentCategory],
+) -> tuple[list[AssetLedgerGroup], list[CategoryLedgerGroup]]:
+    assets_by_category: dict[str, list[AssetType]] = defaultdict(list)
+    for asset in entity_assets:
+        assets_by_category[asset.category_id].append(asset)
+
+    category_ids_present = {cat_id for cat_id, items in assets_by_category.items() if items}
+
+    if len(category_ids_present) <= 1:
+        flat = [_build_asset_ledger_group(asset, tx_by_asset) for asset in _sort_assets(entity_assets)]
+        return flat, []
+
+    asset_categories: list[CategoryLedgerGroup] = []
+    for category in category_order:
+        cat_assets = _sort_assets(assets_by_category.get(category.id, []))
+        if not cat_assets:
+            continue
+        cat = categories_by_id.get(category.id, category)
+        asset_categories.append(
+            CategoryLedgerGroup(
+                category_id=cat.id,
+                category_name=cat.name,
+                color=cat.color,
+                assets=[_build_asset_ledger_group(asset, tx_by_asset) for asset in cat_assets],
+            )
+        )
+    return [], asset_categories
+
+
 def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
     entities_by_id = {e.id: e for e in db.scalars(select(Entity)).all()}
 
-    # ---- Depósitos fiat, agrupados por entidad y ordenados cronológicamente ----
-    # Nota: se seleccionan columnas explícitas (no el modelo completo) porque
-    # FiatDeposit.created_at está mapeado en el ORM pero no existe en la tabla real.
     deposits_by_entity: dict[str, list[tuple]] = defaultdict(list)
     deposit_rows = db.execute(
         select(FiatDeposit.entity_id, FiatDeposit.amount, FiatDeposit.deposit_date)
@@ -47,9 +122,6 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
     for entity_id, amount, deposit_date in deposit_rows:
         deposits_by_entity[entity_id].append((amount, deposit_date))
 
-    # ---- Transacciones, agrupadas por activo y ordenadas cronológicamente ----
-    # Nota: mismo motivo que en fiat_deposits; AssetTransaction.created_at está
-    # mapeado en el ORM pero no existe en la tabla real, así que evitamos select(AssetTransaction).
     tx_by_asset: dict[UUID, list[tuple]] = defaultdict(list)
     tx_rows = db.execute(
         select(
@@ -63,12 +135,16 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
     for asset_type_id, transaction_date, invested_amount, asset_amount, execution_price in tx_rows:
         tx_by_asset[asset_type_id].append((transaction_date, invested_amount, asset_amount, execution_price))
 
-    # ---- Activos vinculados a una entidad que además tengan >= 1 transacción ----
-    asset_types = db.scalars(select(AssetType).where(AssetType.entity_id.is_not(None))).all()
+    asset_types = list(db.scalars(select(AssetType).where(AssetType.entity_id.is_not(None))).all())
     assets_by_entity: dict[str, list[AssetType]] = defaultdict(list)
     for asset in asset_types:
         if tx_by_asset.get(asset.id):
             assets_by_entity[asset.entity_id].append(asset)
+
+    category_order = list(
+        db.scalars(select(InvestmentCategory).order_by(InvestmentCategory.display_order)).all()
+    )
+    categories_by_id = {cat.id: cat for cat in category_order}
 
     entity_ids = set(deposits_by_entity) | set(assets_by_entity)
 
@@ -89,47 +165,20 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
                 )
             )
 
-        asset_groups: list[AssetLedgerGroup] = []
-        for asset in sorted(assets_by_entity.get(entity_id, []), key=lambda a: a.display_order):
-            running_amount = Decimal("0")
-            running_units = Decimal("0")
-            transactions: list[AssetTransactionLedgerRow] = []
-            for transaction_date, invested_amount, asset_amount, execution_price in tx_by_asset.get(
-                asset.id, []
-            ):
-                invested = Decimal(str(invested_amount))
-                price = Decimal(str(execution_price or 0))
-                units = Decimal(str(asset_amount))
-                running_amount += invested
-                running_units += units
-                avg_price = (running_amount / running_units) if running_units > 0 else Decimal("0")
-                transactions.append(
-                    AssetTransactionLedgerRow(
-                        fecha=transaction_date,
-                        currency=asset.currency,
-                        precio_promedio=_round2(avg_price),
-                        precio_compra=_round2(price),
-                        euros_metidos=_round2(invested),
-                        euros_totales=_round2(running_amount),
-                        asset_comprado=_round8(units),
-                        asset_acumulado=_round8(running_units),
-                    )
-                )
-            last_tx = transactions[-1] if transactions else None
-            asset_groups.append(
-                AssetLedgerGroup(
-                    asset_type_id=str(asset.id),
-                    exchange_ticker=asset.name,
-                    currency=asset.currency,
-                    total_asset_acumulado=last_tx.asset_acumulado if last_tx else 0,
-                    total_euros_metidos=last_tx.euros_totales if last_tx else 0,
-                    last_precio_compra=last_tx.precio_compra if last_tx else 0,
-                    transactions=transactions,
-                )
-            )
+        flat_assets, asset_categories = _entity_asset_payload(
+            assets_by_entity.get(entity_id, []),
+            tx_by_asset,
+            categories_by_id,
+            category_order,
+        )
 
         groups.append(
-            EntityLedgerGroup(entity_name=entity_name, fiat_deposits=fiat_deposits, assets=asset_groups)
+            EntityLedgerGroup(
+                entity_name=entity_name,
+                fiat_deposits=fiat_deposits,
+                assets=flat_assets,
+                asset_categories=asset_categories,
+            )
         )
 
     groups.sort(key=lambda g: g.entity_name)
