@@ -16,13 +16,15 @@ export interface FiatDeposit {
 
 export interface AssetTransactionRow {
   fecha: string;
-  /** Precio medio de compra acumulado hasta esta operación (EUR/unidad). */
+  /** Divisa de asset_types. Los importes de la fila están en esta divisa. */
+  currency: string;
+  /** Precio medio de compra acumulado hasta esta operación, en `currency`. */
   precio_promedio: number;
-  /** Precio de ejecución de esta operación concreta (EUR/unidad). */
+  /** Precio de ejecución de esta operación, en `currency`. */
   precio_compra: number;
-  /** Importe en EUR destinado a esta operación. */
+  /** Importe de esta operación, en `currency`. */
   euros_metidos: number;
-  /** Importe en EUR acumulado invertido en este activo hasta esta operación. */
+  /** Importe acumulado invertido en este activo hasta esta operación, en `currency`. */
   euros_totales: number;
   /** Cantidad de unidades del activo compradas en esta operación. */
   asset_comprado: number;

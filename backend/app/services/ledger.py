@@ -106,6 +106,7 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
                 transactions.append(
                     AssetTransactionLedgerRow(
                         fecha=transaction_date,
+                        currency=asset.currency,
                         precio_promedio=_round2(avg_price),
                         precio_compra=_round2(price),
                         euros_metidos=_round2(invested),

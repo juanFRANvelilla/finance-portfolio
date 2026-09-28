@@ -45,6 +45,7 @@
               <div class="ledger-asset-title flex items-center justify-between gap-3 px-4 py-2.5">
                 <span class="text-xs font-bold uppercase tracking-wide text-indigo-300">
                   {{ asset.exchange_ticker }}
+                  <span class="ml-2 font-semibold text-slate-400">{{ asset.currency }}</span>
                 </span>
                 @if (hasTransactions(asset)) {
                   <button
@@ -76,16 +77,16 @@
                         <tr class="border-t border-white/5 transition hover:bg-white/5">
                           <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                            {{ tx.precio_promedio | currency: asset.currency : 'symbol' : '1.2-2' }}
+                            {{ tx.precio_promedio | currency: tx.currency : 'symbol' : '1.2-2' }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                            {{ tx.precio_compra | currency: asset.currency : 'symbol' : '1.2-2' }}
+                            {{ tx.precio_compra | currency: tx.currency : 'symbol' : '1.2-2' }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-300">
-                            {{ tx.euros_metidos | currency: asset.currency }}
+                            {{ tx.euros_metidos | currency: tx.currency }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums font-medium text-white">
-                            {{ tx.euros_totales | currency: asset.currency }}
+                            {{ tx.euros_totales | currency: tx.currency }}
                           </td>
                           <td class="px-4 py-2 text-right tabular-nums text-slate-300">
                             {{ tx.asset_comprado | number: '1.2-8' }}

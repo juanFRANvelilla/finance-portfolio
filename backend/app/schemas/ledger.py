@@ -15,14 +15,16 @@ class FiatDepositRow(BaseModel):
 
 class AssetTransactionLedgerRow(BaseModel):
     fecha: date | None = None
+    currency: str
+    """Divisa de asset_types.currency. El importe de la fila no se convierte."""
     precio_promedio: float
-    """Coste medio acumulado (importe total / títulos) en la divisa del activo."""
+    """Coste medio acumulado (importe total / títulos) en `currency`."""
     precio_compra: float
-    """Precio de ejecución de esta operación (execution_price, divisa del activo)."""
+    """Precio de ejecución de esta operación (execution_price) en `currency`."""
     euros_metidos: float
-    """Importe de esta operación. Es el número guardado; la divisa es la del activo."""
+    """Importe de esta operación, en `currency`."""
     euros_totales: float
-    """Importe acumulado en este activo. Misma divisa que el activo, sin convertir."""
+    """Importe acumulado en este activo, en `currency`."""
     asset_comprado: float
     """Unidades del activo compradas en esta operación."""
     asset_acumulado: float
