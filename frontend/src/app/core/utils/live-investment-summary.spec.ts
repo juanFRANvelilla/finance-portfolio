@@ -28,7 +28,6 @@ function makeAsset(
     units: partial.units ?? null,
     previous_amount: null,
     previous_units: null,
-    monthly_contribution: null,
     suggested_amount: null,
     suggested_units: null,
     has_transactions: false,

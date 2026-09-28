@@ -61,7 +61,6 @@ interface AssetRow {
   currency: string;
   amount: string;
   units: string;
-  monthlyContribution: number | null;
   hasTransactions: boolean;
 }
 
@@ -574,9 +573,7 @@ export class InvestmentDetailComponent {
     return String(Math.max(detail.category_amount_eur, detail.allocated_amount_eur)).replace('.', ',');
   }
 
-  /**
-   * Previsión del total manual: entidades vinculadas > mes anterior + aportaciones mensuales de activos.
-   */
+  /** Previsión del total: entidades vinculadas o mes anterior. */
   suggestedAmount(cat: CategoryOverview): number {
     if (cat.entity_amount_eur > 0) {
       return cat.entity_amount_eur;
@@ -585,14 +582,6 @@ export class InvestmentDetailComponent {
       return cat.suggested_amount_eur;
     }
     return cat.previous_amount_eur ?? 0;
-  }
-
-  formatMonthlyContribution(value: number | null, currency: string): string | null {
-    if (value === null || value <= 0) {
-      return null;
-    }
-    const formatted = String(value).replace('.', ',');
-    return `+${formatted} ${currency}/mes`;
   }
 
   categoryInputPercentage(categoryId: string): string {
@@ -724,7 +713,6 @@ export class InvestmentDetailComponent {
         currency: asset.currency,
         amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
         units: toInputString(hasSaved ? asset.units : (asset.suggested_units ?? asset.previous_units ?? null)),
-        monthlyContribution: asset.monthly_contribution,
         hasTransactions: asset.has_transactions ?? false,
       };
     });

@@ -25,7 +25,6 @@ class AssetTypeRead(BaseModel):
     currency: str
     is_active: bool
     display_order: int
-    monthly_contribution: float | None = None
     entity_id: str | None = None
     price_source: str | None = None
 
@@ -35,7 +34,6 @@ class AssetTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     ticker: str | None = None
     currency: str = "EUR"
-    monthly_contribution: float | None = Field(default=None, ge=0)
     entity_id: str | None = None
     price_source: str | None = None
 
@@ -57,7 +55,6 @@ class AssetTypeCreate(BaseModel):
 class AssetTypeUpdate(BaseModel):
     ticker: str | None = None
     currency: str | None = None
-    monthly_contribution: float | None = Field(default=None, ge=0)
     entity_id: str | None = None
     price_source: str | None = None
 
@@ -119,8 +116,7 @@ class CategoryOverview(BaseModel):
     editable: bool = True
     saved_this_month: bool = False
     suggested_amount_eur: float | None = None
-    """Previsión: depósitos fiat / mes anterior entidad (P1) o mes anterior + aportaciones activos."""
-    monthly_contributions_eur: float = 0.0
+    """Previsión: depósitos fiat vinculados o total del mes anterior."""
 
 
 class InvestmentOverviewResponse(BaseModel):
@@ -164,10 +160,8 @@ class AssetInvestmentDetail(BaseModel):
     units: float | None = None
     previous_amount: float | None = None
     previous_units: float | None = None
-    monthly_contribution: float | None = None
-    """Aportación mensual fija del catálogo (divisa nativa del activo)."""
     suggested_amount: float | None = None
-    """Previsión: suma asset_transactions (P1) o mes anterior + monthly_contribution (P2)."""
+    """Previsión: suma asset_transactions del mes o importe del mes anterior."""
     suggested_units: float | None = None
     """Previsión de títulos desde asset_transactions cuando aplica."""
     has_transactions: bool = False
