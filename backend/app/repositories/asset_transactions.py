@@ -1,5 +1,7 @@
 """Consultas e inserciones sobre asset_transactions."""
 
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from sqlalchemy import func, select, text
@@ -21,6 +23,52 @@ def resolve_sync_start_datetime(db: Session) -> datetime:
     if max_date is None:
         return FALLBACK_SYNC_START
     return datetime.combine(max_date, datetime.min.time())
+
+
+@dataclass(frozen=True)
+class AssetMatch:
+    asset_type_id: str
+    currency: str
+    entity_id: str | None
+
+
+def load_asset_match_index(db: Session) -> dict[str, AssetMatch]:
+    """Índice ticker/name en mayúsculas → activo, para casar operaciones de broker.
+
+    Si varias filas comparten clave, se prefiere `entity_id='myinvestor'`.
+    Si la clave sigue siendo ambigua, no se incluye.
+    """
+    rows = db.execute(
+        text(
+            "SELECT id, name, ticker, currency, entity_id FROM public.asset_types"
+        )
+    ).fetchall()
+
+    grouped: dict[str, list[AssetMatch]] = defaultdict(list)
+    for row in rows:
+        match = AssetMatch(
+            asset_type_id=str(row.id),
+            currency=(row.currency or "EUR").upper(),
+            entity_id=row.entity_id,
+        )
+        keys = set()
+        if row.ticker:
+            keys.add(str(row.ticker).upper())
+        if row.name:
+            keys.add(str(row.name).upper())
+        for key in keys:
+            grouped[key].append(match)
+
+    resolved: dict[str, AssetMatch] = {}
+    for key, matches in grouped.items():
+        unique = {item.asset_type_id: item for item in matches}
+        candidates = list(unique.values())
+        preferred = [item for item in candidates if item.entity_id == "myinvestor"]
+        if len(preferred) == 1:
+            resolved[key] = preferred[0]
+        elif len(candidates) == 1:
+            resolved[key] = candidates[0]
+    return resolved
 
 
 def load_kucoin_asset_name_map(db: Session) -> dict[str, str]:

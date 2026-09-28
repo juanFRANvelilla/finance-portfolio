@@ -7,7 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import check_db_connection
-from app.core.scheduler import start_kucoin_sync_background, shutdown_scheduler, start_scheduler
+from app.core.scheduler import (
+    shutdown_scheduler,
+    start_kucoin_sync_background,
+    start_myinvestor_sync_background,
+    start_scheduler,
+)
 from app.routers import asset_sales, contributions, entities, investments, ledger, market_prices, records
 from app.routers.asset_sales import v1_router as asset_sales_v1_router
 
@@ -31,16 +36,18 @@ async def lifespan(app: FastAPI):
 
     start_scheduler()
     app.state.kucoin_sync_task = start_kucoin_sync_background()
+    app.state.myinvestor_sync_task = start_myinvestor_sync_background()
 
     yield
 
-    task = getattr(app.state, "kucoin_sync_task", None)
-    if task is not None and not task.done():
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    for task_name in ("kucoin_sync_task", "myinvestor_sync_task"):
+        task = getattr(app.state, task_name, None)
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
     shutdown_scheduler()
 
 

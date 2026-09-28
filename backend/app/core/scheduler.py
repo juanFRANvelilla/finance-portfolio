@@ -8,6 +8,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
+from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,8 @@ _scheduler: AsyncIOScheduler | None = None
 
 # Sincronización periódica con KuCoin (producción: cada 4 horas).
 KUCOIN_SYNC_INTERVAL_HOURS = 4
+# Confirmaciones MyInvestor por IMAP. Independiente del job de KuCoin.
+MYINVESTOR_SYNC_INTERVAL_HOURS = 4
 
 
 async def _kucoin_sync_job() -> None:
@@ -42,6 +45,30 @@ async def _kucoin_sync_job() -> None:
         logger.info("--- Fin tarea programada: sync KuCoin ---")
 
 
+async def _myinvestor_sync_job() -> None:
+    """Wrapper async: la lectura IMAP es bloqueante y corre en un hilo."""
+    logger.info("--- Inicio tarea programada: sync MyInvestor ---")
+    try:
+        result = await asyncio.to_thread(run_scheduled_myinvestor_sync)
+        if result.success:
+            logger.info(
+                "Sync MyInvestor completada: %s insertados, %s duplicados omitidos, "
+                "%s correos leídos",
+                result.inserted,
+                result.skipped_duplicate,
+                result.raw_emails_count,
+            )
+        else:
+            logger.warning("Sync MyInvestor terminó con error: %s", result.error)
+    except asyncio.CancelledError:
+        logger.info("Sync MyInvestor cancelada")
+        raise
+    except Exception:
+        logger.exception("Error inesperado en la tarea programada de MyInvestor")
+    finally:
+        logger.info("--- Fin tarea programada: sync MyInvestor ---")
+
+
 def start_scheduler() -> AsyncIOScheduler:
     """Arranca el scheduler y registra las tareas periódicas."""
     global _scheduler
@@ -60,11 +87,24 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
     )
+    _scheduler.add_job(
+        _myinvestor_sync_job,
+        trigger="interval",
+        hours=MYINVESTOR_SYNC_INTERVAL_HOURS,
+        id="myinvestor_sync",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
 
     _scheduler.start()
     logger.info(
         "Tarea programada KuCoin activa: se ejecutará al arrancar y luego cada %s horas",
         KUCOIN_SYNC_INTERVAL_HOURS,
+    )
+    logger.info(
+        "Tarea programada MyInvestor activa: se ejecutará al arrancar y luego cada %s horas",
+        MYINVESTOR_SYNC_INTERVAL_HOURS,
     )
     return _scheduler
 
@@ -75,10 +115,16 @@ def shutdown_scheduler() -> None:
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None
-        logger.info("Scheduler detenido (tarea KuCoin cancelada)")
+        logger.info("Scheduler detenido")
 
 
 def start_kucoin_sync_background() -> asyncio.Task:
     """Lanza la sync de arranque en segundo plano para no retrasar el API."""
     logger.info("Primera ejecución de sync KuCoin en segundo plano...")
     return asyncio.create_task(_kucoin_sync_job(), name="kucoin-sync-startup")
+
+
+def start_myinvestor_sync_background() -> asyncio.Task:
+    """Lanza la sync IMAP de arranque en segundo plano para no retrasar el API."""
+    logger.info("Primera ejecución de sync MyInvestor en segundo plano...")
+    return asyncio.create_task(_myinvestor_sync_job(), name="myinvestor-sync-startup")
