@@ -511,9 +511,19 @@
                   </p>
 
                   <div class="flex flex-col gap-3">
-                    @for (row of panel(cat.category_id).assetRows; track row.assetTypeId) {
-                      <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
-                        <div class="min-w-0">
+                    @for (row of sortedAssetRows(cat.category_id); track row.assetTypeId) {
+                      <div class="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
+                        <label class="flex shrink-0 flex-col">
+                          <span class="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">Orden</span>
+                          <input
+                            type="text"
+                            inputmode="numeric"
+                            class="w-14 rounded-xl border-none bg-slate-900/60 px-2 py-2 text-center text-sm tabular-nums text-white outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-indigo-500"
+                            [value]="row.displayOrder"
+                            (input)="onAssetDisplayOrderChange(cat.category_id, row.assetTypeId, $any($event.target).value)"
+                          />
+                        </label>
+                        <div class="min-w-0 flex-1">
                           <p class="text-sm font-medium text-slate-300">
                             {{ row.name }}
                             <span class="ml-1 text-xs text-slate-500">({{ row.currency }})</span>
@@ -594,13 +604,27 @@
                       >
                         + Añadir activo nuevo
                       </button>
-                      <button
-                        type="button"
-                        (click)="toggleAssetEditMode(cat.category_id)"
-                        class="ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
-                      >
-                        Listo
-                      </button>
+                      <div class="ml-auto flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          [disabled]="!canSaveAssetDisplayOrder(cat.category_id)"
+                          (click)="saveAssetDisplayOrder(cat.category_id)"
+                          class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          @if (panel(cat.category_id).savingAssetOrder) {
+                            Guardando orden...
+                          } @else {
+                            Guardar orden
+                          }
+                        </button>
+                        <button
+                          type="button"
+                          (click)="toggleAssetEditMode(cat.category_id)"
+                          class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500/40 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-700/80"
+                        >
+                          Listo
+                        </button>
+                      </div>
                     </div>
                   </div>
                 }

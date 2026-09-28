@@ -8,6 +8,7 @@ import {
   AssetType,
   AssetTypeCreate,
   AssetTypeUpdate,
+  CategoryAssetDisplayOrderUpdate,
   CategoryDetailResponse,
   CategoryInvestmentsUpsert,
   InvestmentCategory,
@@ -44,6 +45,16 @@ export class InvestmentApiService {
   updateAssetType(assetTypeId: string, payload: AssetTypeUpdate): Observable<AssetType> {
     return this.http.patch<AssetType>(
       `${this.baseUrl}/asset-types/${encodeURIComponent(assetTypeId)}`,
+      payload,
+    );
+  }
+
+  updateCategoryAssetDisplayOrder(
+    categoryId: string,
+    payload: CategoryAssetDisplayOrderUpdate,
+  ): Observable<AssetType[]> {
+    return this.http.put<AssetType[]>(
+      `${this.baseUrl}/categories/${encodeURIComponent(categoryId)}/asset-types/display-order`,
       payload,
     );
   }

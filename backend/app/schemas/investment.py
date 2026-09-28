@@ -57,6 +57,7 @@ class AssetTypeUpdate(BaseModel):
     currency: str | None = None
     entity_id: str | None = None
     price_source: str | None = None
+    display_order: int | None = Field(default=None, ge=1, le=9999)
 
     @field_validator("currency")
     @classmethod
@@ -71,6 +72,15 @@ class AssetTypeUpdate(BaseModel):
         if value is not None and value not in ALLOWED_PRICE_SOURCES:
             raise ValueError(f"price_source debe ser uno de {ALLOWED_PRICE_SOURCES}")
         return value
+
+
+class AssetDisplayOrderItem(BaseModel):
+    asset_type_id: UUID
+    display_order: int = Field(ge=1, le=9999)
+
+
+class CategoryAssetDisplayOrderUpdate(BaseModel):
+    items: list[AssetDisplayOrderItem] = Field(min_length=1)
 
 
 class LinkedInvestedTotalResponse(BaseModel):
@@ -150,6 +160,7 @@ class AssetInvestmentDetail(BaseModel):
     asset_type_id: UUID
     name: str
     ticker: str | None = None
+    display_order: int
     currency: str
     entity_id: str | None = None
     entity_name: str | None = None

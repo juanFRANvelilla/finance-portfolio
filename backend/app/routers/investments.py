@@ -20,6 +20,7 @@ from app.schemas.investment import (
     AssetTypeCreate,
     AssetTypeRead,
     AssetTypeUpdate,
+    CategoryAssetDisplayOrderUpdate,
     CategoryDetailResponse,
     CategoryInvestmentsUpsert,
     CategoryOverview,
@@ -236,11 +237,18 @@ def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un activo llamado '{payload.name}'"
         )
 
+    next_order = db.scalar(
+        select(func.coalesce(func.max(AssetType.display_order), 0)).where(
+            AssetType.category_id == payload.category_id,
+            AssetType.is_active.is_(True),
+        )
+    )
     asset = AssetType(
         category_id=payload.category_id,
         name=payload.name,
         ticker=payload.ticker,
         currency=payload.currency,
+        display_order=int(next_order or 0) + 1,
         entity_id=payload.entity_id,
         price_source=payload.price_source,
     )
@@ -270,6 +278,8 @@ def update_asset_type(
         asset.entity_id = updates["entity_id"]
     if "price_source" in updates:
         asset.price_source = updates["price_source"]
+    if "display_order" in updates:
+        asset.display_order = updates["display_order"]
 
     db.commit()
     db.refresh(asset)
@@ -279,6 +289,58 @@ def update_asset_type(
         market_price_service.invalidate_ticker(asset.price_source, asset.ticker)
 
     return asset
+
+
+@router.put("/categories/{category_id}/asset-types/display-order", response_model=list[AssetTypeRead])
+def update_category_asset_display_order(
+    category_id: str, payload: CategoryAssetDisplayOrderUpdate, db: Session = Depends(get_db)
+) -> list[AssetType]:
+    """Actualiza el orden de visualización de los activos activos de una categoría."""
+    _get_category_or_404(db, category_id)
+
+    assets = list(
+        db.scalars(
+            select(AssetType)
+            .where(AssetType.category_id == category_id, AssetType.is_active.is_(True))
+            .order_by(AssetType.display_order)
+        ).all()
+    )
+    assets_by_id = {asset.id: asset for asset in assets}
+    expected_ids = set(assets_by_id.keys())
+    submitted_ids = {item.asset_type_id for item in payload.items}
+
+    if submitted_ids != expected_ids:
+        missing = expected_ids - submitted_ids
+        extra = submitted_ids - expected_ids
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debes indicar el orden de todos los activos de la categoría.",
+            )
+        if extra:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hay activos en la petición que no pertenecen a esta categoría.",
+            )
+
+    orders = [item.display_order for item in payload.items]
+    if len(set(orders)) != len(orders):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cada activo debe tener un número de orden distinto dentro de la categoría.",
+        )
+
+    for item in payload.items:
+        assets_by_id[item.asset_type_id].display_order = item.display_order
+
+    db.commit()
+    return list(
+        db.scalars(
+            select(AssetType)
+            .where(AssetType.category_id == category_id, AssetType.is_active.is_(True))
+            .order_by(AssetType.display_order)
+        ).all()
+    )
 
 
 @router.get(
@@ -522,6 +584,7 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 asset_type_id=asset.id,
                 name=asset.name,
                 ticker=asset.ticker,
+                display_order=asset.display_order,
                 currency=asset.currency,
                 entity_id=asset.entity_id,
                 entity_name=asset.entity.name if asset.entity else None,

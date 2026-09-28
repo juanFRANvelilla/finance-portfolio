@@ -34,6 +34,16 @@ export interface AssetTypeUpdate {
   currency?: string;
   entity_id?: string | null;
   price_source?: PriceSource | null;
+  display_order?: number;
+}
+
+export interface AssetDisplayOrderItem {
+  asset_type_id: string;
+  display_order: number;
+}
+
+export interface CategoryAssetDisplayOrderUpdate {
+  items: AssetDisplayOrderItem[];
 }
 
 export interface LinkedInvestedTotalResponse {
@@ -107,6 +117,7 @@ export interface AssetInvestmentDetail {
   asset_type_id: string;
   name: string;
   ticker: string | null;
+  display_order: number;
   currency: string;
   entity_id: string | null;
   entity_name: string | null;

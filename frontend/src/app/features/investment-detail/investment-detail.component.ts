@@ -59,6 +59,7 @@ interface AssetRow {
   name: string;
   ticker: string | null;
   currency: string;
+  displayOrder: string;
   amount: string;
   units: string;
   hasTransactions: boolean;
@@ -81,6 +82,9 @@ interface CategoryPanelState {
   categoryTotalDraft: string;
   categoryTotalEditing: boolean;
   savingCategoryTotal: boolean;
+  /** Orden guardado al entrar en «Editar activos» (assetTypeId → display_order). */
+  assetOrderSnapshot: Record<string, number>;
+  savingAssetOrder: boolean;
 }
 
 function createPanelState(): CategoryPanelState {
@@ -100,6 +104,8 @@ function createPanelState(): CategoryPanelState {
     categoryTotalDraft: '',
     categoryTotalEditing: false,
     savingCategoryTotal: false,
+    assetOrderSnapshot: {},
+    savingAssetOrder: false,
   };
 }
 
@@ -703,7 +709,7 @@ export class InvestmentDetailComponent {
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
-    return detail.assets.map((asset) => {
+    const rows = detail.assets.map((asset) => {
       const hasSaved = asset.amount > 0 || asset.units !== null;
       const fallbackAmount = asset.suggested_amount ?? asset.previous_amount ?? 0;
       return {
@@ -711,11 +717,120 @@ export class InvestmentDetailComponent {
         name: asset.name,
         ticker: asset.ticker,
         currency: asset.currency,
+        displayOrder: String(asset.display_order),
         amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
         units: toInputString(hasSaved ? asset.units : (asset.suggested_units ?? asset.previous_units ?? null)),
         hasTransactions: asset.has_transactions ?? false,
       };
     });
+    return this.sortAssetRows(rows);
+  }
+
+  private sortAssetRows(rows: AssetRow[]): AssetRow[] {
+    return [...rows].sort(
+      (a, b) => this.parseDisplayOrderInput(a.displayOrder) - this.parseDisplayOrderInput(b.displayOrder),
+    );
+  }
+
+  sortedAssetRows(categoryId: string): AssetRow[] {
+    return this.sortAssetRows(this.panel(categoryId).assetRows);
+  }
+
+  private parseDisplayOrderInput(value: string): number {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.MAX_SAFE_INTEGER;
+  }
+
+  private orderSnapshotFromRows(rows: AssetRow[]): Record<string, number> {
+    const snapshot: Record<string, number> = {};
+    for (const row of rows) {
+      snapshot[row.assetTypeId] = this.parseDisplayOrderInput(row.displayOrder);
+    }
+    return snapshot;
+  }
+
+  onAssetDisplayOrderChange(categoryId: string, assetTypeId: string, value: string): void {
+    const rows = this.panel(categoryId).assetRows.map((row) =>
+      row.assetTypeId === assetTypeId ? { ...row, displayOrder: value } : row,
+    );
+    this.updatePanel(categoryId, { assetRows: rows });
+  }
+
+  hasPendingAssetOrderChanges(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    if (!p.assetEditMode) {
+      return false;
+    }
+    for (const row of p.assetRows) {
+      const saved = p.assetOrderSnapshot[row.assetTypeId];
+      if (saved === undefined) {
+        return true;
+      }
+      if (this.parseDisplayOrderInput(row.displayOrder) !== saved) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  canSaveAssetDisplayOrder(categoryId: string): boolean {
+    const p = this.panel(categoryId);
+    if (!p.assetEditMode || p.savingAssetOrder || !this.hasPendingAssetOrderChanges(categoryId)) {
+      return false;
+    }
+    const orders = p.assetRows.map((row) => this.parseDisplayOrderInput(row.displayOrder));
+    if (orders.some((order) => order === Number.MAX_SAFE_INTEGER)) {
+      return false;
+    }
+    return new Set(orders).size === orders.length;
+  }
+
+  saveAssetDisplayOrder(categoryId: string): void {
+    const p = this.panel(categoryId);
+    if (!this.canSaveAssetDisplayOrder(categoryId)) {
+      return;
+    }
+
+    this.updatePanel(categoryId, { savingAssetOrder: true, errorMessage: null });
+    this.api
+      .updateCategoryAssetDisplayOrder(categoryId, {
+        items: p.assetRows.map((row) => ({
+          asset_type_id: row.assetTypeId,
+          display_order: this.parseDisplayOrderInput(row.displayOrder),
+        })),
+      })
+      .subscribe({
+        next: () => {
+          this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
+            next: (detail) => {
+              const rows = this.buildAssetRows(detail);
+              this.updatePanel(categoryId, {
+                detail,
+                assetRows: rows,
+                assetOrderSnapshot: this.orderSnapshotFromRows(rows),
+                savingAssetOrder: false,
+                assetEditMode: true,
+              });
+            },
+            error: () => {
+              this.updatePanel(categoryId, {
+                savingAssetOrder: false,
+                errorMessage: 'Orden guardado, pero no se pudo refrescar el detalle.',
+              });
+            },
+          });
+        },
+        error: (err) => {
+          this.updatePanel(categoryId, {
+            savingAssetOrder: false,
+            errorMessage: this.extractError(err, 'No se pudo guardar el orden de los activos.'),
+          });
+        },
+      });
   }
 
   assetSegmentsFor(categoryId: string): DonutSegment[] {
@@ -864,9 +979,11 @@ export class InvestmentDetailComponent {
     const enteringEdit = !p.assetEditMode;
 
     if (enteringEdit && p.detail) {
+      const assetRows = this.buildAssetRows(p.detail);
       this.updatePanel(categoryId, {
         assetEditMode: true,
-        assetRows: this.buildAssetRows(p.detail),
+        assetRows,
+        assetOrderSnapshot: this.orderSnapshotFromRows(assetRows),
         showAddAsset: false,
         errorMessage: null,
       });
@@ -878,6 +995,7 @@ export class InvestmentDetailComponent {
       showAddAsset: false,
       errorMessage: null,
       assetRows: p.detail ? this.buildAssetRows(p.detail) : p.assetRows,
+      assetOrderSnapshot: {},
     });
   }
 
@@ -928,7 +1046,12 @@ export class InvestmentDetailComponent {
             next: (detail) => {
               this.applyDetail(categoryId, detail);
               if (keepEditMode) {
-                this.updatePanel(categoryId, { assetEditMode: true });
+                const assetRows = this.buildAssetRows(detail);
+                this.updatePanel(categoryId, {
+                  assetEditMode: true,
+                  assetRows,
+                  assetOrderSnapshot: this.orderSnapshotFromRows(assetRows),
+                });
               }
             },
             error: () => {

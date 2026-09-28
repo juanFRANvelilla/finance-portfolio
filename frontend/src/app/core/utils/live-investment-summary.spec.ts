@@ -21,6 +21,7 @@ function makeAsset(
   return {
     name: partial.name ?? 'Activo',
     ticker: partial.ticker ?? null,
+    display_order: partial.display_order ?? 1,
     currency: partial.currency ?? 'EUR',
     entity_id: null,
     entity_name: null,
