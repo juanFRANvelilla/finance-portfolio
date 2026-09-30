@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     myinvestor_imap_mailbox_movements: str = "MyInvestor/Movimientos"
     myinvestor_imap_mailbox_transfers: str = "MyInvestor/Transferencias"
     myinvestor_entity_id: str = "myinvestor"
+    kucoin_entity_id: str = "kucoin"
 
     model_config = SettingsConfigDict(env_file=str(ENV_FILE), extra="ignore")
 

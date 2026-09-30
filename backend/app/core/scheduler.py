@@ -7,6 +7,7 @@ import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from app.services.kucoin_fiat_cash_flows_sync_service import run_scheduled_kucoin_fiat_cash_flows_sync
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
 from app.services.monthly_asset_snapshot import run_ensure_current_month_snapshots
 from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
@@ -25,21 +26,31 @@ MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS = 24
 
 
 async def _kucoin_sync_job() -> None:
-    """Wrapper async: ejecuta la sync bloqueante en un hilo para no bloquear el event loop."""
+    """Wrapper async: fills de trading + fiat EUR → entity_cash_flows (hilos)."""
     logger.info("--- Inicio tarea programada: sync KuCoin ---")
     try:
-        result = await asyncio.to_thread(run_scheduled_kucoin_sync)
-        if result.success:
+        trades = await asyncio.to_thread(run_scheduled_kucoin_sync)
+        if trades.success:
             logger.info(
-                "Sync KuCoin completada: %s insertados, %s duplicados omitidos, "
-                "%s fills brutos (desde %s)",
-                result.inserted,
-                result.skipped_duplicate,
-                result.raw_fills_count,
-                result.start_date.date(),
+                "Sync KuCoin operaciones: %s insertados, %s duplicados, %s fills (desde %s)",
+                trades.inserted,
+                trades.skipped_duplicate,
+                trades.raw_fills_count,
+                trades.start_date.date(),
             )
         else:
-            logger.warning("Sync KuCoin terminó con error: %s", result.error)
+            logger.warning("Sync KuCoin operaciones con error: %s", trades.error)
+
+        fiat = await asyncio.to_thread(run_scheduled_kucoin_fiat_cash_flows_sync)
+        if fiat.success:
+            logger.info(
+                "Sync KuCoin fiat EUR: %s insertados, %s duplicados (desde %s)",
+                fiat.inserted,
+                fiat.skipped_duplicate,
+                fiat.start_date.date(),
+            )
+        else:
+            logger.warning("Sync KuCoin fiat EUR con error: %s", fiat.error)
     except asyncio.CancelledError:
         logger.info("Sync KuCoin cancelada")
         raise
@@ -144,7 +155,8 @@ def start_scheduler() -> AsyncIOScheduler:
 
     _scheduler.start()
     logger.info(
-        "Tarea programada KuCoin activa: se ejecutará al arrancar y luego cada %s horas",
+        "Tarea programada KuCoin activa (operaciones + fiat EUR): "
+        "al arrancar y cada %s horas",
         KUCOIN_SYNC_INTERVAL_HOURS,
     )
     logger.info(
