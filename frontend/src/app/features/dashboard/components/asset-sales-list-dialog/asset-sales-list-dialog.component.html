@@ -20,10 +20,15 @@
         <p class="py-8 text-center text-sm text-slate-500">No hay ventas registradas.</p>
       } @else {
         <div class="min-h-0 flex-1 overflow-auto rounded-xl ring-1 ring-white/5">
-          <table class="w-full min-w-[640px] text-left text-sm">
+          <table class="w-full min-w-[640px] table-auto text-left text-sm">
+            <colgroup>
+              <col class="w-0" />
+              <col class="w-0" />
+            </colgroup>
             <thead class="sticky top-0 bg-slate-900/95 text-xs uppercase tracking-wide text-slate-400">
               <tr>
-                <th class="px-3 py-2.5 font-medium">Activo</th>
+                <th class="whitespace-nowrap py-2.5 pl-3 pr-1 font-medium">Activo</th>
+                <th class="whitespace-nowrap py-2.5 pl-2 pr-4 font-medium">% vendido</th>
                 <th class="px-3 py-2.5 font-medium">Mes</th>
                 <th class="px-3 py-2.5 font-medium">Año</th>
                 <th class="px-3 py-2.5 font-medium text-right">Precio venta</th>
@@ -34,7 +39,14 @@
             <tbody class="divide-y divide-white/5 text-slate-200">
               @for (row of sales(); track row.id) {
                 <tr class="hover:bg-white/[0.02]">
-                  <td class="px-3 py-2.5 font-medium text-white">{{ row.asset_name }}</td>
+                  <td class="whitespace-nowrap py-2.5 pl-3 pr-1 font-medium text-white">{{ row.asset_name }}</td>
+                  <td class="whitespace-nowrap py-2.5 pl-2 pr-4 tabular-nums text-slate-300">
+                    @if (row.position_sold_pct != null) {
+                      {{ row.position_sold_pct | number: '1.0-2' }}%
+                    } @else {
+                      <span class="text-slate-500">—</span>
+                    }
+                  </td>
                   <td class="px-3 py-2.5 text-slate-300">{{ monthNames[row.sale_month - 1] }}</td>
                   <td class="px-3 py-2.5 tabular-nums text-slate-300">{{ row.sale_year }}</td>
                   <td class="px-3 py-2.5 text-right tabular-nums">
