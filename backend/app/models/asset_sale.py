@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Computed, Date, ForeignKey, Numeric, SmallInteger, func
+from sqlalchemy import Computed, Date, ForeignKey, Numeric, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,10 @@ class AssetSale(Base):
     avg_buy_price: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     sale_price: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     fee: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False, server_default="0")
+    position_sold_pct: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    """Porcentaje de la posición total vendido en esta operación (100 = venta total)."""
+    exchange_trade_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    """Id del fill en exchange; idempotencia para ventas importadas (p. ej. KuCoin)."""
     profit: Mapped[float] = mapped_column(
         Numeric(18, 4),
         Computed("(((sale_price * units) - fee) - (units * avg_buy_price))", persisted=True),

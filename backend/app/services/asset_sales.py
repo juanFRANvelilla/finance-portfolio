@@ -261,6 +261,8 @@ def create_asset_sale(
         avg_buy_price=preview["avg_buy_price"],
         sale_price=preview["sale_price"],
         fee=preview["fee"],
+        position_sold_pct=preview["position_share_pct"],
+        exchange_trade_id=None,
     )
     db.add(sale)
 
@@ -313,6 +315,9 @@ def list_asset_sales(db: Session) -> dict:
                 "profit": _round4(profit_native),
                 "profit_percentage": _round4(sale.profit_percentage),
                 "profit_eur": _round4(profit_eur),
+                "position_sold_pct": (
+                    _round4(sale.position_sold_pct) if sale.position_sold_pct is not None else None
+                ),
             }
         )
 

@@ -171,6 +171,7 @@ export interface AssetSaleRead {
   profit: number;
   profit_percentage: number;
   currency: string;
+  position_sold_pct?: number | null;
 }
 
 export interface AssetSaleListItem {
@@ -186,6 +187,7 @@ export interface AssetSaleListItem {
   profit: number;
   profit_percentage: number;
   profit_eur: number;
+  position_sold_pct?: number | null;
 }
 
 export interface AssetSalesListResponse {

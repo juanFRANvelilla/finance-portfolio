@@ -32,9 +32,11 @@ async def _kucoin_sync_job() -> None:
         trades = await asyncio.to_thread(run_scheduled_kucoin_sync)
         if trades.success:
             logger.info(
-                "Sync KuCoin operaciones: %s insertados, %s duplicados, %s fills (desde %s)",
+                "Sync KuCoin operaciones: %s tx insertadas, %s ventas insertadas, "
+                "%s duplicados, %s fills (desde %s)",
                 trades.inserted,
-                trades.skipped_duplicate,
+                trades.sales_inserted,
+                trades.skipped_duplicate + trades.sales_skipped_duplicate,
                 trades.raw_fills_count,
                 trades.start_date.date(),
             )

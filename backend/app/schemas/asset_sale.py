@@ -59,6 +59,7 @@ class AssetSaleRead(BaseModel):
     profit: float
     profit_percentage: float
     currency: str
+    position_sold_pct: float | None = None
 
 
 class AssetSaleListItem(BaseModel):
@@ -74,6 +75,7 @@ class AssetSaleListItem(BaseModel):
     profit: float
     profit_percentage: float
     profit_eur: float
+    position_sold_pct: float | None = None
 
 
 class AssetSalesListResponse(BaseModel):

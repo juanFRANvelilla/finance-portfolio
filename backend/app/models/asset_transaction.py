@@ -9,7 +9,7 @@ from app.core.database import Base
 
 
 class AssetTransaction(Base):
-    """Operaciones de compra registradas en exchange (p. ej. fills de KuCoin)."""
+    """Operaciones de exchange (compras + ventas KuCoin). Ventas: importes/unidades negativos."""
 
     __tablename__ = "asset_transactions"
     __table_args__ = (UniqueConstraint("exchange_trade_id", name="uq_asset_transactions_exchange_trade_id"),)

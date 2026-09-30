@@ -1,4 +1,4 @@
-"""Sincronización de fills de KuCoin hacia asset_transactions."""
+"""Sincronización de fills de KuCoin hacia asset_transactions y asset_sales."""
 
 from __future__ import annotations
 
@@ -13,10 +13,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.repositories.asset_sales import upsert_kucoin_daily_asset_sale
+from app.services.kucoin_daily_asset_sales import build_daily_kucoin_sale_row
 from app.repositories.asset_transactions import (
     insert_transactions_batch,
     load_kucoin_asset_name_map,
     resolve_sync_start_datetime,
+    sum_position_by_asset_type_ids,
 )
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 
@@ -36,8 +39,12 @@ class KucoinSyncResult:
     candidates: int = 0
     inserted: int = 0
     skipped_duplicate: int = 0
+    sales_candidates: int = 0
+    sales_inserted: int = 0
+    sales_skipped_duplicate: int = 0
     skipped_fiat_bridge: int = 0
     skipped_unknown_asset: int = 0
+    skipped_invalid_sell: int = 0
     success: bool = True
     error: str | None = None
     messages: list[str] = field(default_factory=list)
@@ -52,7 +59,7 @@ def get_sync_start_datetime(db: Session | None = None) -> datetime:
 
 
 def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
-    """Extrae fills de KuCoin desde `start_date` e inserta en asset_transactions."""
+    """Extrae fills de KuCoin desde `start_date` e inserta compras/ventas."""
     end_date = datetime.now()
     result = KucoinSyncResult(start_date=start_date, end_date=end_date)
 
@@ -76,10 +83,18 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
                 logger.error(result.error)
                 return result
 
-            fills, stats = _transform_fills(raw_fills, asset_map, usdt_eur_rate)
-            result.candidates = len(fills)
+            position_totals = sum_position_by_asset_type_ids(db, list(asset_map.values()))
+            fills, daily_sale_keys, stats = _transform_fills(
+                raw_fills,
+                asset_map,
+                usdt_eur_rate,
+                position_totals,
+            )
+            result.candidates = len([f for f in fills if f["asset_amount"] > 0])
+            result.sales_candidates = len(daily_sale_keys)
             result.skipped_fiat_bridge = stats["skipped_fiat_bridge"]
             result.skipped_unknown_asset = stats["skipped_unknown_asset"]
+            result.skipped_invalid_sell = stats["skipped_invalid_sell"]
 
             if not fills:
                 result.messages.append("No hay operaciones válidas para insertar.")
@@ -88,12 +103,28 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
             inserted, skipped, inserted_fills = insert_transactions_batch(db, fills)
             result.inserted = inserted
             result.skipped_duplicate = skipped
-            apply_transactions_to_monthly_snapshot(db, inserted_fills)
+
+            buy_fills = [f for f in inserted_fills if Decimal(str(f["asset_amount"])) > 0]
+            apply_transactions_to_monthly_snapshot(db, buy_fills)
+
+            if daily_sale_keys:
+                upserted = 0
+                for asset_type_id, sale_date in sorted(
+                    daily_sale_keys, key=lambda item: (item[1], item[0])
+                ):
+                    daily_row = build_daily_kucoin_sale_row(db, asset_type_id, sale_date)
+                    if daily_row is None:
+                        continue
+                    upsert_kucoin_daily_asset_sale(db, daily_row)
+                    upserted += 1
+                db.commit()
+                result.sales_inserted = upserted
 
         logger.info(
-            "KuCoin sync OK: %s insertados, %s duplicados omitidos (desde %s)",
+            "KuCoin sync OK: %s tx insertadas, %s ventas insertadas, %s duplicados (desde %s)",
             result.inserted,
-            result.skipped_duplicate,
+            result.sales_inserted,
+            result.skipped_duplicate + result.sales_skipped_duplicate,
             start_date.date(),
         )
         return result
@@ -158,12 +189,6 @@ def _fetch_kucoin_fills(start_date: datetime, end_date: datetime) -> list[dict]:
             items = response.get("data", {}).get("items", [])
             if items:
                 all_fills.extend(items)
-                logger.debug(
-                    "Ventana %s → %s: %s fills",
-                    current_start.date(),
-                    current_end.date(),
-                    len(items),
-                )
         except Exception as exc:
             logger.warning(
                 "Error en ventana KuCoin %s → %s: %s: %s",
@@ -205,20 +230,29 @@ def _calculate_usdt_eur_rate(raw_fills: list[dict]) -> float:
     return USDT_EUR_FALLBACK_RATE
 
 
+def _quote_to_native_amount(funds: float, quote_currency: str, usdt_eur_rate: float) -> float | None:
+    if quote_currency == "EUR":
+        return funds
+    if quote_currency == "USDT":
+        return funds * usdt_eur_rate
+    return None
+
+
 def _transform_fills(
     raw_fills: list[dict],
     asset_map: dict[str, str],
     usdt_eur_rate: float,
-) -> tuple[list[dict], dict[str, int]]:
-    processed: list[dict] = []
+    position_totals: dict[str, tuple[Decimal, Decimal]],
+) -> tuple[list[dict], set[tuple[str, date]], dict[str, int]]:
+    parsed: list[dict] = []
     skipped_fiat_bridge = 0
     skipped_unknown_asset = 0
+    skipped_invalid_sell = 0
 
     for fill in raw_fills:
         symbol = fill.get("symbol", "")
         side = fill.get("side", "").upper()
-
-        if side != "BUY":
+        if side not in {"BUY", "SELL"}:
             continue
 
         parts = symbol.upper().split("-")
@@ -245,39 +279,114 @@ def _transform_fills(
             continue
 
         created_at_ms = int(fill.get("createdAt", 0))
-        executed_at: datetime = datetime.utcfromtimestamp(created_at_ms / 1000)
-        transaction_date: date = executed_at.date()
+        executed_at = datetime.utcfromtimestamp(created_at_ms / 1000)
+        transaction_date = executed_at.date()
         funds = float(fill.get("funds", 0))
         size = float(fill.get("size", 0))
         fee = float(fill.get("fee", 0))
 
-        if quote_currency == "EUR":
-            invested_amount_eur = funds
-        elif quote_currency == "USDT":
-            invested_amount_eur = funds * usdt_eur_rate
-        else:
+        native_amount = _quote_to_native_amount(funds, quote_currency, usdt_eur_rate)
+        if native_amount is None:
             logger.warning("Divisa de cotización desconocida '%s' en %s", quote_currency, symbol)
             skipped_unknown_asset += 1
             continue
 
-        execution_price_eur = invested_amount_eur / size if size > 0 else 0.0
+        if size <= 0:
+            skipped_unknown_asset += 1
+            continue
 
-        processed.append(
+        execution_price = native_amount / size
+        parsed.append(
             {
+                "side": side,
                 "symbol": symbol,
                 "exchange_trade_id": str(exchange_trade_id),
                 "asset_type_id": asset_type_id,
                 "transaction_date": transaction_date,
                 "executed_at": executed_at,
-                "invested_amount": Decimal(str(round(invested_amount_eur, 8))),
-                "asset_amount": Decimal(str(size)),
-                "execution_price": Decimal(str(round(execution_price_eur, 8))),
+                "native_amount": Decimal(str(round(native_amount, 8))),
+                "size": Decimal(str(size)),
+                "execution_price": Decimal(str(round(execution_price, 8))),
                 "fee_amount": Decimal(str(fee)),
             }
+        )
+
+    parsed.sort(key=lambda item: item["executed_at"])
+
+    running: dict[str, tuple[Decimal, Decimal]] = {
+        asset_id: (Decimal(str(units)), Decimal(str(invested)))
+        for asset_id, (units, invested) in position_totals.items()
+    }
+
+    tx_rows: list[dict] = []
+    daily_sale_keys: set[tuple[str, date]] = set()
+
+    for item in parsed:
+        asset_type_id = item["asset_type_id"]
+        units_before, invested_before = running.get(asset_type_id, (Decimal("0"), Decimal("0")))
+
+        if item["side"] == "BUY":
+            tx_rows.append(
+                {
+                    "symbol": item["symbol"],
+                    "exchange_trade_id": item["exchange_trade_id"],
+                    "asset_type_id": asset_type_id,
+                    "transaction_date": item["transaction_date"],
+                    "executed_at": item["executed_at"],
+                    "invested_amount": item["native_amount"],
+                    "asset_amount": item["size"],
+                    "execution_price": item["execution_price"],
+                    "fee_amount": item["fee_amount"],
+                }
+            )
+            running[asset_type_id] = (
+                units_before + item["size"],
+                invested_before + item["native_amount"],
+            )
+            continue
+
+        # SELL
+        if units_before <= 0:
+            logger.warning(
+                "Venta KuCoin omitida (sin posición previa): trade=%s asset=%s",
+                item["exchange_trade_id"],
+                item["symbol"],
+            )
+            skipped_invalid_sell += 1
+            continue
+
+        sold_units = item["size"]
+        avg_buy_price = (
+            (invested_before / units_before).quantize(Decimal("0.0001"))
+            if units_before > 0
+            else Decimal("0")
+        )
+
+        tx_rows.append(
+            {
+                "symbol": item["symbol"],
+                "exchange_trade_id": item["exchange_trade_id"],
+                "asset_type_id": asset_type_id,
+                "transaction_date": item["transaction_date"],
+                "executed_at": item["executed_at"],
+                "invested_amount": -item["native_amount"],
+                "asset_amount": -sold_units,
+                "execution_price": item["execution_price"],
+                "fee_amount": item["fee_amount"],
+            }
+        )
+
+        daily_sale_keys.add((asset_type_id, item["transaction_date"]))
+
+        cost_removed = avg_buy_price * sold_units
+        running[asset_type_id] = (
+            units_before - sold_units,
+            invested_before - cost_removed,
         )
 
     stats = {
         "skipped_fiat_bridge": skipped_fiat_bridge,
         "skipped_unknown_asset": skipped_unknown_asset,
+        "skipped_invalid_sell": skipped_invalid_sell,
     }
-    return processed, stats
+    return tx_rows, daily_sale_keys, stats

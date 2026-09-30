@@ -3,7 +3,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
-
+from decimal import Decimal
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
@@ -69,6 +69,33 @@ def load_asset_match_index(db: Session) -> dict[str, AssetMatch]:
         elif len(candidates) == 1:
             resolved[key] = candidates[0]
     return resolved
+
+
+def sum_position_by_asset_type_ids(
+    db: Session, asset_type_ids: list[str]
+) -> dict[str, tuple[Decimal, Decimal]]:
+    """Suma (unidades, invested_amount) acumulada por activo en asset_transactions."""
+    if not asset_type_ids:
+        return {}
+
+    rows = db.execute(
+        text(
+            """
+            SELECT asset_type_id::text,
+                   COALESCE(SUM(asset_amount), 0),
+                   COALESCE(SUM(invested_amount), 0)
+            FROM public.asset_transactions
+            WHERE asset_type_id::text = ANY(:ids)
+            GROUP BY asset_type_id
+            """
+        ),
+        {"ids": asset_type_ids},
+    ).fetchall()
+
+    return {
+        str(row[0]): (Decimal(str(row[1])), Decimal(str(row[2])))
+        for row in rows
+    }
 
 
 def load_kucoin_asset_name_map(db: Session) -> dict[str, str]:
