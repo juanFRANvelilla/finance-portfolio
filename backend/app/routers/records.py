@@ -27,7 +27,6 @@ from app.services.record_calculator import (
     compute_totals_from_simple_balances,
 )
 from app.services.fiat_deposits import fiat_deposit_totals_by_entity
-from app.services.hybrid_ledger import compute_cumulative_invested, uses_ledger
 
 
 router = APIRouter(prefix="/api/records", tags=["records"])
@@ -213,31 +212,13 @@ def _validate_import_payload(payload: ImportPayload, entities_by_id: dict[str, E
         )
 
 
-def _resolve_hybrid_invested(
-    db: Session,
-    *,
-    year: int,
-    month: int,
-    hybrid_balances: list,
-    entities_by_id: dict[str, Entity],
-) -> list[tuple[str, float, float]]:
+def _resolve_hybrid_invested(hybrid_balances: list) -> list[tuple[str, float, float]]:
     """Devuelve (entity_id, liquid_amount, cumulative_invested) listo para persistir."""
     resolved: list[tuple[str, float, float]] = []
     for hybrid in hybrid_balances:
-        entity = entities_by_id[hybrid.entity_id]
         liquid = float(hybrid.liquid_amount)
         if hybrid.invested_amount is not None:
             invested = float(hybrid.invested_amount)
-        elif uses_ledger(entity):
-            invested = compute_cumulative_invested(db, hybrid.entity_id, year, month, liquid)
-            if invested < 0:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"La entidad '{hybrid.entity_id}' tiene invertido calculado negativo ({invested:.2f}). "
-                        "Revisa el líquido, las aportaciones del mes o el registro del mes anterior."
-                    ),
-                )
         else:
             invested = 0.0
         resolved.append((hybrid.entity_id, liquid, invested))
@@ -328,9 +309,7 @@ def _upsert_record_balances(
 
     entity_ids = {h.entity_id for h in hybrid_balances}
     entities_by_id = _load_entities(db, entity_ids) if entity_ids else {}
-    resolved_hybrids = _resolve_hybrid_invested(
-        db, year=year, month=month, hybrid_balances=hybrid_balances, entities_by_id=entities_by_id
-    )
+    resolved_hybrids = _resolve_hybrid_invested(hybrid_balances)
     _merge_hybrid_accounts(record, resolved_hybrids)
 
     db.commit()
@@ -388,13 +367,7 @@ def _patch_hybrid_balances(
     _validate_balance_entity_types([], hybrid_balances, entities_by_id)
 
     record = _ensure_record(db, year, month)
-    resolved_hybrids = _resolve_hybrid_invested(
-        db,
-        year=year,
-        month=month,
-        hybrid_balances=hybrid_balances,
-        entities_by_id=entities_by_id,
-    )
+    resolved_hybrids = _resolve_hybrid_invested(hybrid_balances)
     _merge_hybrid_accounts(record, resolved_hybrids)
     db.flush()
     return _commit_record_with_totals(db, year, month)
@@ -450,13 +423,7 @@ def upsert_monthly_record(
     entities_by_id = _load_entities(db, entity_ids)
     _validate_balance_entity_types(payload.balances, payload.hybrid_balances, entities_by_id)
 
-    resolved_hybrids = _resolve_hybrid_invested(
-        db,
-        year=year,
-        month=month,
-        hybrid_balances=payload.hybrid_balances,
-        entities_by_id=entities_by_id,
-    )
+    resolved_hybrids = _resolve_hybrid_invested(payload.hybrid_balances)
     record = _get_record(db, year, month)
     existing_hybrids = (
         [(h.entity_id, float(h.liquid_amount), float(h.cumulative_invested)) for h in record.hybrid_accounts]
@@ -510,13 +477,7 @@ def import_monthly_record(
     entities_by_id = _load_entities(db, entity_ids)
     _validate_import_payload(payload, entities_by_id)
 
-    resolved_hybrids = _resolve_hybrid_invested(
-        db,
-        year=year,
-        month=month,
-        hybrid_balances=payload.hybrid_balances,
-        entities_by_id=entities_by_id,
-    )
+    resolved_hybrids = _resolve_hybrid_invested(payload.hybrid_balances)
     simple_inputs = [
         EntityBalanceInput(entity_id=b.entity_id, balance_amount=b.amount)
         for b in payload.simple_balances

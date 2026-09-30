@@ -12,12 +12,6 @@ import {
   MonthlyRecordUpsert,
   TimelineResponse,
 } from '../models/monthly-record.model';
-import {
-  Contribution,
-  ContributionCreate,
-  EntityContributionsResponse,
-} from '../models/contribution.model';
-
 @Injectable({ providedIn: 'root' })
 export class FinanceApiService {
   private readonly http = inject(HttpClient);
@@ -81,33 +75,5 @@ export class FinanceApiService {
       `${this.baseUrl}/records/${year}/${month}/import`,
       payload,
     );
-  }
-
-  getEntityContributions(
-    year: number,
-    month: number,
-    entityId: string,
-    liquidAmount = 0,
-  ): Observable<EntityContributionsResponse> {
-    return this.http.get<EntityContributionsResponse>(
-      `${this.baseUrl}/contributions/${year}/${month}/${encodeURIComponent(entityId)}`,
-      { params: { liquid_amount: liquidAmount } },
-    );
-  }
-
-  createEntityContribution(
-    year: number,
-    month: number,
-    entityId: string,
-    payload: ContributionCreate,
-  ): Observable<Contribution> {
-    return this.http.post<Contribution>(
-      `${this.baseUrl}/contributions/${year}/${month}/${encodeURIComponent(entityId)}`,
-      payload,
-    );
-  }
-
-  deleteEntityContribution(contributionId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/contributions/${contributionId}`);
   }
 }

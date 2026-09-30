@@ -22,8 +22,6 @@ class Entity(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    uses_contribution_ledger: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    """Si true (solo HYBRID), el invertido puede contrastarse con aportaciones del mes."""
 
     balances: Mapped[list["MonthlyEntityBalance"]] = relationship(
         back_populates="entity",

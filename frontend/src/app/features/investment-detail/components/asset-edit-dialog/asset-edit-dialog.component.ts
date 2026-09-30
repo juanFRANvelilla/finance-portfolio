@@ -50,7 +50,6 @@ export class AssetEditDialogComponent {
         name: currentName ?? currentId,
         entity_type: 'INVESTED' as const,
         is_active: true,
-        uses_contribution_ledger: false,
       },
     ];
   });

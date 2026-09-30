@@ -1,54 +1,8 @@
 @media (min-width: 1024px) {
-  .hybrid-card-ledger {
-    flex: 1.65 1 0%;
-  }
-
-  .hybrid-card-simple {
+  .hybrid-card {
     flex: 1 1 0%;
     max-width: 24rem;
   }
-}
-
-.hybrid-fields-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.5rem;
-
-  @media (min-width: 480px) {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: flex-start;
-  }
-}
-
-.hybrid-field-liquid {
-  flex: 0.9 1 0%;
-  min-width: 0;
-}
-
-.hybrid-field-invested {
-  flex: 1 1 0%;
-  min-width: 0;
-}
-
-.hybrid-field-preview {
-  flex: 1.15 1 0%;
-  min-width: 0;
-}
-
-.preview-calc-box {
-  display: flex;
-  align-items: center;
-  height: 38px;
-  padding-inline: 0.75rem;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: #c7d2fe;
-  background-color: rgb(99 102 241 / 0.1);
-  box-shadow: 0 0 0 1px rgb(99 102 241 / 0.2);
 }
 
 .linked-invested-btn {

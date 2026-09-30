@@ -14,7 +14,7 @@ from app.core.scheduler import (
     start_myinvestor_sync_background,
     start_scheduler,
 )
-from app.routers import asset_sales, contributions, entities, investments, ledger, market_prices, records
+from app.routers import asset_sales, entities, investments, ledger, market_prices, records
 from app.routers.asset_sales import v1_router as asset_sales_v1_router
 
 logging.basicConfig(
@@ -70,7 +70,6 @@ app.add_middleware(
 
 app.include_router(entities.router)
 app.include_router(records.router)
-app.include_router(contributions.router)
 app.include_router(investments.router)
 app.include_router(asset_sales.router)
 app.include_router(asset_sales_v1_router)
