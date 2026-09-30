@@ -6,11 +6,11 @@
  * el frontend solo la renderiza.
  */
 
-export interface FiatDeposit {
+export interface EntityCashFlow {
   fecha: string;
-  /** Importe ingresado en EUR. */
+  /** Importe en EUR (+ entrada, − salida). */
   cantidad: number;
-  /** Suma acumulada de aportaciones fiat hasta esta fecha (inclusive). */
+  /** Suma acumulada de movimientos hasta esta fecha (inclusive). */
   total_acumulado: number;
 }
 
@@ -69,8 +69,8 @@ export interface CategoryLedgerGroup {
 
 export interface EntityGroup {
   entity_name: string;
-  /** Histórico de ingresos fiat; ausente/vacío en entidades sin aportaciones registradas (p. ej. MyInvestor). */
-  fiat_deposits?: FiatDeposit[];
+  /** Histórico de movimientos de caja; vacío si la entidad no tiene filas. */
+  entity_cash_flows?: EntityCashFlow[];
   /** Activos en lista plana cuando la entidad solo tiene una categoría. */
   assets: AssetGroup[];
   /** Subgrupos por categoría cuando la entidad mezcla varios tipos (Fondos, Acciones, …). */

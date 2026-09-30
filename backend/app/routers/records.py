@@ -26,7 +26,7 @@ from app.services.record_calculator import (
     compute_totals_from_record,
     compute_totals_from_simple_balances,
 )
-from app.services.fiat_deposits import fiat_deposit_totals_by_entity
+from app.services.entity_cash_flows import cash_flow_totals_by_entity
 
 
 router = APIRouter(prefix="/api/records", tags=["records"])
@@ -123,7 +123,7 @@ def _build_response(
     previous_record = _get_record(db, prev_year, prev_month)
     previous_net_worth = _persisted_net_worth(previous_record)
     previous_total_invested = _persisted_total_invested(previous_record)
-    entity_balance_previews = fiat_deposit_totals_by_entity(db)
+    entity_balance_previews = cash_flow_totals_by_entity(db)
 
     if record is None:
         return MonthlyRecordResponse(

@@ -6,11 +6,11 @@ from pydantic import BaseModel, Field, field_validator
 ALLOWED_CURRENCIES = ("EUR", "USD")
 
 
-class FiatDepositRow(BaseModel):
+class EntityCashFlowRow(BaseModel):
     fecha: date | None = None
     cantidad: float
     total_acumulado: float
-    """Suma acumulada de depósitos fiat de la entidad hasta esta fila (inclusive)."""
+    """Suma acumulada de movimientos de caja de la entidad hasta esta fila (inclusive)."""
 
 
 class AssetTransactionLedgerRow(BaseModel):
@@ -86,7 +86,7 @@ class CategoryLedgerGroup(BaseModel):
 
 class EntityLedgerGroup(BaseModel):
     entity_name: str
-    fiat_deposits: list[FiatDepositRow] = Field(default_factory=list)
+    entity_cash_flows: list[EntityCashFlowRow] = Field(default_factory=list)
     """Lista plana cuando la entidad solo tiene activos de una categoría."""
     assets: list[AssetLedgerGroup] = Field(default_factory=list)
     """Subgrupos por categoría cuando la entidad mezcla Fondos/Acciones/Crypto, etc."""

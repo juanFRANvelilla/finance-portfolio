@@ -17,7 +17,7 @@ function round2(value: number): number {
 
 /**
  * Vista de "libro mayor" de inversiones: replica el Excel de seguimiento,
- * agrupado estrictamente por entidad financiera → aportaciones fiat → activos.
+ * agrupado estrictamente por entidad financiera → movimientos de caja → activos.
  *
  * Componente puramente presentacional: recibe los datos ya agregados por el
  * backend y solo se encarga del renderizado (tablas + formato).
@@ -36,8 +36,8 @@ export class InvestmentLedgerComponent {
   readonly profitDialogOpen = signal(false);
   readonly profitDialogAsset = signal<AssetGroup | null>(null);
 
-  hasFiatDeposits(entity: EntityGroup): boolean {
-    return !!entity.fiat_deposits && entity.fiat_deposits.length > 0;
+  hasCashFlows(entity: EntityGroup): boolean {
+    return !!entity.entity_cash_flows && entity.entity_cash_flows.length > 0;
   }
 
   hasAssetCategories(entity: EntityGroup): boolean {

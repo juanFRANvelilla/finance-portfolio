@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.models.asset_type import AssetType
 from app.models.entity import Entity, EntityType
-from app.models.fiat_deposit import FiatDeposit
+from app.models.entity_cash_flow import EntityCashFlow
 from app.models.investment_category import InvestmentCategory
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
 from app.models.monthly_category_investment import MonthlyCategoryInvestment
@@ -31,15 +31,15 @@ from app.schemas.investment import (
 )
 from app.services.asset_sales import asset_type_ids_with_sale_in_month
 from app.services.asset_transactions import transaction_totals_by_asset_type
-from app.services.fiat_deposits import fiat_deposit_total_for_entity
+from app.services.entity_cash_flows import cash_flow_total_for_entity
 from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
 from app.services.linked_asset_investments import sum_linked_asset_investments_eur
 from app.services.market_price_service import market_price_service
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
 
-# Categoría que recibe la previsión estática por depósitos fiat (p. ej. KuCoin → Crypto).
-FIAT_DEPOSIT_PREVIEW_CATEGORY_ID = "crypto"
+# Categoría que recibe la previsión estática por movimientos de caja (p. ej. KuCoin → Crypto).
+CASH_FLOW_PREVIEW_CATEGORY_ID = "crypto"
 # Acciones: el total de categoría se calcula solo a partir de sus activos.
 COMPUTED_CATEGORY_IDS = {"acciones"}
 
@@ -104,17 +104,17 @@ def _previous_entity_balance(db: Session, entity_id: str, year: int, month: int)
     return _round2(Decimal(str(balance.balance_amount)))
 
 
-def _entity_deposit_preview(db: Session, entity_id: str, year: int, month: int) -> float | None:
-    """Previsión estática por entidad: P1 suma fiat_deposits, P2 saldo mes anterior."""
-    fiat_total = fiat_deposit_total_for_entity(db, entity_id)
-    if fiat_total is not None:
-        return fiat_total
+def _entity_cash_flow_preview(db: Session, entity_id: str, year: int, month: int) -> float | None:
+    """Previsión estática por entidad: P1 suma entity_cash_flows, P2 saldo mes anterior."""
+    cash_flow_total = cash_flow_total_for_entity(db, entity_id)
+    if cash_flow_total is not None:
+        return cash_flow_total
 
     return _previous_entity_balance(db, entity_id, year, month)
 
 
-def _fiat_deposit_category_breakdown(db: Session, year: int, month: int) -> dict[str, dict]:
-    """Previsión Crypto desde entidades INVESTED con filas en fiat_deposits."""
+def _cash_flow_category_breakdown(db: Session, year: int, month: int) -> dict[str, dict]:
+    """Previsión Crypto desde entidades INVESTED con filas en entity_cash_flows."""
     entities = list(
         db.scalars(
             select(Entity).where(Entity.is_active.is_(True), Entity.entity_type == EntityType.INVESTED)
@@ -125,19 +125,19 @@ def _fiat_deposit_category_breakdown(db: Session, year: int, month: int) -> dict
     names: dict[str, list[str]] = {}
 
     for entity in entities:
-        has_deposits = db.scalar(
+        has_cash_flows = db.scalar(
             select(func.count())
-            .select_from(FiatDeposit)
-            .where(FiatDeposit.entity_id == entity.id)
+            .select_from(EntityCashFlow)
+            .where(EntityCashFlow.entity_id == entity.id)
         )
-        if not has_deposits:
+        if not has_cash_flows:
             continue
 
-        preview = _entity_deposit_preview(db, entity.id, year, month)
+        preview = _entity_cash_flow_preview(db, entity.id, year, month)
         if preview is None or preview <= 0:
             continue
 
-        category_id = FIAT_DEPOSIT_PREVIEW_CATEGORY_ID
+        category_id = CASH_FLOW_PREVIEW_CATEGORY_ID
         totals[category_id] = totals.get(category_id, Decimal("0")) + Decimal(str(preview))
         names.setdefault(category_id, []).append(entity.name)
 
@@ -412,7 +412,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
     prev_saved = _category_totals(db, prev_year, prev_month)
     prev_computed = _computed_category_totals(db, prev_year, prev_month)
 
-    deposit_breakdown = _fiat_deposit_category_breakdown(db, year, month)
+    cash_flow_breakdown = _cash_flow_category_breakdown(db, year, month)
 
     category_overviews: list[CategoryOverview] = []
     total_invested = Decimal("0")
@@ -426,7 +426,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         previous_amount = prev_saved.get(cat.id) if cat.id in prev_saved else prev_computed.get(cat.id)
         total_invested += Decimal(str(amount))
 
-        entity_amount = deposit_breakdown.get(cat.id, {}).get("amount", 0.0)
+        entity_amount = cash_flow_breakdown.get(cat.id, {}).get("amount", 0.0)
         suggested_amount_eur = _category_suggested_amount_eur(
             previous_amount_eur=previous_amount,
             entity_amount_eur=entity_amount,
@@ -441,7 +441,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
                 percentage=0.0,  # se recalcula abajo con el total del detalle
                 previous_amount_eur=previous_amount,
                 entity_amount_eur=entity_amount,
-                entity_names=deposit_breakdown.get(cat.id, {}).get("names", []),
+                entity_names=cash_flow_breakdown.get(cat.id, {}).get("names", []),
                 editable=not is_computed,
                 saved_this_month=cat.id in saved,
                 suggested_amount_eur=suggested_amount_eur,

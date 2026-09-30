@@ -1,8 +1,8 @@
-"""Agregación del "libro mayor" de inversiones: fiat_deposits + asset_transactions
+"""Agregación del "libro mayor" de inversiones: entity_cash_flows + asset_transactions
 agrupados por entidad financiera.
 
 Dentro de cada entidad:
-- Depósitos fiat arriba.
+- Movimientos de caja arriba.
 - Activos con transacciones: si hay más de una categoría, se agrupan por categoría
   (orden global de categorías + display_order del activo); si solo hay una, lista plana.
 """
@@ -17,14 +17,14 @@ from sqlalchemy.orm import Session
 from app.models.asset_transaction import AssetTransaction
 from app.models.asset_type import AssetType
 from app.models.entity import Entity
-from app.models.fiat_deposit import FiatDeposit
+from app.models.entity_cash_flow import EntityCashFlow
 from app.models.investment_category import InvestmentCategory
 from app.schemas.ledger import (
     AssetLedgerGroup,
     AssetTransactionLedgerRow,
     CategoryLedgerGroup,
     EntityLedgerGroup,
-    FiatDepositRow,
+    EntityCashFlowRow,
 )
 
 
@@ -113,14 +113,14 @@ def _entity_asset_payload(
 def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
     entities_by_id = {e.id: e for e in db.scalars(select(Entity)).all()}
 
-    deposits_by_entity: dict[str, list[tuple]] = defaultdict(list)
-    deposit_rows = db.execute(
-        select(FiatDeposit.entity_id, FiatDeposit.amount, FiatDeposit.deposit_date)
-        .where(FiatDeposit.entity_id.is_not(None))
-        .order_by(FiatDeposit.deposit_date.asc().nulls_last(), FiatDeposit.id.asc())
+    cash_flows_by_entity: dict[str, list[tuple]] = defaultdict(list)
+    cash_flow_rows = db.execute(
+        select(EntityCashFlow.entity_id, EntityCashFlow.amount, EntityCashFlow.flow_date)
+        .where(EntityCashFlow.entity_id.is_not(None))
+        .order_by(EntityCashFlow.flow_date.asc().nulls_last(), EntityCashFlow.id.asc())
     ).all()
-    for entity_id, amount, deposit_date in deposit_rows:
-        deposits_by_entity[entity_id].append((amount, deposit_date))
+    for entity_id, amount, flow_date in cash_flow_rows:
+        cash_flows_by_entity[entity_id].append((amount, flow_date))
 
     tx_by_asset: dict[UUID, list[tuple]] = defaultdict(list)
     tx_rows = db.execute(
@@ -146,20 +146,20 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
     )
     categories_by_id = {cat.id: cat for cat in category_order}
 
-    entity_ids = set(deposits_by_entity) | set(assets_by_entity)
+    entity_ids = set(cash_flows_by_entity) | set(assets_by_entity)
 
     groups: list[EntityLedgerGroup] = []
     for entity_id in entity_ids:
         entity = entities_by_id.get(entity_id)
         entity_name = entity.name if entity else entity_id
 
-        fiat_deposits: list[FiatDepositRow] = []
+        entity_cash_flows: list[EntityCashFlowRow] = []
         running_total = Decimal("0")
-        for amount, deposit_date in deposits_by_entity.get(entity_id, []):
+        for amount, flow_date in cash_flows_by_entity.get(entity_id, []):
             running_total += Decimal(str(amount))
-            fiat_deposits.append(
-                FiatDepositRow(
-                    fecha=deposit_date,
+            entity_cash_flows.append(
+                EntityCashFlowRow(
+                    fecha=flow_date,
                     cantidad=_round2(amount),
                     total_acumulado=_round2(running_total),
                 )
@@ -175,7 +175,7 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
         groups.append(
             EntityLedgerGroup(
                 entity_name=entity_name,
-                fiat_deposits=fiat_deposits,
+                entity_cash_flows=entity_cash_flows,
                 assets=flat_assets,
                 asset_categories=asset_categories,
             )

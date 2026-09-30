@@ -8,7 +8,7 @@ import { InvestmentLedgerComponent } from './investment-ledger.component';
 
 /**
  * Página real de "Gestionar transacciones": carga el histórico completo de
- * fiat_deposits + asset_transactions (agrupado por entidad) desde el backend.
+ * entity_cash_flows + asset_transactions (agrupado por entidad) desde el backend.
  */
 @Component({
   selector: 'app-investment-ledger-page',

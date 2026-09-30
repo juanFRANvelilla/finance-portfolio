@@ -6,7 +6,7 @@
         <h2 class="text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
       </div>
 
-      @if (hasFiatDeposits(entity)) {
+      @if (hasCashFlows(entity)) {
         <div class="ledger-table-card mb-6 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
           <div class="overflow-x-auto">
             <table class="w-full min-w-[420px] text-sm">
@@ -18,19 +18,19 @@
                 </tr>
               </thead>
               <tbody>
-                @for (deposit of entity.fiat_deposits; track deposit.fecha) {
+                @for (flow of entity.entity_cash_flows; track flow.fecha) {
                   <tr class="border-t border-white/5 transition hover:bg-white/5">
-                    <td class="px-4 py-2 text-slate-300">{{ deposit.fecha | date: 'dd/MM/yyyy' }}</td>
+                    <td class="px-4 py-2 text-slate-300">{{ flow.fecha | date: 'dd/MM/yyyy' }}</td>
                     <td
                       class="px-4 py-2 text-right tabular-nums"
-                      [class.fiat-amount-positive]="deposit.cantidad > 0"
-                      [class.fiat-amount-negative]="deposit.cantidad < 0"
-                      [class.fiat-amount-zero]="deposit.cantidad === 0"
+                      [class.fiat-amount-positive]="flow.cantidad > 0"
+                      [class.fiat-amount-negative]="flow.cantidad < 0"
+                      [class.fiat-amount-zero]="flow.cantidad === 0"
                     >
-                      {{ deposit.cantidad | currency: 'EUR' }}
+                      {{ flow.cantidad | currency: 'EUR' }}
                     </td>
                     <td class="px-4 py-2 text-right tabular-nums font-semibold text-amber-200">
-                      {{ deposit.total_acumulado | currency: 'EUR' }}
+                      {{ flow.total_acumulado | currency: 'EUR' }}
                     </td>
                   </tr>
                 }
@@ -62,7 +62,7 @@
             <ng-container *ngTemplateOutlet="assetLedgerCard; context: { asset: asset }" />
           }
         </div>
-      } @else if (!hasFiatDeposits(entity)) {
+      } @else if (!hasCashFlows(entity)) {
         <p class="py-6 text-center text-sm text-slate-500">Esta entidad todavía no tiene activos registrados.</p>
       }
     </section>

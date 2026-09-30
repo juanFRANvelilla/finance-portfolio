@@ -81,7 +81,7 @@ class MonthlyRecordResponse(BaseModel):
     previous_net_worth: float | None = None
     previous_total_invested: float | None = None
     entity_balance_previews: dict[str, float] = Field(default_factory=dict)
-    """Suma de fiat_deposits por entidad (solo entidades con filas; el resto usa 0 en frontend)."""
+    """Suma de entity_cash_flows por entidad (solo entidades con filas; el resto usa 0 en frontend)."""
 
 
 class TimelinePoint(BaseModel):

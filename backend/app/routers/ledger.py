@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/investment", tags=["ledger"])
 
 @router.get("/ledger", response_model=list[EntityLedgerGroup])
 def get_investment_ledger(db: Session = Depends(get_db)) -> list[EntityLedgerGroup]:
-    """Histórico completo de fiat_deposits + asset_transactions, agrupado por entidad.
+    """Histórico completo de entity_cash_flows + asset_transactions, agrupado por entidad.
 
     Dentro de cada entidad, los activos se agrupan por categoría solo si hay más de una.
     """
