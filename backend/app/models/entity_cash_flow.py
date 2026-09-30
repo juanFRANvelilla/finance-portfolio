@@ -16,7 +16,7 @@ class EntityCashFlow(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     entity_id: Mapped[str | None] = mapped_column(String(30), ForeignKey("entities.id"), nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    flow_date: Mapped[date | None] = mapped_column("deposit_date", Date, nullable=True)
+    flow_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
