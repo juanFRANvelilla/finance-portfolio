@@ -27,10 +27,11 @@ logger = logging.getLogger(__name__)
 
 TRADE_ID_PREFIX = "myinvestor:"
 
-# Identificador del correo (ISIN o ticker) → ticker guardado en asset_types.
-# El oro de MyInvestor llega como ISIN; en Yahoo el precio que cuadra es el de Stuttgart.
+# Identificador del correo (ISIN o ticker) → ticker guardado en asset_types (Yahoo en EUR).
+# MyInvestor suele traer ISIN US o ticker US; en asset_types usamos el listado en EUR.
 MYINVESTOR_ID_ALIASES = {
-    "FR0013416716": "FR0013416716.SG",
+    "FR0013416716": "FR0013416716.SG",  # oro Amundi → Stuttgart
+    "US5949181045": "MSF.DE",  # Microsoft US ISIN → Xetra (precio en EUR en Yahoo)
 }
 
 
