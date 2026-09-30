@@ -16,7 +16,7 @@ extraEnv:
   value: "UTC"
 - name: "CORS_ORIGINS"
   value: "http://finance.pre.local"
-# DATABASE_URL, KUCOIN_API_KEY, KUCOIN_SECRET, KUCOIN_PASSPHRASE, IMAP_USER, IMAP_PASSWORD
+# DATABASE_URL, KUCOIN_*, IMAP_* (cuenta), MYINVESTOR_IMAP_MAILBOX_*, MYINVESTOR_ENTITY_ID
 # El DATABASE_URL del secret debe apuntar a la base de datos finance_portfolio_pre
 extraEnvFrom:
 - secretRef:

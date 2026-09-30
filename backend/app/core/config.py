@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     imap_port: int = 993
     imap_user: str | None = None
     imap_password: str | None = None
-    imap_mailbox: str = "MyInvestor/Movimientos"
-    imap_mailbox_transfers: str = "MyInvestor/Transferencias"
+    myinvestor_imap_mailbox_movements: str = "MyInvestor/Movimientos"
+    myinvestor_imap_mailbox_transfers: str = "MyInvestor/Transferencias"
     myinvestor_entity_id: str = "myinvestor"
 
     model_config = SettingsConfigDict(env_file=str(ENV_FILE), extra="ignore")

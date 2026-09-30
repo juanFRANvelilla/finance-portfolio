@@ -87,12 +87,16 @@ def sync_myinvestor_transactions(
             port=settings.imap_port,
             user=settings.imap_user,
             password=settings.imap_password,
-            mailbox=settings.imap_mailbox,
+            mailbox=settings.myinvestor_imap_mailbox_movements,
         )
         result.raw_emails_count = len(messages)
         if not messages:
-            result.messages.append(f"No hay correos en {settings.imap_mailbox!r}.")
-            logger.info("MyInvestor sync: 0 correos en %s", settings.imap_mailbox)
+            result.messages.append(
+                f"No hay correos en {settings.myinvestor_imap_mailbox_movements!r}."
+            )
+            logger.info(
+                "MyInvestor sync: 0 correos en %s", settings.myinvestor_imap_mailbox_movements
+            )
             return result
 
         with SessionLocal() as db:

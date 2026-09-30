@@ -49,7 +49,7 @@ def sync_myinvestor_transfers(
         result.error = "Faltan credenciales IMAP. Define IMAP_USER e IMAP_PASSWORD."
         return result
 
-    mailbox = settings.imap_mailbox_transfers
+    mailbox = settings.myinvestor_imap_mailbox_transfers
     entity_id = settings.myinvestor_entity_id
 
     try:
@@ -132,5 +132,8 @@ def sync_myinvestor_transfers(
 
 def run_scheduled_myinvestor_transfers_sync() -> MyInvestorTransfersSyncResult:
     """Sync IMAP de transferencias hacia entity_cash_flows (idempotencia por source_reference)."""
-    logger.info("Sync MyInvestor transferencias: etiqueta %s", get_settings().imap_mailbox_transfers)
+    logger.info(
+        "Sync MyInvestor transferencias: etiqueta %s",
+        get_settings().myinvestor_imap_mailbox_transfers,
+    )
     return sync_myinvestor_transfers(dump_unparsed_bodies=False)
