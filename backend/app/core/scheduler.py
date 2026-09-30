@@ -10,6 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
 from app.services.monthly_asset_snapshot import run_ensure_current_month_snapshots
 from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
+from app.services.myinvestor_transfers_sync_service import run_scheduled_myinvestor_transfers_sync
 
 logger = logging.getLogger(__name__)
 
@@ -49,20 +50,30 @@ async def _kucoin_sync_job() -> None:
 
 
 async def _myinvestor_sync_job() -> None:
-    """Wrapper async: la lectura IMAP es bloqueante y corre en un hilo."""
+    """Wrapper async: IMAP bloqueante en hilo (operaciones + transferencias)."""
     logger.info("--- Inicio tarea programada: sync MyInvestor ---")
     try:
-        result = await asyncio.to_thread(run_scheduled_myinvestor_sync)
-        if result.success:
+        trades = await asyncio.to_thread(run_scheduled_myinvestor_sync)
+        if trades.success:
             logger.info(
-                "Sync MyInvestor completada: %s insertados, %s duplicados omitidos, "
-                "%s correos leídos",
-                result.inserted,
-                result.skipped_duplicate,
-                result.raw_emails_count,
+                "Sync MyInvestor operaciones: %s insertados, %s duplicados, %s correos",
+                trades.inserted,
+                trades.skipped_duplicate,
+                trades.raw_emails_count,
             )
         else:
-            logger.warning("Sync MyInvestor terminó con error: %s", result.error)
+            logger.warning("Sync MyInvestor operaciones con error: %s", trades.error)
+
+        transfers = await asyncio.to_thread(run_scheduled_myinvestor_transfers_sync)
+        if transfers.success:
+            logger.info(
+                "Sync MyInvestor transferencias: %s insertados, %s duplicados, %s correos",
+                transfers.inserted,
+                transfers.skipped_duplicate,
+                transfers.raw_emails_count,
+            )
+        else:
+            logger.warning("Sync MyInvestor transferencias con error: %s", transfers.error)
     except asyncio.CancelledError:
         logger.info("Sync MyInvestor cancelada")
         raise
@@ -137,7 +148,8 @@ def start_scheduler() -> AsyncIOScheduler:
         KUCOIN_SYNC_INTERVAL_HOURS,
     )
     logger.info(
-        "Tarea programada MyInvestor activa: se ejecutará al arrancar y luego cada %s horas",
+        "Tarea programada MyInvestor activa (operaciones + transferencias): "
+        "al arrancar y cada %s horas",
         MYINVESTOR_SYNC_INTERVAL_HOURS,
     )
     logger.info(

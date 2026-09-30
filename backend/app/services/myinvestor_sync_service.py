@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.myinvestor.mail import fetch_mailbox_messages
-from app.myinvestor.parse_trade import (
+from app.myinvestor.trades.parse_trade import (
     amounts_for_asset_currency,
     diagnose_myinvestor_parse,
     is_purchase_side,

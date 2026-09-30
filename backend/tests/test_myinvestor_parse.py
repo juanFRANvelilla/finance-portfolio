@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from decimal import Decimal
 
-from app.myinvestor.parse_trade import (
+from app.myinvestor.trades.parse_trade import (
     amounts_for_asset_currency,
     parse_decimal_amount,
     parse_myinvestor_trade,

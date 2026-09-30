@@ -2,8 +2,8 @@
 Sincroniza confirmaciones de compra de MyInvestor hacia asset_transactions.
 
 Uso (lanzamiento suelto, fuera de FastAPI):
-    python -m app.myinvestor.sync_trades
-    python -m app.myinvestor.sync_trades --profile local
+    python -m app.myinvestor.trades.sync_trades
+    python -m app.myinvestor.trades.sync_trades --profile local
 
 STANDALONE_PROFILE decide el archivo de este script:
     server → backend/.env.server
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 # Perfil solo para este lanzamiento manual. "server" lee .env.server.
 STANDALONE_PROFILE = "server"

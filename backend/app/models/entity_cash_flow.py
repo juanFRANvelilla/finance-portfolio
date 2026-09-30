@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,11 +12,14 @@ class EntityCashFlow(Base):
     """Movimientos de caja por entidad (aportaciones / retiradas, importe ±)."""
 
     __tablename__ = "entity_cash_flows"
+    __table_args__ = (UniqueConstraint("source_reference", name="uq_entity_cash_flows_source_reference"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     entity_id: Mapped[str | None] = mapped_column(String(30), ForeignKey("entities.id"), nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     flow_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    """Clave externa p. ej. myinvestor:transfer:{referencia_operacion}."""
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,

@@ -1,6 +1,6 @@
 ---
 description: Diseño y reglas de sincronización entre asset_transactions y monthly_asset_investments (KuCoin + MyInvestor), incluyendo el campo last_update y el cierre/apertura de mes.
-globs: backend/app/models/monthly_asset_investment.py,backend/app/models/asset_transaction.py,backend/app/services/kucoin_sync_service.py,backend/app/services/myinvestor_sync_service.py,backend/app/repositories/asset_transactions.py,backend/app/services/asset_transactions.py,backend/app/myinvestor/parse_trade.py,backend/app/core/scheduler.py
+globs: backend/app/models/monthly_asset_investment.py,backend/app/models/asset_transaction.py,backend/app/services/kucoin_sync_service.py,backend/app/services/myinvestor_sync_service.py,backend/app/repositories/asset_transactions.py,backend/app/services/asset_transactions.py,backend/app/myinvestor/trades/parse_trade.py,backend/app/core/scheduler.py
 alwaysApply: false
 ---
 
