@@ -13,6 +13,18 @@
   color: #fcd34d; // amber-300
 }
 
+.fiat-amount-positive {
+  color: rgb(125 211 160 / 0.92); // verde apagado (≈ emerald-300 suave)
+}
+
+.fiat-amount-negative {
+  color: rgb(232 160 160 / 0.92); // rojo apagado (≈ rose-300 suave)
+}
+
+.fiat-amount-zero {
+  color: rgb(226 232 240 / 0.85); // slate-200
+}
+
 /* Cabecera "activo/cripto": tinte azul/morado sutil. */
 .ledger-thead-crypto {
   background-color: rgb(99 102 241 / 0.1); // indigo-500/10
