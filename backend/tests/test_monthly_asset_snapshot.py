@@ -162,25 +162,21 @@ class CurrentNaturalMonthTest(unittest.TestCase):
 
 
 class GroupFillsCurrentMonthTest(unittest.TestCase):
-    def test_sell_with_sept_transaction_date_but_oct_executed_at_targets_october_row(self) -> None:
+    def test_sells_are_not_grouped_with_buys(self) -> None:
         fill = {
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 9, 30),
             "executed_at": datetime(2026, 10, 1, 20, 21, 41),
-            "invested_amount": Decimal("-500"),
+            "invested_amount": None,
             "asset_amount": Decimal("-0.01"),
             "exchange_trade_id": "sell-1",
         }
-        self.assertEqual(executed_at_as_date(fill), date(2026, 10, 1))
-
         grouped, skipped = group_fills_for_current_month_snapshot(
             [fill],
             today=date(2026, 10, 5),
         )
+        self.assertEqual(grouped, {})
         self.assertEqual(skipped, 0)
-        self.assertIn((ASSET_ID, 2026, 10), grouped)
-        self.assertEqual(len(grouped[(ASSET_ID, 2026, 10)]), 1)
-        self.assertEqual(grouped[(ASSET_ID, 2026, 10)][0].month, 10)
 
     def test_transaction_date_ignored_when_executed_at_is_current_month(self) -> None:
         fill = {
@@ -216,8 +212,8 @@ class GroupFillsCurrentMonthTest(unittest.TestCase):
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 9, 30),
             "executed_at": datetime(2026, 9, 30, 18, 0, 0),
-            "invested_amount": Decimal("-100"),
-            "asset_amount": Decimal("-1"),
+            "invested_amount": Decimal("100"),
+            "asset_amount": Decimal("1"),
         }
         grouped, skipped = group_fills_for_current_month_snapshot(
             [fill],
@@ -226,49 +222,61 @@ class GroupFillsCurrentMonthTest(unittest.TestCase):
         self.assertEqual(grouped, {})
         self.assertEqual(skipped, 1)
 
-    def test_sell_reduces_amount_and_units_in_decision(self) -> None:
-        fill = SnapshotFill(
-            asset_type_id=ASSET_ID,
-            year=2026,
-            month=10,
-            executed_at=datetime(2026, 10, 1, 20, 21, 41),
-            invested_amount=Decimal("-200"),
-            asset_amount=Decimal("-0.5"),
-        )
-        decision = decide_snapshot_update(
-            existing_amount=Decimal("1000.00"),
-            existing_units=Decimal("2.0000"),
-            existing_last_update=datetime(2026, 10, 1, 0, 0, 0),
-            fills=[fill],
-        )
-        self.assertTrue(decision.should_update)
-        self.assertEqual(decision.new_amount, Decimal("800.00"))
-        self.assertEqual(decision.new_units, Decimal("1.5000"))
+class ApplySellSnapshotTest(unittest.TestCase):
+    @patch("app.services.monthly_asset_snapshot._load_row")
+    @patch("app.services.monthly_asset_snapshot.ensure_current_month_snapshots")
+    def test_sell_reduces_units_using_monthly_pmp(
+        self,
+        mock_ensure: MagicMock,
+        mock_load_row: MagicMock,
+    ) -> None:
+        row = MagicMock()
+        row.units = Decimal("2.0000")
+        row.amount = Decimal("1000.00")
+        row.last_update = datetime(2026, 10, 1, 0, 0, 0)
+        mock_load_row.return_value = row
+
+        db = MagicMock()
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 10, 1),
+            "executed_at": datetime(2026, 10, 1, 20, 21, 41),
+            "invested_amount": None,
+            "asset_amount": Decimal("-0.5"),
+            "exchange_trade_id": "kucoin:1",
+        }
+
+        from app.services.monthly_asset_snapshot import _apply_sell_fills_to_monthly_snapshot
+
+        groups = _apply_sell_fills_to_monthly_snapshot(db, [fill], today=date(2026, 10, 2))
+
+        self.assertEqual(groups, 1)
+        self.assertEqual(row.units, Decimal("1.5000"))
+        self.assertEqual(row.amount, Decimal("750.00"))
+        mock_ensure.assert_called_once()
 
 
 class ApplySnapshotEnsureTest(unittest.TestCase):
-    @patch("app.services.monthly_asset_snapshot._apply_group")
+    @patch("app.services.monthly_asset_snapshot._apply_sell_fills_to_monthly_snapshot", return_value=1)
     @patch("app.services.monthly_asset_snapshot.ensure_current_month_snapshots")
-    def test_ensure_runs_when_current_month_fill_needs_snapshot(
+    def test_ensure_runs_when_current_month_sell_needs_snapshot(
         self,
         mock_ensure: MagicMock,
-        mock_apply_group: MagicMock,
+        mock_apply_sell: MagicMock,
     ) -> None:
-        mock_ensure.return_value = 2
         db = MagicMock()
         fill = {
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 9, 30),
             "executed_at": datetime(2026, 10, 1, 20, 21, 41),
-            "invested_amount": Decimal("-100"),
+            "invested_amount": None,
             "asset_amount": Decimal("-0.1"),
             "exchange_trade_id": "kucoin:1",
         }
 
         result = apply_transactions_to_monthly_snapshot(db, [fill], today=date(2026, 10, 2))
 
-        mock_ensure.assert_called_once_with(db, today=date(2026, 10, 2))
-        mock_apply_group.assert_called_once()
+        mock_apply_sell.assert_called_once()
         self.assertEqual(result.groups_processed, 1)
         db.commit.assert_called_once()
 

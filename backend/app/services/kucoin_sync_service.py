@@ -379,7 +379,7 @@ def _transform_fills(
                 "asset_type_id": asset_type_id,
                 "transaction_date": item["transaction_date"],
                 "executed_at": item["executed_at"],
-                "invested_amount": -item["native_amount"],
+                "invested_amount": None,
                 "asset_amount": -sold_units,
                 "execution_price": item["execution_price"],
                 "fee_amount": item["fee_amount"],

@@ -17,8 +17,9 @@ pisar cambios manuales.
   el futuro, podría insertarse a mano. Nunca se recalcula ni se borra sola.
 - **`monthly_asset_investments`**: foto en directo del total que tienes de un
   activo, mes a mes. `amount`/`units` de un mes arrancan siendo el cierre del
-  mes anterior, y se les suma cada compra a lo largo del mes (se restará en
-  ventas, cuando exista esa lógica). Al cerrar el mes, esa foto "nace" igual
+  mes anterior, y se les suma cada compra a lo largo del mes; las ventas restan
+  unidades usando el PMP de esa fila monthly (sin usar `invested_amount` de la
+  tx). Al cerrar el mes, esa foto "nace" igual
   en el mes siguiente.
 
 Ninguna pantalla debe fabricar la foto de un mes sumando `asset_transactions`
@@ -151,7 +152,21 @@ Para que un mes nuevo nazca siempre con fila (y el front deje de tener que
 - El front sigue permitiendo editar a mano cualquier mes; esto solo evita que
   nazca sin fila.
 
+## Ventas KuCoin (snapshot + txs)
+
+- En `asset_transactions`, las ventas llevan `asset_amount` < 0 e
+  **`invested_amount` = NULL** (el importe bruto/neto vive en `asset_sales`).
+- El snapshot mensual solo aplica ventas del **mes natural actual** cuyo
+  `executed_at` cae en ese mes, y **solo después** de que exista la fila
+  `asset_sales` del día (KuCoin: upsert diario OK).
+- Por activo en el batch: se suma `|asset_amount|` de todas las ventas del
+  mes actual; `PMP = amount/units` de la fila monthly **antes** de restar;
+  `units' = units − Q`, `amount' = units' × PMP` (PMP estable en la venta).
+- Regla de `last_update` igual que en compras (estrictamente posterior).
+
+Ventas manuales / MyInvestor: pendiente alinear con FIFO; no pasan por esta
+rama de snapshot hasta entonces.
+
 ## Fuera de alcance (de momento)
 
-- Ventas (`asset_sales`) no participan en este snapshot todavía.
-- El front no cambia en esta fase.
+- El front no cambia en esta fase salvo campos ya expuestos en API.

@@ -93,6 +93,8 @@ def group_fills_for_current_month_snapshot(
     grouped: dict[tuple[str, int, int], list[SnapshotFill]] = defaultdict(list)
 
     for fill in inserted_fills:
+        if Decimal(str(fill["asset_amount"])) <= 0:
+            continue
         execution_day = executed_at_as_date(fill)
         if execution_day is None:
             logger.warning(
@@ -190,38 +192,147 @@ def decide_snapshot_update(
     )
 
 
+def _apply_sell_fills_to_monthly_snapshot(
+    db: Session,
+    sell_fills: list[dict],
+    *,
+    today: date | None = None,
+) -> int:
+    """Resta unidades vendidas usando PMP de la fila monthly del mes actual (no de txs)."""
+    current = today or date.today()
+    target_year, target_month = current.year, current.month
+    by_asset: dict[str, list[dict]] = defaultdict(list)
+
+    for fill in sell_fills:
+        execution_day = executed_at_as_date(fill)
+        if execution_day is None:
+            logger.warning(
+                "Snapshot venta omitido: sin executed_at (exchange_trade_id=%s)",
+                fill.get("exchange_trade_id"),
+            )
+            continue
+        if not is_current_natural_month(execution_day, today=current):
+            continue
+        by_asset[str(fill["asset_type_id"])].append(fill)
+
+    if not by_asset:
+        return 0
+
+    ensure_current_month_snapshots(db, today=current)
+    groups = 0
+
+    for asset_type_id, fills in by_asset.items():
+        q_total = sum(
+            (abs(Decimal(str(f["asset_amount"]))) for f in fills),
+            Decimal("0"),
+        )
+        if q_total <= 0:
+            continue
+
+        row = _load_row(db, asset_type_id=asset_type_id, year=target_year, month=target_month)
+        if row is None:
+            logger.warning(
+                "Snapshot venta omitido: sin fila monthly %s-%02d para asset_type_id=%s",
+                target_year,
+                target_month,
+                asset_type_id,
+            )
+            continue
+
+        units = Decimal(str(row.units)) if row.units is not None else Decimal("0")
+        amount = Decimal(str(row.amount))
+        if units <= 0:
+            logger.warning(
+                "Snapshot venta omitido: units<=0 en monthly para asset_type_id=%s",
+                asset_type_id,
+            )
+            continue
+
+        pmp = (amount / units).quantize(Decimal("0.0001"))
+        executed_ats = [f["executed_at"] for f in fills if f.get("executed_at") is not None]
+        latest_executed_at = max(executed_ats) if executed_ats else None
+
+        if row.last_update is not None and latest_executed_at is not None:
+            if latest_executed_at <= row.last_update:
+                logger.info(
+                    "Snapshot venta sin cambios para asset_type_id=%s %s-%02d (last_update=%s)",
+                    asset_type_id,
+                    target_year,
+                    target_month,
+                    row.last_update,
+                )
+                continue
+
+        new_units = (units - q_total).quantize(_UNITS_QUANT)
+        if new_units < 0:
+            logger.warning(
+                "Snapshot venta: units vendidas (%s) > posición (%s) asset_type_id=%s; se capa a 0",
+                q_total,
+                units,
+                asset_type_id,
+            )
+            new_units = Decimal("0")
+
+        new_amount = (new_units * pmp).quantize(_AMOUNT_QUANT)
+        row.units = new_units
+        row.amount = new_amount
+        if latest_executed_at is not None:
+            row.last_update = latest_executed_at
+
+        groups += 1
+        logger.info(
+            "monthly_asset_investments venta asset_type_id=%s %s-%02d: units %s→%s amount %s→%s (PMP=%s)",
+            asset_type_id,
+            target_year,
+            target_month,
+            units,
+            new_units,
+            amount,
+            new_amount,
+            pmp,
+        )
+
+    return groups
+
+
 def apply_transactions_to_monthly_snapshot(
     db: Session,
     inserted_fills: list[dict],
     *,
     today: date | None = None,
 ) -> SnapshotApplyResult:
-    """Punto de entrada: agrupa fills insertados y actualiza/crea la foto del mes.
+    """Punto de entrada: compras suman importe; ventas restan unidades vía PMP monthly.
 
-    Se llama tras insertar en `asset_transactions` (compras y ventas). Solo
-    actualiza la fila del mes natural actual; si no existe, ejecuta antes
-    `ensure_current_month_snapshots` (misma lógica que el job de las 02:00).
+    Se llama tras insertar en `asset_transactions` (y ventas con asset_sales OK).
     """
     empty = SnapshotApplyResult(fills_considered=0, fills_skipped_not_current_month=0, groups_processed=0)
     if not inserted_fills:
         return empty
 
     current = today or date.today()
+    buy_fills = [f for f in inserted_fills if Decimal(str(f["asset_amount"])) > 0]
+    sell_fills = [f for f in inserted_fills if Decimal(str(f["asset_amount"])) < 0]
+
     grouped, skipped_not_current = group_fills_for_current_month_snapshot(
-        inserted_fills,
+        buy_fills,
         today=current,
     )
+    sell_groups = 0
+    if sell_fills:
+        sell_groups = _apply_sell_fills_to_monthly_snapshot(db, sell_fills, today=current)
 
     if grouped:
         ensure_current_month_snapshots(db, today=current)
         for (asset_type_id, year, month), fills in grouped.items():
             _apply_group(db, asset_type_id=asset_type_id, year=year, month=month, fills=fills)
+
+    if grouped or sell_groups:
         db.commit()
 
     return SnapshotApplyResult(
         fills_considered=len(inserted_fills),
         fills_skipped_not_current_month=skipped_not_current,
-        groups_processed=len(grouped),
+        groups_processed=len(grouped) + sell_groups,
     )
 
 

@@ -261,6 +261,7 @@ def create_asset_sale(
         avg_buy_price=preview["avg_buy_price"],
         sale_price=preview["sale_price"],
         fee=preview["fee"],
+        net_liquidity=preview["net_liquidity"],
         position_sold_pct=preview["position_share_pct"],
         exchange_trade_id=None,
     )
@@ -312,6 +313,7 @@ def list_asset_sales(db: Session) -> dict:
                 "sale_date": sale.sale_date,
                 "units": _round8(sale.units),
                 "sale_price": _round4(sale.sale_price),
+                "net_liquidity": _round4(sale.net_liquidity),
                 "profit": _round4(profit_native),
                 "profit_percentage": _round4(sale.profit_percentage),
                 "profit_eur": _round4(profit_eur),

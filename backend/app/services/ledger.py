@@ -43,11 +43,26 @@ def _build_asset_ledger_group(
     running_units = Decimal("0")
     transactions: list[AssetTransactionLedgerRow] = []
     for transaction_date, invested_amount, asset_amount, execution_price in tx_by_asset.get(asset.id, []):
-        invested = Decimal(str(invested_amount))
         price = Decimal(str(execution_price or 0))
         units = Decimal(str(asset_amount))
-        running_amount += invested
-        running_units += units
+        if units < 0:
+            abs_units = abs(units)
+            if invested_amount is None:
+                if running_units > 0:
+                    pmp = running_amount / running_units
+                    cost_out = (abs_units * pmp).quantize(Decimal("0.00000001"))
+                else:
+                    cost_out = Decimal("0")
+                running_amount -= cost_out
+                row_invested = -cost_out
+            else:
+                row_invested = Decimal(str(invested_amount))
+                running_amount += row_invested
+            running_units += units
+        else:
+            row_invested = Decimal(str(invested_amount or 0))
+            running_amount += row_invested
+            running_units += units
         avg_price = (running_amount / running_units) if running_units > 0 else Decimal("0")
         transactions.append(
             AssetTransactionLedgerRow(
@@ -55,7 +70,7 @@ def _build_asset_ledger_group(
                 currency=asset.currency,
                 precio_promedio=_round2(avg_price),
                 precio_compra=_round2(price),
-                euros_metidos=_round2(invested),
+                euros_metidos=_round2(row_invested),
                 euros_totales=_round2(running_amount),
                 asset_comprado=_round8(units),
                 asset_acumulado=_round8(running_units),

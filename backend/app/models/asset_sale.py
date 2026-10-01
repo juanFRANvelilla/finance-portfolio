@@ -24,6 +24,8 @@ class AssetSale(Base):
     avg_buy_price: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     sale_price: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     fee: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False, server_default="0")
+    net_liquidity: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    """Importe neto en cartera (precio×unidades − fee), divisa del activo."""
     position_sold_pct: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
     """Porcentaje de la posición total vendido en esta operación (100 = venta total)."""
     exchange_trade_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)

@@ -20,7 +20,7 @@ class AggregateDailyKucoinSaleTests(unittest.TestCase):
             sells=[
                 _SellSlice(
                     asset_amount=Decimal("-0.0006"),
-                    invested_amount=Decimal("-44.670024"),
+                    gross_proceeds=Decimal("44.670024"),
                     fee_amount=Decimal("0.04467002"),
                 )
             ],
@@ -44,12 +44,12 @@ class AggregateDailyKucoinSaleTests(unittest.TestCase):
             sells=[
                 _SellSlice(
                     asset_amount=Decimal("-0.0006"),
-                    invested_amount=Decimal("-44.67"),
+                    gross_proceeds=Decimal("44.67"),
                     fee_amount=Decimal("0.04"),
                 ),
                 _SellSlice(
                     asset_amount=Decimal("-0.0003"),
-                    invested_amount=Decimal("-22.335"),
+                    gross_proceeds=Decimal("22.335"),
                     fee_amount=Decimal("0.02"),
                 ),
             ],
@@ -61,6 +61,7 @@ class AggregateDailyKucoinSaleTests(unittest.TestCase):
         assert row is not None
         self.assertAlmostEqual(row["units"], 0.0009, places=8)
         self.assertAlmostEqual(row["fee"], 0.06, places=4)
+        self.assertAlmostEqual(row["net_liquidity"], 66.945, places=3)
         expected_vwap = (44.67 + 22.335) / 0.0009
         self.assertAlmostEqual(row["sale_price"], round(expected_vwap, 4), places=3)
         self.assertAlmostEqual(row["position_sold_pct"], 9.0, places=1)
@@ -82,7 +83,7 @@ class AggregateDailyKucoinSaleTests(unittest.TestCase):
             sells=[
                 _SellSlice(
                     asset_amount=Decimal("-1.5"),
-                    invested_amount=Decimal("-3000"),
+                    gross_proceeds=Decimal("3000"),
                     fee_amount=Decimal("1"),
                 )
             ],

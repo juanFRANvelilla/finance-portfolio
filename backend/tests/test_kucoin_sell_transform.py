@@ -28,7 +28,8 @@ class KucoinSellTransformTests(unittest.TestCase):
         self.assertEqual(stats["skipped_invalid_sell"], 0)
         self.assertEqual(len(tx_rows), 1)
         self.assertEqual(daily_keys, {(asset_id, datetime(2026, 3, 1).date())})
-        self.assertLess(tx_rows[0]["invested_amount"], 0)
+        self.assertIsNone(tx_rows[0]["invested_amount"])
+        self.assertLess(tx_rows[0]["asset_amount"], 0)
 
     def test_two_sells_same_day_same_asset_one_daily_key(self) -> None:
         asset_id = "22222222-2222-2222-2222-222222222222"

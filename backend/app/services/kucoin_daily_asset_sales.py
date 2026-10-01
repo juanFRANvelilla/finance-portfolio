@@ -17,7 +17,7 @@ def kucoin_daily_sale_exchange_trade_id(asset_type_id: str, sale_date: date) -> 
 @dataclass(frozen=True)
 class _SellSlice:
     asset_amount: Decimal
-    invested_amount: Decimal
+    gross_proceeds: Decimal
     fee_amount: Decimal
 
 
@@ -43,7 +43,7 @@ def aggregate_daily_kucoin_sale(
 
     for sell in sells:
         units_sold = abs(sell.asset_amount)
-        proceeds = abs(sell.invested_amount)
+        proceeds = sell.gross_proceeds
         fee = sell.fee_amount
 
         if running_units <= 0:
@@ -86,6 +86,7 @@ def aggregate_daily_kucoin_sale(
         "avg_buy_price": float(avg_buy_price),
         "sale_price": float(sale_price),
         "fee": float(total_fee.quantize(Decimal("0.0001"))),
+        "net_liquidity": float((total_proceeds - total_fee).quantize(Decimal("0.0001"))),
         "position_sold_pct": position_sold_pct,
         "exchange_trade_id": kucoin_daily_sale_exchange_trade_id(asset_type_id, sale_date),
     }
@@ -98,7 +99,7 @@ def build_daily_kucoin_sale_row(
     sells = db.execute(
         text(
             """
-            SELECT asset_amount, invested_amount, fee_amount, executed_at
+            SELECT asset_amount, execution_price, fee_amount, executed_at
             FROM public.asset_transactions
             WHERE asset_type_id = :asset_type_id
               AND transaction_date = :sale_date
@@ -159,14 +160,18 @@ def build_daily_kucoin_sale_row(
         position_units = Decimal("0")
         position_invested = Decimal("0")
 
-    slices = [
-        _SellSlice(
-            asset_amount=Decimal(str(sell.asset_amount)),
-            invested_amount=Decimal(str(sell.invested_amount)),
-            fee_amount=Decimal(str(sell.fee_amount or 0)),
+    slices = []
+    for sell in sells:
+        units = abs(Decimal(str(sell.asset_amount)))
+        price = Decimal(str(sell.execution_price or 0))
+        gross = (units * price).quantize(Decimal("0.00000001"))
+        slices.append(
+            _SellSlice(
+                asset_amount=Decimal(str(sell.asset_amount)),
+                gross_proceeds=gross,
+                fee_amount=Decimal(str(sell.fee_amount or 0)),
+            )
         )
-        for sell in sells
-    ]
 
     return aggregate_daily_kucoin_sale(
         asset_type_id=asset_type_id,

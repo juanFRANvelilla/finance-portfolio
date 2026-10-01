@@ -15,10 +15,10 @@ def upsert_kucoin_daily_asset_sale(db: Session, row: dict) -> bool:
             """
             INSERT INTO public.asset_sales
                 (id, asset_type_id, units, sale_year, sale_month, sale_date,
-                 avg_buy_price, sale_price, fee, position_sold_pct, exchange_trade_id)
+                 avg_buy_price, sale_price, fee, net_liquidity, position_sold_pct, exchange_trade_id)
             VALUES
                 (:id, :asset_type_id, :units, :sale_year, :sale_month, :sale_date,
-                 :avg_buy_price, :sale_price, :fee, :position_sold_pct, :exchange_trade_id)
+                 :avg_buy_price, :sale_price, :fee, :net_liquidity, :position_sold_pct, :exchange_trade_id)
             ON CONFLICT (exchange_trade_id) DO UPDATE SET
                 units = EXCLUDED.units,
                 sale_year = EXCLUDED.sale_year,
@@ -27,6 +27,7 @@ def upsert_kucoin_daily_asset_sale(db: Session, row: dict) -> bool:
                 avg_buy_price = EXCLUDED.avg_buy_price,
                 sale_price = EXCLUDED.sale_price,
                 fee = EXCLUDED.fee,
+                net_liquidity = EXCLUDED.net_liquidity,
                 position_sold_pct = EXCLUDED.position_sold_pct
             """
         ),
@@ -40,6 +41,7 @@ def upsert_kucoin_daily_asset_sale(db: Session, row: dict) -> bool:
             "avg_buy_price": row["avg_buy_price"],
             "sale_price": row["sale_price"],
             "fee": row["fee"],
+            "net_liquidity": row["net_liquidity"],
             "position_sold_pct": row["position_sold_pct"],
             "exchange_trade_id": row["exchange_trade_id"],
         },

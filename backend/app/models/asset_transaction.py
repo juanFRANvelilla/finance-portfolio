@@ -23,8 +23,8 @@ class AssetTransaction(Base):
     executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     """Fecha y hora exacta de ejecución (la que trae el exchange/correo).
     Es lo que se compara contra monthly_asset_investments.last_update."""
-    invested_amount: Mapped[float] = mapped_column(Numeric(16, 8), nullable=False)
-    """Importe invertido en la divisa de asset_types.currency (la fila no guarda divisa)."""
+    invested_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
+    """Importe en divisa del activo. Obligatorio en compras; NULL en ventas (solo unidades negativas)."""
     asset_amount: Mapped[float] = mapped_column(Numeric(16, 8), nullable=False)
     execution_price: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
     fee_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)

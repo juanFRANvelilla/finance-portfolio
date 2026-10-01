@@ -32,6 +32,7 @@ def _sale_to_read(sale, currency: str) -> AssetSaleRead:
         profit=float(sale.profit),
         profit_percentage=float(sale.profit_percentage),
         currency=currency,
+        net_liquidity=float(sale.net_liquidity),
         position_sold_pct=float(sale.position_sold_pct) if sale.position_sold_pct is not None else None,
     )
 
