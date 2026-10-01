@@ -6,10 +6,9 @@ Resumen de la regla:
 - Solo actúa sobre fills que `insert_transactions_batch` haya insertado de
   verdad (los duplicados por `exchange_trade_id` no llegan aquí).
 - Solo toca la fila de `monthly_asset_investments` del **mes natural actual**
-  (`date.today()` al procesar), no la del `transaction_date` cuando difiere.
-  Entra en el snapshot si la fecha efectiva de la operación cae en el mes actual:
-  `executed_at.date()` si existe; si no, `transaction_date`. Ej.: operación con
-  Fecha Operación 30/09 pero `executed_at` 01/10 → actualiza octubre (mes 10).
+  (`date.today()` al procesar). Entra en el snapshot solo si `executed_at` cae en
+  ese mes; `transaction_date` no interviene. Sin `executed_at` no se actualiza
+  la foto mensual (solo queda el registro en `asset_transactions`).
   Meses pasados/futuros respecto al mes en curso: solo `asset_transactions`.
 - Si no existe fila para (activo, año, mes), se crea copiando `amount`/`units`
   del mes anterior (o 0 si tampoco existe) y sumando TODOS los fills del grupo
@@ -71,14 +70,11 @@ def is_current_natural_month(operation_date: date, *, today: date | None = None)
     return (operation_date.year, operation_date.month) == (current.year, current.month)
 
 
-def operation_effective_date(fill: dict) -> date | None:
-    """Día que determina si una operación pertenece al mes natural en curso."""
+def executed_at_as_date(fill: dict) -> date | None:
+    """Día de ejecución usado para el snapshot; obligatorio en automatizaciones."""
     executed_at = fill.get("executed_at")
     if isinstance(executed_at, datetime):
         return executed_at.date()
-    transaction_date = fill.get("transaction_date")
-    if isinstance(transaction_date, date):
-        return transaction_date
     return None
 
 
@@ -97,19 +93,18 @@ def group_fills_for_current_month_snapshot(
     grouped: dict[tuple[str, int, int], list[SnapshotFill]] = defaultdict(list)
 
     for fill in inserted_fills:
-        effective = operation_effective_date(fill)
-        if effective is None:
+        execution_day = executed_at_as_date(fill)
+        if execution_day is None:
             logger.warning(
-                "Fill insertado sin fecha efectiva; no se puede actualizar "
-                "monthly_asset_investments: %s",
-                fill,
+                "Snapshot omitido: fill sin executed_at (exchange_trade_id=%s)",
+                fill.get("exchange_trade_id"),
             )
             continue
-        if not is_current_natural_month(effective, today=current):
+        if not is_current_natural_month(execution_day, today=current):
             skipped_not_current += 1
             logger.info(
-                "Snapshot omitido: operación %s fuera del mes actual %s-%02d (exchange_trade_id=%s)",
-                effective.isoformat(),
+                "Snapshot omitido: executed_at %s fuera del mes actual %s-%02d (exchange_trade_id=%s)",
+                execution_day.isoformat(),
                 target_year,
                 target_month,
                 fill.get("exchange_trade_id"),

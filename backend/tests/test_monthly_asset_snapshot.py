@@ -17,9 +17,9 @@ from app.services.monthly_asset_snapshot import (
     _previous_year_month,
     apply_transactions_to_monthly_snapshot,
     decide_snapshot_update,
+    executed_at_as_date,
     group_fills_for_current_month_snapshot,
     is_current_natural_month,
-    operation_effective_date,
 )
 
 ASSET_ID = "11111111-1111-1111-1111-111111111111"
@@ -171,7 +171,7 @@ class GroupFillsCurrentMonthTest(unittest.TestCase):
             "asset_amount": Decimal("-0.01"),
             "exchange_trade_id": "sell-1",
         }
-        self.assertEqual(operation_effective_date(fill), date(2026, 10, 1))
+        self.assertEqual(executed_at_as_date(fill), date(2026, 10, 1))
 
         grouped, skipped = group_fills_for_current_month_snapshot(
             [fill],
@@ -181,6 +181,35 @@ class GroupFillsCurrentMonthTest(unittest.TestCase):
         self.assertIn((ASSET_ID, 2026, 10), grouped)
         self.assertEqual(len(grouped[(ASSET_ID, 2026, 10)]), 1)
         self.assertEqual(grouped[(ASSET_ID, 2026, 10)][0].month, 10)
+
+    def test_transaction_date_ignored_when_executed_at_is_current_month(self) -> None:
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 9, 15),
+            "executed_at": datetime(2026, 10, 3, 10, 0, 0),
+            "invested_amount": Decimal("100"),
+            "asset_amount": Decimal("1"),
+        }
+        grouped, skipped = group_fills_for_current_month_snapshot(
+            [fill],
+            today=date(2026, 10, 5),
+        )
+        self.assertEqual(skipped, 0)
+        self.assertIn((ASSET_ID, 2026, 10), grouped)
+
+    def test_missing_executed_at_skipped_even_with_transaction_date(self) -> None:
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 10, 3),
+            "invested_amount": Decimal("100"),
+            "asset_amount": Decimal("1"),
+        }
+        grouped, skipped = group_fills_for_current_month_snapshot(
+            [fill],
+            today=date(2026, 10, 5),
+        )
+        self.assertEqual(grouped, {})
+        self.assertEqual(skipped, 0)
 
     def test_operation_only_in_past_month_is_skipped_when_today_is_october(self) -> None:
         fill = {

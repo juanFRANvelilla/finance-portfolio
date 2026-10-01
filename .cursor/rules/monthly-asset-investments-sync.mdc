@@ -59,11 +59,10 @@ duplicado).
 ### Solo el mes natural actual (automatización)
 
 Al aplicar transacciones nuevas a `monthly_asset_investments`, **solo** se
-consideran fills cuya fecha efectiva cae en el **mismo año/mes que hoy**
-(`executed_at.date()` si existe; si no, `transaction_date`). La actualización
-va siempre a la **fila del mes natural actual**, aunque `transaction_date` sea
-del mes anterior (p. ej. venta con Fecha Operación 30/09 y `executed_at`
-01/10 → foto de octubre).
+consideran fills cuyo **`executed_at`** cae en el **mismo año/mes que hoy**.
+`transaction_date` no se usa para esta regla. Sin `executed_at` no se toca la
+foto mensual. La actualización va a la **fila del mes natural actual** (mes de
+`executed_at` cuando aplica).
 
 - Compra del mes actual → puede actualizar la foto de ese mes (con la regla de
   `last_update` de abajo).
