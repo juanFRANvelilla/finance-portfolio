@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -27,6 +28,15 @@ MYINVESTOR_SYNC_INTERVAL_HOURS = 4
 MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR = 2
 MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE = 0
 MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE = ZoneInfo("Europe/Madrid")
+
+
+def _defer_interval_job_first_run(*, hours: int) -> datetime:
+    """Evita que KuCoin/MyInvestor corran al mismo instante que `scheduler.start()`.
+
+    La primera sync de arranque la lanza `main` en segundo plano, después de la
+    apertura de mes.
+    """
+    return datetime.now(timezone.utc) + timedelta(hours=hours)
 
 
 async def _kucoin_sync_job() -> None:
@@ -135,6 +145,7 @@ def start_scheduler() -> AsyncIOScheduler:
         _kucoin_sync_job,
         trigger="interval",
         hours=KUCOIN_SYNC_INTERVAL_HOURS,
+        next_run_time=_defer_interval_job_first_run(hours=KUCOIN_SYNC_INTERVAL_HOURS),
         id="kucoin_sync",
         replace_existing=True,
         max_instances=1,
@@ -144,6 +155,7 @@ def start_scheduler() -> AsyncIOScheduler:
         _myinvestor_sync_job,
         trigger="interval",
         hours=MYINVESTOR_SYNC_INTERVAL_HOURS,
+        next_run_time=_defer_interval_job_first_run(hours=MYINVESTOR_SYNC_INTERVAL_HOURS),
         id="myinvestor_sync",
         replace_existing=True,
         max_instances=1,
@@ -164,17 +176,18 @@ def start_scheduler() -> AsyncIOScheduler:
 
     _scheduler.start()
     logger.info(
-        "Tarea programada KuCoin activa (operaciones + fiat EUR): "
-        "al arrancar y cada %s horas",
+        "Tarea programada KuCoin activa: sync de arranque tras apertura de mes; "
+        "luego cada %s horas",
         KUCOIN_SYNC_INTERVAL_HOURS,
     )
     logger.info(
-        "Tarea programada MyInvestor activa (operaciones + transferencias): "
-        "al arrancar y cada %s horas",
+        "Tarea programada MyInvestor activa: sync de arranque tras apertura de mes; "
+        "luego cada %s horas",
         MYINVESTOR_SYNC_INTERVAL_HOURS,
     )
     logger.info(
-        "Tarea programada de apertura de mes activa: al arrancar y cada noche a las %02d:%02d (%s)",
+        "Tarea programada de apertura de mes: primero al arrancar; "
+        "después cada noche a las %02d:%02d (%s)",
         MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
         MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
         MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE.key,
@@ -203,7 +216,7 @@ def start_myinvestor_sync_background() -> asyncio.Task:
     return asyncio.create_task(_myinvestor_sync_job(), name="myinvestor-sync-startup")
 
 
-def start_monthly_snapshot_rollover_background() -> asyncio.Task:
-    """Lanza la apertura de mes de arranque en segundo plano para no retrasar el API."""
-    logger.info("Primera comprobación de apertura de mes en segundo plano...")
-    return asyncio.create_task(_monthly_snapshot_rollover_job(), name="monthly-snapshot-rollover-startup")
+async def run_startup_monthly_snapshot_rollover() -> None:
+    """Apertura de mes al arrancar el API, antes que KuCoin/MyInvestor."""
+    logger.info("Arranque: apertura de mes en monthly_asset_investments (prioridad)...")
+    await _monthly_snapshot_rollover_job()

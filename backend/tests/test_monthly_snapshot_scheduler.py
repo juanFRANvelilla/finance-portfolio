@@ -14,8 +14,8 @@ class MonthlySnapshotSchedulerTests(unittest.TestCase):
         self.assertEqual(MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE, 0)
         self.assertEqual(MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE.key, "Europe/Madrid")
 
-    def test_startup_helper_still_exists(self) -> None:
-        self.assertTrue(callable(scheduler_module.start_monthly_snapshot_rollover_background))
+    def test_startup_runner_exists(self) -> None:
+        self.assertTrue(callable(scheduler_module.run_startup_monthly_snapshot_rollover))
 
 
 if __name__ == "__main__":
