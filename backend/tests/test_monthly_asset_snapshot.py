@@ -9,12 +9,17 @@ import unittest
 from datetime import date, datetime
 from decimal import Decimal
 
+from unittest.mock import MagicMock, patch
+
 from app.services.monthly_asset_snapshot import (
     SnapshotFill,
     _next_year_month,
     _previous_year_month,
+    apply_transactions_to_monthly_snapshot,
     decide_snapshot_update,
+    group_fills_for_current_month_snapshot,
     is_current_natural_month,
+    operation_effective_date,
 )
 
 ASSET_ID = "11111111-1111-1111-1111-111111111111"
@@ -154,6 +159,109 @@ class CurrentNaturalMonthTest(unittest.TestCase):
     def test_year_boundary(self) -> None:
         self.assertFalse(is_current_natural_month(date(2025, 12, 31), today=date(2026, 1, 5)))
         self.assertTrue(is_current_natural_month(date(2026, 1, 1), today=date(2026, 1, 5)))
+
+
+class GroupFillsCurrentMonthTest(unittest.TestCase):
+    def test_sell_with_sept_transaction_date_but_oct_executed_at_targets_october_row(self) -> None:
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 9, 30),
+            "executed_at": datetime(2026, 10, 1, 20, 21, 41),
+            "invested_amount": Decimal("-500"),
+            "asset_amount": Decimal("-0.01"),
+            "exchange_trade_id": "sell-1",
+        }
+        self.assertEqual(operation_effective_date(fill), date(2026, 10, 1))
+
+        grouped, skipped = group_fills_for_current_month_snapshot(
+            [fill],
+            today=date(2026, 10, 5),
+        )
+        self.assertEqual(skipped, 0)
+        self.assertIn((ASSET_ID, 2026, 10), grouped)
+        self.assertEqual(len(grouped[(ASSET_ID, 2026, 10)]), 1)
+        self.assertEqual(grouped[(ASSET_ID, 2026, 10)][0].month, 10)
+
+    def test_operation_only_in_past_month_is_skipped_when_today_is_october(self) -> None:
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 9, 30),
+            "executed_at": datetime(2026, 9, 30, 18, 0, 0),
+            "invested_amount": Decimal("-100"),
+            "asset_amount": Decimal("-1"),
+        }
+        grouped, skipped = group_fills_for_current_month_snapshot(
+            [fill],
+            today=date(2026, 10, 1),
+        )
+        self.assertEqual(grouped, {})
+        self.assertEqual(skipped, 1)
+
+    def test_sell_reduces_amount_and_units_in_decision(self) -> None:
+        fill = SnapshotFill(
+            asset_type_id=ASSET_ID,
+            year=2026,
+            month=10,
+            executed_at=datetime(2026, 10, 1, 20, 21, 41),
+            invested_amount=Decimal("-200"),
+            asset_amount=Decimal("-0.5"),
+        )
+        decision = decide_snapshot_update(
+            existing_amount=Decimal("1000.00"),
+            existing_units=Decimal("2.0000"),
+            existing_last_update=datetime(2026, 10, 1, 0, 0, 0),
+            fills=[fill],
+        )
+        self.assertTrue(decision.should_update)
+        self.assertEqual(decision.new_amount, Decimal("800.00"))
+        self.assertEqual(decision.new_units, Decimal("1.5000"))
+
+
+class ApplySnapshotEnsureTest(unittest.TestCase):
+    @patch("app.services.monthly_asset_snapshot._apply_group")
+    @patch("app.services.monthly_asset_snapshot.ensure_current_month_snapshots")
+    def test_ensure_runs_when_current_month_fill_needs_snapshot(
+        self,
+        mock_ensure: MagicMock,
+        mock_apply_group: MagicMock,
+    ) -> None:
+        mock_ensure.return_value = 2
+        db = MagicMock()
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 9, 30),
+            "executed_at": datetime(2026, 10, 1, 20, 21, 41),
+            "invested_amount": Decimal("-100"),
+            "asset_amount": Decimal("-0.1"),
+            "exchange_trade_id": "kucoin:1",
+        }
+
+        result = apply_transactions_to_monthly_snapshot(db, [fill], today=date(2026, 10, 2))
+
+        mock_ensure.assert_called_once_with(db, today=date(2026, 10, 2))
+        mock_apply_group.assert_called_once()
+        self.assertEqual(result.groups_processed, 1)
+        db.commit.assert_called_once()
+
+    @patch("app.services.monthly_asset_snapshot.ensure_current_month_snapshots")
+    def test_ensure_not_called_when_no_fill_belongs_to_current_month(
+        self,
+        mock_ensure: MagicMock,
+    ) -> None:
+        db = MagicMock()
+        fill = {
+            "asset_type_id": ASSET_ID,
+            "transaction_date": date(2026, 8, 15),
+            "executed_at": datetime(2026, 8, 15, 12, 0, 0),
+            "invested_amount": Decimal("100"),
+            "asset_amount": Decimal("1"),
+        }
+
+        result = apply_transactions_to_monthly_snapshot(db, [fill], today=date(2026, 10, 2))
+
+        mock_ensure.assert_not_called()
+        self.assertEqual(result.groups_processed, 0)
+        self.assertEqual(result.fills_skipped_not_current_month, 1)
 
 
 class YearMonthHelpersTest(unittest.TestCase):

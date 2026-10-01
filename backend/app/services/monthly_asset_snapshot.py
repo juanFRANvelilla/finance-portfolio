@@ -5,9 +5,12 @@ Resumen de la regla:
 
 - Solo actúa sobre fills que `insert_transactions_batch` haya insertado de
   verdad (los duplicados por `exchange_trade_id` no llegan aquí).
-- Solo toca `monthly_asset_investments` del **mes natural actual** (según
-  `transaction_date` / Fecha Operación). Meses pasados o futuros: la transacción
-  queda en `asset_transactions` pero no se auto-actualiza ninguna foto mensual.
+- Solo toca la fila de `monthly_asset_investments` del **mes natural actual**
+  (`date.today()` al procesar), no la del `transaction_date` cuando difiere.
+  Entra en el snapshot si la fecha efectiva de la operación cae en el mes actual:
+  `executed_at.date()` si existe; si no, `transaction_date`. Ej.: operación con
+  Fecha Operación 30/09 pero `executed_at` 01/10 → actualiza octubre (mes 10).
+  Meses pasados/futuros respecto al mes en curso: solo `asset_transactions`.
 - Si no existe fila para (activo, año, mes), se crea copiando `amount`/`units`
   del mes anterior (o 0 si tampoco existe) y sumando TODOS los fills del grupo
   (son todos nuevos, no hay nada que comparar).
@@ -62,10 +65,69 @@ class SnapshotFill:
     asset_amount: Decimal
 
 
-def is_current_natural_month(transaction_date: date, *, today: date | None = None) -> bool:
-    """True si la Fecha Operación cae en el mismo año/mes que el día natural `today`."""
+def is_current_natural_month(operation_date: date, *, today: date | None = None) -> bool:
+    """True si `operation_date` cae en el mismo año/mes que el día natural `today`."""
     current = today or date.today()
-    return (transaction_date.year, transaction_date.month) == (current.year, current.month)
+    return (operation_date.year, operation_date.month) == (current.year, current.month)
+
+
+def operation_effective_date(fill: dict) -> date | None:
+    """Día que determina si una operación pertenece al mes natural en curso."""
+    executed_at = fill.get("executed_at")
+    if isinstance(executed_at, datetime):
+        return executed_at.date()
+    transaction_date = fill.get("transaction_date")
+    if isinstance(transaction_date, date):
+        return transaction_date
+    return None
+
+
+def group_fills_for_current_month_snapshot(
+    inserted_fills: list[dict],
+    *,
+    today: date | None = None,
+) -> tuple[dict[tuple[str, int, int], list[SnapshotFill]], int]:
+    """Agrupa fills insertados hacia la fila del mes natural actual.
+
+    Devuelve (grupos, fills_omitidos_por_no_ser_mes_actual).
+    """
+    current = today or date.today()
+    target_year, target_month = current.year, current.month
+    skipped_not_current = 0
+    grouped: dict[tuple[str, int, int], list[SnapshotFill]] = defaultdict(list)
+
+    for fill in inserted_fills:
+        effective = operation_effective_date(fill)
+        if effective is None:
+            logger.warning(
+                "Fill insertado sin fecha efectiva; no se puede actualizar "
+                "monthly_asset_investments: %s",
+                fill,
+            )
+            continue
+        if not is_current_natural_month(effective, today=current):
+            skipped_not_current += 1
+            logger.info(
+                "Snapshot omitido: operación %s fuera del mes actual %s-%02d (exchange_trade_id=%s)",
+                effective.isoformat(),
+                target_year,
+                target_month,
+                fill.get("exchange_trade_id"),
+            )
+            continue
+
+        grouped[(str(fill["asset_type_id"]), target_year, target_month)].append(
+            SnapshotFill(
+                asset_type_id=str(fill["asset_type_id"]),
+                year=target_year,
+                month=target_month,
+                executed_at=fill.get("executed_at"),
+                invested_amount=Decimal(str(fill["invested_amount"])),
+                asset_amount=Decimal(str(fill["asset_amount"])),
+            )
+        )
+
+    return grouped, skipped_not_current
 
 
 @dataclass(frozen=True)
@@ -75,20 +137,6 @@ class SnapshotApplyResult:
     fills_considered: int
     fills_skipped_not_current_month: int
     groups_processed: int
-
-
-def _to_snapshot_fill(fill: dict) -> SnapshotFill | None:
-    transaction_date: date | None = fill.get("transaction_date")
-    if transaction_date is None:
-        return None
-    return SnapshotFill(
-        asset_type_id=str(fill["asset_type_id"]),
-        year=transaction_date.year,
-        month=transaction_date.month,
-        executed_at=fill.get("executed_at"),
-        invested_amount=Decimal(str(fill["invested_amount"])),
-        asset_amount=Decimal(str(fill["asset_amount"])),
-    )
 
 
 @dataclass(frozen=True)
@@ -155,44 +203,24 @@ def apply_transactions_to_monthly_snapshot(
 ) -> SnapshotApplyResult:
     """Punto de entrada: agrupa fills insertados y actualiza/crea la foto del mes.
 
-    Se llama justo después de `insert_transactions_batch`, solo con los fills
-    que devolvió como realmente insertados. Fuera del mes natural actual no se
-    modifica ninguna fila de monthly_asset_investments.
+    Se llama tras insertar en `asset_transactions` (compras y ventas). Solo
+    actualiza la fila del mes natural actual; si no existe, ejecuta antes
+    `ensure_current_month_snapshots` (misma lógica que el job de las 02:00).
     """
     empty = SnapshotApplyResult(fills_considered=0, fills_skipped_not_current_month=0, groups_processed=0)
     if not inserted_fills:
         return empty
 
     current = today or date.today()
-    skipped_not_current = 0
-    grouped: dict[tuple[str, int, int], list[SnapshotFill]] = defaultdict(list)
-    for fill in inserted_fills:
-        snapshot_fill = _to_snapshot_fill(fill)
-        if snapshot_fill is None:
-            logger.warning(
-                "Fill insertado sin transaction_date; no se puede actualizar "
-                "monthly_asset_investments: %s",
-                fill,
-            )
-            continue
-        tx_date = fill.get("transaction_date")
-        if tx_date is not None and not is_current_natural_month(tx_date, today=current):
-            skipped_not_current += 1
-            logger.info(
-                "Snapshot omitido: operación %s-%02d fuera del mes actual %s-%02d (exchange_trade_id=%s)",
-                snapshot_fill.year,
-                snapshot_fill.month,
-                current.year,
-                current.month,
-                fill.get("exchange_trade_id"),
-            )
-            continue
-        grouped[(snapshot_fill.asset_type_id, snapshot_fill.year, snapshot_fill.month)].append(snapshot_fill)
-
-    for (asset_type_id, year, month), fills in grouped.items():
-        _apply_group(db, asset_type_id=asset_type_id, year=year, month=month, fills=fills)
+    grouped, skipped_not_current = group_fills_for_current_month_snapshot(
+        inserted_fills,
+        today=current,
+    )
 
     if grouped:
+        ensure_current_month_snapshots(db, today=current)
+        for (asset_type_id, year, month), fills in grouped.items():
+            _apply_group(db, asset_type_id=asset_type_id, year=year, month=month, fills=fills)
         db.commit()
 
     return SnapshotApplyResult(

@@ -104,9 +104,7 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
             result.inserted = inserted
             result.skipped_duplicate = skipped
 
-            buy_fills = [f for f in inserted_fills if Decimal(str(f["asset_amount"])) > 0]
-            apply_transactions_to_monthly_snapshot(db, buy_fills)
-
+            upserted_sale_keys: set[tuple[str, date]] = set()
             if daily_sale_keys:
                 upserted = 0
                 for asset_type_id, sale_date in sorted(
@@ -116,9 +114,21 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
                     if daily_row is None:
                         continue
                     upsert_kucoin_daily_asset_sale(db, daily_row)
+                    upserted_sale_keys.add((asset_type_id, sale_date))
                     upserted += 1
                 db.commit()
                 result.sales_inserted = upserted
+
+            snapshot_fills: list[dict] = []
+            for fill in inserted_fills:
+                if Decimal(str(fill["asset_amount"])) < 0:
+                    sale_key = (fill["asset_type_id"], fill["transaction_date"])
+                    if sale_key not in upserted_sale_keys:
+                        continue
+                snapshot_fills.append(fill)
+
+            if snapshot_fills:
+                apply_transactions_to_monthly_snapshot(db, snapshot_fills)
 
         logger.info(
             "KuCoin sync OK: %s tx insertadas, %s ventas insertadas, %s duplicados (desde %s)",
