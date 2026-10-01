@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from app.services.kucoin_fiat_cash_flows_sync_service import run_scheduled_kucoin_fiat_cash_flows_sync
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
@@ -21,8 +23,10 @@ _scheduler: AsyncIOScheduler | None = None
 KUCOIN_SYNC_INTERVAL_HOURS = 4
 # Confirmaciones MyInvestor por IMAP. Independiente del job de KuCoin.
 MYINVESTOR_SYNC_INTERVAL_HOURS = 4
-# Apertura del mes natural en monthly_asset_investments. Idempotente, corre a diario.
-MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS = 24
+# Apertura del mes natural en monthly_asset_investments (cron + al arrancar el pod).
+MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR = 2
+MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE = 0
+MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE = ZoneInfo("Europe/Madrid")
 
 
 async def _kucoin_sync_job() -> None:
@@ -147,8 +151,11 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         _monthly_snapshot_rollover_job,
-        trigger="interval",
-        hours=MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS,
+        trigger=CronTrigger(
+            hour=MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
+            minute=MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
+            timezone=MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE,
+        ),
         id="monthly_snapshot_rollover",
         replace_existing=True,
         max_instances=1,
@@ -167,8 +174,10 @@ def start_scheduler() -> AsyncIOScheduler:
         MYINVESTOR_SYNC_INTERVAL_HOURS,
     )
     logger.info(
-        "Tarea programada de apertura de mes activa: se ejecutará al arrancar y luego cada %s horas",
-        MONTHLY_SNAPSHOT_ROLLOVER_INTERVAL_HOURS,
+        "Tarea programada de apertura de mes activa: al arrancar y cada noche a las %02d:%02d (%s)",
+        MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
+        MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
+        MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE.key,
     )
     return _scheduler
 
