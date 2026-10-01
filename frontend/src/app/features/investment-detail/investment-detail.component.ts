@@ -325,6 +325,18 @@ export class InvestmentDetailComponent {
     return { amount: asset.amount, currency: asset.currency };
   }
 
+  /** Precio medio de compra = importe mostrado ÷ títulos (misma divisa que el importe). */
+  avgBuyPriceForAsset(
+    asset: AssetInvestmentDetail,
+  ): { price: number; currency: string } | null {
+    const units = asset.units;
+    if (units == null || units <= 0) {
+      return null;
+    }
+    const importe = this.importeDisplayForAsset(asset);
+    return { price: importe.amount / units, currency: importe.currency };
+  }
+
   toggleTotalProfitInfo(): void {
     const willOpen = !this.totalProfitInfoOpen();
     this.totalProfitInfoOpen.set(willOpen);

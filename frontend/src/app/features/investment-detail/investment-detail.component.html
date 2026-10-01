@@ -364,6 +364,7 @@
                             <th class="px-3 py-2 font-medium">Activo</th>
                             <th class="px-3 py-2 font-medium text-right">Títulos</th>
                             <th class="px-3 py-2 font-medium text-right">Importe</th>
+                            <th class="px-3 py-2 font-medium text-right">Precio promedio</th>
                             <th class="px-3 py-2 font-medium text-right">Precio</th>
                             <th class="px-3 py-2 font-medium text-right">Valor real</th>
                             <th class="px-3 py-2 font-medium text-right">Resultado</th>
@@ -430,6 +431,13 @@
                                         </button>
                                       }
                                     </div>
+                                  }
+                                </td>
+                                <td class="px-3 py-2 text-right tabular-nums text-slate-300">
+                                  @if (avgBuyPriceForAsset(asset); as avg) {
+                                    {{ avg.price | currency: avg.currency:'symbol':'1.2-4' }}
+                                  } @else {
+                                    <span class="text-slate-500">—</span>
                                   }
                                 </td>
                                 @if (liveMetricsForAsset(asset, cat.category_id); as metrics) {
