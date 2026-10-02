@@ -19,8 +19,6 @@ def compute_totals_from_record(record: MonthlyRecord) -> dict[str, float]:
         amount = Decimal(str(balance.balance_amount))
         if entity_type == EntityType.LIQUID:
             total_liquid += amount
-        elif entity_type == EntityType.INVESTED:
-            total_invested += amount
 
     for hybrid in record.hybrid_accounts:
         total_liquid += Decimal(str(hybrid.liquid_amount))
@@ -54,8 +52,6 @@ def compute_totals_from_simple_balances(
         amount = Decimal(str(balance.balance_amount))
         if entity.entity_type == EntityType.LIQUID:
             total_liquid += amount
-        elif entity.entity_type == EntityType.INVESTED:
-            total_invested += amount
 
     if resolved_hybrids is not None:
         for _entity_id, liquid, invested in resolved_hybrids:
@@ -89,8 +85,6 @@ def compute_totals_from_import(payload: ImportPayload, entities_by_id: dict[str,
         amount = Decimal(str(balance.amount))
         if entity.entity_type == EntityType.LIQUID:
             total_liquid += amount
-        elif entity.entity_type == EntityType.INVESTED:
-            total_invested += amount
 
     for hybrid in payload.hybrid_balances:
         total_liquid += Decimal(str(hybrid.liquid_amount))

@@ -8,7 +8,6 @@ from app.core.database import Base
 
 class EntityType(str, enum.Enum):
     LIQUID = "LIQUID"
-    INVESTED = "INVESTED"
     HYBRID = "HYBRID"
 
 

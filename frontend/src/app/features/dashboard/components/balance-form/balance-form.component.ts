@@ -36,9 +36,7 @@ export class BalanceFormComponent {
   readonly updateHybrids = output<HybridFormSubmission>();
   readonly cancelEdit = output<void>();
 
-  readonly simpleEntities = computed(() =>
-    this.entities().filter((e) => e.entity_type === 'LIQUID' || e.entity_type === 'INVESTED'),
-  );
+  readonly simpleEntities = computed(() => this.entities().filter((e) => e.entity_type === 'LIQUID'));
 
   readonly hybridEntities = computed(() => this.entities().filter((e) => e.entity_type === 'HYBRID'));
 

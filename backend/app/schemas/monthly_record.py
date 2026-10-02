@@ -51,7 +51,7 @@ class HybridBalancesPatch(BaseModel):
 
 
 class EntityBalancesPatch(BaseModel):
-    """Actualiza solo balances LIQUID/INVESTED y refresca totales del mes."""
+    """Actualiza solo balances LIQUID y refresca totales del mes."""
 
     balances: list[EntityBalanceInput] = Field(min_length=1)
 

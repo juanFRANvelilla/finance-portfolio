@@ -31,13 +31,11 @@ export class AssetEditDialogComponent {
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
-  /** Entidades elegibles + la vinculada al activo aunque no sea INVESTED/HYBRID. */
+  /** Entidades híbridas elegibles + la vinculada al activo aunque ya no esté activa. */
   readonly entityOptions = computed(() => {
     const currentId = this.entityId();
     const currentName = this.asset()?.entity_name;
-    const linkable = this.allEntities().filter(
-      (entity) => entity.entity_type === 'INVESTED' || entity.entity_type === 'HYBRID',
-    );
+    const linkable = this.allEntities().filter((entity) => entity.entity_type === 'HYBRID');
 
     if (!currentId || linkable.some((entity) => entity.id === currentId)) {
       return linkable;
@@ -48,7 +46,7 @@ export class AssetEditDialogComponent {
       {
         id: currentId,
         name: currentName ?? currentId,
-        entity_type: 'INVESTED' as const,
+        entity_type: 'HYBRID' as const,
         is_active: true,
       },
     ];
@@ -123,8 +121,8 @@ export class AssetEditDialogComponent {
     if (entity.entity_type === 'HYBRID') {
       return 'Híbrida';
     }
-    if (entity.entity_type === 'INVESTED') {
-      return 'Inversión';
+    if (entity.entity_type === 'LIQUID') {
+      return 'Líquido';
     }
     return entity.entity_type;
   }

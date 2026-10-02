@@ -168,10 +168,10 @@ def _validate_balance_entity_types(
 
     for balance in simple_balances:
         entity_type = entities_by_id[balance.entity_id].entity_type
-        if entity_type not in (EntityType.LIQUID, EntityType.INVESTED):
+        if entity_type != EntityType.LIQUID:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La entidad '{balance.entity_id}' debe ser LIQUID o INVESTED",
+                detail=f"La entidad '{balance.entity_id}' debe ser LIQUID",
             )
 
     for hybrid in hybrid_balances:
@@ -380,7 +380,7 @@ def patch_entity_balances(
     payload: EntityBalancesPatch,
     db: Session = Depends(get_db),
 ) -> MonthlyRecordResponse:
-    """Actualiza balances LIQUID/INVESTED sin tocar monthly_hybrid_accounts."""
+    """Actualiza balances LIQUID sin tocar monthly_hybrid_accounts."""
     _validate_month(month)
     record = _patch_simple_balances(
         db,

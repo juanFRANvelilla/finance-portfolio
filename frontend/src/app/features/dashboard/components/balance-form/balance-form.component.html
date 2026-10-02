@@ -24,13 +24,9 @@
         <span class="mb-1 flex items-center gap-2 text-sm font-medium text-slate-300">
           {{ entity.name }}
           <span
-            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-            [class.bg-sky-500/15]="entity.entity_type === 'LIQUID'"
-            [class.text-sky-300]="entity.entity_type === 'LIQUID'"
-            [class.bg-purple-500/15]="entity.entity_type === 'INVESTED'"
-            [class.text-purple-300]="entity.entity_type === 'INVESTED'"
+            class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300"
           >
-            {{ entity.entity_type === 'LIQUID' ? 'Líquido' : 'Invertido' }}
+            Líquido
           </span>
         </span>
         <div class="relative">

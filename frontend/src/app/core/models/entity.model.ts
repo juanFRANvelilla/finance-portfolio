@@ -1,4 +1,4 @@
-export type EntityType = 'LIQUID' | 'INVESTED' | 'HYBRID';
+export type EntityType = 'LIQUID' | 'HYBRID';
 
 export interface Entity {
   id: string;

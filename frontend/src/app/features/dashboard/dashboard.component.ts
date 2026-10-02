@@ -94,9 +94,7 @@ export class DashboardComponent {
     if (!record) {
       return false;
     }
-    const simpleCount = this.entities().filter(
-      (entity) => entity.entity_type === 'LIQUID' || entity.entity_type === 'INVESTED',
-    ).length;
+    const simpleCount = this.entities().filter((entity) => entity.entity_type === 'LIQUID').length;
     if (simpleCount === 0) {
       return record.hybrid_accounts.length > 0;
     }

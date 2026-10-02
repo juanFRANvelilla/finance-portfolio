@@ -146,10 +146,10 @@ def _validate_asset_entity_link(db: Session, entity_id: str | None) -> None:
     if entity_id is None:
         return
     entity = _get_entity_or_404(db, entity_id)
-    if entity.entity_type not in (EntityType.INVESTED, EntityType.HYBRID):
+    if entity.entity_type != EntityType.HYBRID:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"La entidad '{entity_id}' debe ser de tipo INVESTED o HYBRID",
+            detail=f"La entidad '{entity_id}' debe ser de tipo HYBRID",
         )
 
 
