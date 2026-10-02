@@ -14,7 +14,6 @@ from app.models.asset_type import AssetType
 from app.models.entity import Entity, EntityType
 from app.models.investment_category import InvestmentCategory
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
-from app.models.monthly_category_investment import MonthlyCategoryInvestment
 from app.models.monthly_record import MonthlyRecord
 from app.schemas.investment import (
     AssetInvestmentDetail,
@@ -24,7 +23,6 @@ from app.schemas.investment import (
     AssetTypeUpdate,
     CategoryAssetDisplayOrderUpdate,
     CategoryDetailResponse,
-    CategoryInvestmentsUpsert,
     CategoryOverview,
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
@@ -37,10 +35,6 @@ from app.services.linked_asset_investments import sum_linked_asset_investments_e
 from app.services.market_price_service import market_price_service
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
-
-# Acciones: el total de categoría se calcula solo a partir de sus activos.
-COMPUTED_CATEGORY_IDS = {"acciones"}
-
 
 def _round2(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01")))
@@ -113,12 +107,14 @@ def _get_category_or_404(db: Session, category_id: str) -> InvestmentCategory:
     return category
 
 
-def _category_totals(db: Session, year: int, month: int) -> dict[str, float]:
-    """Totales guardados a mano en monthly_category_investments (Fondos/Crypto) para ese mes."""
-    stmt = select(MonthlyCategoryInvestment).where(
-        MonthlyCategoryInvestment.year == year, MonthlyCategoryInvestment.month == month
+def _month_has_investment_data(db: Session, year: int, month: int) -> bool:
+    """True si existe al menos una fila en monthly_asset_investments para ese mes (incl. apertura automática)."""
+    count = db.scalar(
+        select(func.count())
+        .select_from(MonthlyAssetInvestment)
+        .where(MonthlyAssetInvestment.year == year, MonthlyAssetInvestment.month == month)
     )
-    return {row.category_id: float(row.amount_eur) for row in db.scalars(stmt).all()}
+    return bool(count and count > 0)
 
 
 def _computed_category_totals(db: Session, year: int, month: int) -> dict[str, float]:
@@ -307,21 +303,15 @@ def get_entity_linked_invested_total(
 
 def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewResponse:
     categories = _get_categories(db)
-
-    saved = _category_totals(db, year, month)
-    computed = _computed_category_totals(db, year, month)
+    has_investment_data = _month_has_investment_data(db, year, month)
+    computed = _computed_category_totals(db, year, month) if has_investment_data else {}
 
     prev_year, prev_month = _previous_year_month(year, month)
 
     category_overviews: list[CategoryOverview] = []
     total_invested = Decimal("0")
     for cat in categories:
-        is_computed = cat.id in COMPUTED_CATEGORY_IDS
-        allocated = computed.get(cat.id, 0.0)
-        if cat.id in saved:
-            amount = max(saved[cat.id], allocated)
-        else:
-            amount = allocated
+        amount = computed.get(cat.id, 0.0)
         total_invested += Decimal(str(amount))
 
         category_overviews.append(
@@ -331,8 +321,8 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
                 color=cat.color,
                 amount_eur=amount,
                 percentage=0.0,  # se recalcula abajo con el total del detalle
-                editable=not is_computed,
-                saved_this_month=cat.id in saved,
+                editable=False,
+                saved_this_month=False,
             )
         )
 
@@ -347,6 +337,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         month=month,
         total_invested=total_invested_f,
         has_month_record=_find_record(db, year, month) is not None,
+        has_investment_data=has_investment_data,
         categories=category_overviews,
         previous_year=prev_year,
         previous_month=prev_month,
@@ -357,60 +348,14 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
 def get_investment_overview(year: int, month: int, db: Session = Depends(get_db)) -> InvestmentOverviewResponse:
     """Resumen de inversión de un mes.
 
-    `total_invested` es la suma de las categorías registradas aquí (Fondos + Crypto + Acciones),
+    `total_invested` es la suma en EUR de monthly_asset_investments por categoría,
     independiente del total invertido del panel principal (monthly_records).
     """
     return _build_overview(db, year, month)
 
 
-@router.post("/{year}/{month}/categories", response_model=InvestmentOverviewResponse)
-def upsert_category_investments(
-    year: int, month: int, payload: CategoryInvestmentsUpsert, db: Session = Depends(get_db)
-) -> InvestmentOverviewResponse:
-    """Guarda el importe manual y libre de las categorías editables (Fondos/Crypto).
-    Sin bloqueos por cuadre de totales: máxima flexibilidad para registrar en cualquier momento."""
-    categories = _get_categories(db)
-    valid_ids = {cat.id for cat in categories}
-    computed_ids = {cat.id for cat in categories if cat.id in COMPUTED_CATEGORY_IDS}
-
-    provided_ids = {item.category_id for item in payload.categories}
-
-    unknown_ids = provided_ids - valid_ids
-    if unknown_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Categorías desconocidas: {sorted(unknown_ids)}"
-        )
-
-    computed_provided = provided_ids & computed_ids
-    if computed_provided:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Estas categorías se calculan automáticamente a partir de sus activos: {sorted(computed_provided)}",
-        )
-
-    for item in payload.categories:
-        existing = db.scalars(
-            select(MonthlyCategoryInvestment).where(
-                MonthlyCategoryInvestment.year == year,
-                MonthlyCategoryInvestment.month == month,
-                MonthlyCategoryInvestment.category_id == item.category_id,
-            )
-        ).first()
-        if existing is not None:
-            existing.amount_eur = item.amount_eur
-        else:
-            db.add(
-                MonthlyCategoryInvestment(
-                    year=year, month=month, category_id=item.category_id, amount_eur=item.amount_eur
-                )
-            )
-    db.commit()
-
-    return _build_overview(db, year, month)
-
-
 def _build_category_detail(db: Session, year: int, month: int, category: InvestmentCategory) -> CategoryDetailResponse:
-    is_computed = category.id in COMPUTED_CATEGORY_IDS
+    is_computed = True
 
     asset_types = list(
         db.scalars(
@@ -468,19 +413,6 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
     fx_usd_to_eur = get_usd_to_eur_rate(year, month) if has_usd_assets else None
 
     allocated_f = _round2(allocated)
-    category_row = db.scalars(
-        select(MonthlyCategoryInvestment).where(
-            MonthlyCategoryInvestment.year == year,
-            MonthlyCategoryInvestment.month == month,
-            MonthlyCategoryInvestment.category_id == category.id,
-        )
-    ).first()
-    if category_row is not None:
-        category_amount = max(float(category_row.amount_eur), allocated_f)
-    else:
-        category_amount = allocated_f
-
-    others = max(0.0, _round2(Decimal(str(category_amount)) - allocated))
 
     return CategoryDetailResponse(
         year=year,
@@ -488,11 +420,11 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
         category_id=category.id,
         category_name=category.name,
         is_computed=is_computed,
-        category_amount_eur=category_amount,
+        category_amount_eur=allocated_f,
         fx_usd_to_eur=fx_usd_to_eur,
         assets=assets_detail,
-        allocated_amount_eur=_round2(allocated),
-        others_amount_eur=others,
+        allocated_amount_eur=allocated_f,
+        others_amount_eur=0.0,
     )
 
 
@@ -513,16 +445,13 @@ def upsert_category_assets(
     category = _get_category_or_404(db, category_id)
 
     if not payload.assets:
-        logger.warning(
-            "POST upsert_category_assets: category=%s %s-%02d sin activos en payload "
-            "(solo puede actualizar total de categoría)",
-            category_id,
-            year,
-            month,
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debes indicar al menos un activo en assets",
         )
 
     logger.info(
-        "POST upsert_category_assets: category=%s %s-%02d payload.assets=%s category_amount_eur=%s",
+        "POST upsert_category_assets: category=%s %s-%02d payload.assets=%s",
         category_id,
         year,
         month,
@@ -534,7 +463,6 @@ def upsert_category_assets(
             }
             for item in payload.assets
         ],
-        payload.category_amount_eur,
     )
 
     asset_types_by_id = {
@@ -605,53 +533,6 @@ def upsert_category_assets(
             month,
             item.amount,
             item.units,
-        )
-
-    allocated_eur = Decimal("0")
-    saved_rows = db.scalars(
-        select(MonthlyAssetInvestment)
-        .join(AssetType, MonthlyAssetInvestment.asset_type_id == AssetType.id)
-        .where(
-            MonthlyAssetInvestment.year == year,
-            MonthlyAssetInvestment.month == month,
-            AssetType.category_id == category.id,
-        )
-    ).all()
-    for saved in saved_rows:
-        asset = asset_types_by_id[saved.asset_type_id]
-        allocated_eur += Decimal(str(amount_to_eur(float(saved.amount), asset.currency, year, month)))
-
-    category_row = db.scalars(
-        select(MonthlyCategoryInvestment).where(
-            MonthlyCategoryInvestment.year == year,
-            MonthlyCategoryInvestment.month == month,
-            MonthlyCategoryInvestment.category_id == category.id,
-        )
-    ).first()
-
-    if payload.category_amount_eur is not None:
-        requested = Decimal(str(payload.category_amount_eur))
-        if requested + Decimal("0.005") < allocated_eur:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"El total de categoría ({_round2(requested):.2f} €) no puede ser inferior "
-                    f"a la suma de activos ({_round2(allocated_eur):.2f} €)."
-                ),
-            )
-        total_eur = _round2(requested)
-    elif category_row is not None and Decimal(str(category_row.amount_eur)) >= allocated_eur:
-        total_eur = float(category_row.amount_eur)
-    else:
-        total_eur = _round2(allocated_eur)
-
-    if category_row is not None:
-        category_row.amount_eur = total_eur
-    else:
-        db.add(
-            MonthlyCategoryInvestment(
-                year=year, month=month, category_id=category.id, amount_eur=total_eur
-            )
         )
 
     db.commit()

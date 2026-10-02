@@ -10,15 +10,38 @@
       Cargando...
     </div>
   } @else if (overview()) {
-    @if (!overview()!.has_month_record) {
-      <div class="rounded-2xl bg-slate-800/60 px-4 py-3 text-sm text-slate-400 ring-1 ring-white/10">
-        Este mes todavía no tiene balances guardados en el panel principal, pero puedes registrar aquí el detalle
-        de tu inversión libremente.
-      </div>
-    }
+    @if (overview()!.has_investment_data === false) {
+      <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+              <path
+                fill-rule="evenodd"
+                d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-white">Todavía no hay datos para este mes</h3>
+            <p class="mt-1 text-sm text-slate-400">
+              Despliega una categoría y registra totales o posiciones cuando quieras empezar el mes.
+            </p>
+          </div>
+        </div>
+      </section>
+    } @else {
+      @if (!overview()!.has_month_record) {
+        <div class="rounded-2xl bg-slate-800/60 px-4 py-3 text-sm text-slate-400 ring-1 ring-white/10">
+          Este mes todavía no tiene balances guardados en el panel principal, pero puedes registrar aquí el detalle
+          de tu inversión libremente.
+        </div>
+      }
 
-    <!-- ==================== TOTAL INVERTIDO ==================== -->
-    <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
+      <!-- ==================== TOTAL INVERTIDO ==================== -->
+      <section class="rounded-2xl bg-slate-800/60 p-6 ring-1 ring-white/10">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Total invertido</h2>
@@ -88,6 +111,7 @@
       </div>
       <p class="mt-4 text-center text-xs text-slate-500">Pulsa una categoría para desplegar su detalle.</p>
     </section>
+    }
 
     <!-- ==================== CATEGORÍAS: FONDOS / ACCIONES / CRYPTO (desplegables) ==================== -->
     <section class="flex flex-col gap-4">
@@ -191,111 +215,12 @@
               @if (panel(cat.category_id).loadingDetail) {
                 <div class="py-8 text-center text-sm text-slate-500">Cargando...</div>
               } @else if (panel(cat.category_id).detail) {
-                <!-- ---- Total de categoría ---- -->
                 <div class="mb-5">
                   <span class="mb-1 block text-sm font-medium text-slate-300">Total de la categoría</span>
-                  @if (!isCategoryTotalEditing(cat.category_id)) {
-                    <div class="flex items-center gap-2">
-                      <div
-                        class="relative min-w-0 flex-1 cursor-pointer rounded-xl ring-1 ring-white/10 transition hover:ring-white/20"
-                        role="button"
-                        tabindex="0"
-                        title="Editar total de categoría"
-                        (click)="startCategoryTotalEdit(cat.category_id)"
-                        (keydown.enter)="startCategoryTotalEdit(cat.category_id)"
-                      >
-                        <input
-                          type="text"
-                          readonly
-                          tabindex="-1"
-                          aria-hidden="true"
-                          class="pointer-events-none w-full cursor-default rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none"
-                          [value]="categoryTotalInputDisplay(cat.category_id)"
-                        />
-                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
-                      </div>
-                      <button
-                        type="button"
-                        title="Editar total de categoría"
-                        aria-label="Editar total de categoría"
-                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 ring-1 ring-white/10 transition hover:bg-white/5 hover:text-indigo-300"
-                        (click)="startCategoryTotalEdit(cat.category_id)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                          <path d="m2.695 14.363 1.414-1.414 9.193 9.193-1.414 1.414-9.193-9.193ZM16.707 2.293a1 1 0 0 1 0 1.414l-8.25 8.25a1 1 0 0 1-.707.293H5a1 1 0 0 1-1-1v-2.75a1 1 0 0 1 .293-.707l8.25-8.25a1 1 0 0 1 1.414 0Z" />
-                        </svg>
-                      </button>
-                    </div>
-                  } @else {
-                    <div class="relative">
-                      <input
-                        type="text"
-                        inputmode="decimal"
-                        placeholder="0,00"
-                        class="w-full rounded-xl border-none bg-slate-900/60 px-3 py-2.5 pr-10 text-sm text-white outline-none ring-2 ring-indigo-500"
-                        [value]="categoryTotalInputDisplay(cat.category_id)"
-                        (input)="onCategoryTotalDraftChange(cat.category_id, $any($event.target).value)"
-                      />
-                      <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">€</span>
-                    </div>
-                    <p class="mt-1.5 text-xs text-slate-500">
-                      Suma de activos: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }}
-                    </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        class="transaction-reload-btn"
-                        title="Igualar el total a la suma de activos desglosados"
-                        aria-label="Sincronizar total con suma de activos"
-                        [disabled]="panel(cat.category_id).savingCategoryTotal"
-                        (click)="syncCategoryTotalToAllocated(cat.category_id)"
-                      >
-                        <svg
-                          class="transaction-reload-btn-icon"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                          <path d="M21 3v6h-6" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        [disabled]="!canConfirmCategoryTotal(cat.category_id)"
-                        (click)="confirmCategoryTotal(cat.category_id)"
-                      >
-                        @if (panel(cat.category_id).savingCategoryTotal) {
-                          Guardando...
-                        } @else {
-                          Confirmar
-                        }
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        [disabled]="panel(cat.category_id).savingCategoryTotal"
-                        (click)="cancelCategoryTotalEdit(cat.category_id)"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  }
-                  @if (categoryOthersDisplay(cat.category_id) > 0) {
-                    <p class="mt-2 text-xs text-slate-500">
-                      Incluye {{ categoryOthersDisplay(cat.category_id) | eurCurrency }} en «Otros»
-                      (activos desglosados: {{ panel(cat.category_id).detail!.allocated_amount_eur | eurCurrency }})
-                    </p>
-                  } @else if (isCategoryTotalEditing(cat.category_id)) {
-                    <p class="mt-2 text-xs text-slate-500">
-                      Puedes subir el total por encima de la suma; el excedente aparecerá como «Otros».
-                    </p>
-                  }
+                  <p class="text-lg font-semibold tabular-nums text-white">
+                    {{ categoryTotalDisplay(cat.category_id) | eurCurrency }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500">Suma de los activos registrados este mes (EUR).</p>
                   <div class="mt-2 flex items-center gap-3">
                     <input
                       type="range"
@@ -490,20 +415,6 @@
                                   </div>
                                 </td>
                               </tr>
-                          }
-                          @if (categoryOthersDisplay(cat.category_id) > 0) {
-                            <tr class="border-t border-white/5 bg-slate-900/20">
-                              <td class="px-3 py-2 text-slate-400 italic">Otros</td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-400">
-                                {{ categoryOthersDisplay(cat.category_id) | eurCurrency }}
-                              </td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              <td class="px-3 py-2 text-right tabular-nums text-slate-500">—</td>
-                              <td class="px-3 py-2"></td>
-                            </tr>
                           }
                         </tbody>
                       </table>

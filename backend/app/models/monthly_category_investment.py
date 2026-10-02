@@ -8,11 +8,10 @@ from app.core.database import Base
 
 
 class MonthlyCategoryInvestment(Base):
-    """Total invertido (en EUR) por categoría de inversión, mes a mes.
+    """Legacy: totales manuales por categoría. La app ya no lee ni escribe esta tabla.
 
-    Desacoplada de monthly_records: se referencia directamente por (year, month)
-    para poder registrar datos de inversión en cualquier mes, tenga o no
-    balances de entidades guardados en el panel principal.
+    Los totales del detalle de inversión salen de monthly_asset_investments.
+    Pendiente DROP en BD.
     """
 
     __tablename__ = "monthly_category_investments"

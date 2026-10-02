@@ -10,7 +10,6 @@ import {
   AssetTypeUpdate,
   CategoryAssetDisplayOrderUpdate,
   CategoryDetailResponse,
-  CategoryInvestmentsUpsert,
   InvestmentCategory,
   InvestmentOverviewResponse,
   LinkedInvestedTotalResponse,
@@ -60,14 +59,6 @@ export class InvestmentApiService {
 
   getOverview(year: number, month: number): Observable<InvestmentOverviewResponse> {
     return this.http.get<InvestmentOverviewResponse>(`${this.baseUrl}/${year}/${month}`);
-  }
-
-  upsertCategories(
-    year: number,
-    month: number,
-    payload: CategoryInvestmentsUpsert,
-  ): Observable<InvestmentOverviewResponse> {
-    return this.http.post<InvestmentOverviewResponse>(`${this.baseUrl}/${year}/${month}/categories`, payload);
   }
 
   getCategoryDetail(year: number, month: number, categoryId: string): Observable<CategoryDetailResponse> {

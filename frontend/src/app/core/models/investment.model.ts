@@ -54,24 +54,14 @@ export interface LinkedInvestedTotalResponse {
   asset_count: number;
 }
 
-export interface CategoryInvestmentInput {
-  category_id: string;
-  amount_eur: number;
-}
-
-export interface CategoryInvestmentsUpsert {
-  categories: CategoryInvestmentInput[];
-}
-
 export interface CategoryOverview {
   category_id: string;
   name: string;
   color: string | null;
   amount_eur: number;
   percentage: number;
-  /** false para categorías cuyo total se calcula solo a partir de sus activos (Acciones). */
+  /** Legacy API: siempre false (totales derivados de activos). */
   editable: boolean;
-  /** true si ya hay un valor manual guardado para este mes concreto (solo aplica a editables). */
   saved_this_month: boolean;
 }
 
@@ -81,6 +71,8 @@ export interface InvestmentOverviewResponse {
   total_invested: number;
   /** Suma de categorías del detalle; puede diferir del panel principal. */
   has_month_record: boolean;
+  /** True si hay filas en monthly_asset_investments para el mes (p. ej. tras apertura automática). */
+  has_investment_data: boolean;
   categories: CategoryOverview[];
   previous_year: number;
   previous_month: number;
@@ -94,8 +86,6 @@ export interface AssetInvestmentInput {
 
 export interface AssetInvestmentsUpsert {
   assets: AssetInvestmentInput[];
-  /** Total declarado en EUR; debe ser >= suma de activos. El excedente es «Otros». */
-  category_amount_eur?: number | null;
 }
 
 export interface AssetInvestmentDetail {

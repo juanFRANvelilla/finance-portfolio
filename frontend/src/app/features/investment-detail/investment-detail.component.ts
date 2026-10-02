@@ -82,10 +82,6 @@ interface CategoryPanelState {
   newAssetTicker: string;
   newAssetCurrency: string;
   creatingAsset: boolean;
-  /** Borrador mientras se edita el total de categoría inline. */
-  categoryTotalDraft: string;
-  categoryTotalEditing: boolean;
-  savingCategoryTotal: boolean;
   /** Orden guardado al entrar en «Editar activos» (assetTypeId → display_order). */
   assetOrderSnapshot: Record<string, number>;
   savingAssetOrder: boolean;
@@ -105,9 +101,6 @@ function createPanelState(): CategoryPanelState {
     newAssetTicker: '',
     newAssetCurrency: 'EUR',
     creatingAsset: false,
-    categoryTotalDraft: '',
-    categoryTotalEditing: false,
-    savingCategoryTotal: false,
     assetOrderSnapshot: {},
     savingAssetOrder: false,
   };
@@ -609,14 +602,7 @@ export class InvestmentDetailComponent {
       assetEditMode: autoEdit,
       assetRows,
       fxUsdToEur: detail.fx_usd_to_eur,
-      categoryTotalDraft: this.categoryTotalDisplayString(detail),
-      categoryTotalEditing: false,
-      savingCategoryTotal: false,
     });
-  }
-
-  private categoryTotalDisplayString(detail: CategoryDetailResponse): string {
-    return String(Math.max(detail.category_amount_eur, detail.allocated_amount_eur)).replace('.', ',');
   }
 
   categoryInputPercentage(categoryId: string): string {
@@ -626,115 +612,9 @@ export class InvestmentDetailComponent {
     return ((value / total) * 100).toFixed(1);
   }
 
-  /** Total de categoría declarado (sidebar / donut). */
+  /** Total de categoría (suma EUR de activos del mes). */
   categoryTotalDisplay(categoryId: string): number {
-    const p = this.panel(categoryId);
-    if (p.categoryTotalEditing) {
-      const allocated = p.detail?.allocated_amount_eur ?? 0;
-      const parsed = parseDecimalInput(p.categoryTotalDraft);
-      const value = parsed === null ? allocated : parsed;
-      return Math.max(value, allocated);
-    }
-    return p.detail?.category_amount_eur ?? 0;
-  }
-
-  categoryTotalInputDisplay(categoryId: string): string {
-    const p = this.panel(categoryId);
-    if (p.categoryTotalEditing) {
-      return p.categoryTotalDraft;
-    }
-    const detail = p.detail;
-    return detail ? this.categoryTotalDisplayString(detail) : '';
-  }
-
-  categoryOthersDisplay(categoryId: string): number {
-    const p = this.panel(categoryId);
-    const allocated = p.detail?.allocated_amount_eur ?? 0;
-    if (p.categoryTotalEditing) {
-      return Math.max(0, this.categoryTotalDisplay(categoryId) - allocated);
-    }
-    return p.detail?.others_amount_eur ?? 0;
-  }
-
-  isCategoryTotalEditing(categoryId: string): boolean {
-    return this.panel(categoryId).categoryTotalEditing;
-  }
-
-  startCategoryTotalEdit(categoryId: string): void {
-    const detail = this.panel(categoryId).detail;
-    if (!detail) {
-      return;
-    }
-    this.updatePanel(categoryId, {
-      categoryTotalEditing: true,
-      categoryTotalDraft: this.categoryTotalDisplayString(detail),
-      errorMessage: null,
-    });
-  }
-
-  cancelCategoryTotalEdit(categoryId: string): void {
-    const detail = this.panel(categoryId).detail;
-    this.updatePanel(categoryId, {
-      categoryTotalEditing: false,
-      categoryTotalDraft: detail ? this.categoryTotalDisplayString(detail) : '',
-    });
-  }
-
-  onCategoryTotalDraftChange(categoryId: string, value: string): void {
-    this.updatePanel(categoryId, { categoryTotalDraft: value });
-  }
-
-  syncCategoryTotalToAllocated(categoryId: string): void {
-    const allocated = this.panel(categoryId).detail?.allocated_amount_eur ?? 0;
-    this.updatePanel(categoryId, {
-      categoryTotalDraft: String(allocated).replace('.', ','),
-    });
-  }
-
-  hasCategoryTotalPendingChange(categoryId: string): boolean {
-    const p = this.panel(categoryId);
-    if (!p.detail || !p.categoryTotalEditing) {
-      return false;
-    }
-    const saved = Math.round(p.detail.category_amount_eur * 100) / 100;
-    const draft = Math.round(this.categoryTotalDisplay(categoryId) * 100) / 100;
-    return Math.abs(draft - saved) >= 0.005;
-  }
-
-  canConfirmCategoryTotal(categoryId: string): boolean {
-    const p = this.panel(categoryId);
-    if (!p.detail || p.savingCategoryTotal || !this.hasCategoryTotalPendingChange(categoryId)) {
-      return false;
-    }
-    const allocated = p.detail.allocated_amount_eur;
-    const total = this.categoryTotalDisplay(categoryId);
-    return total + 0.001 >= allocated;
-  }
-
-  confirmCategoryTotal(categoryId: string): void {
-    const p = this.panel(categoryId);
-    if (!p.detail || !this.canConfirmCategoryTotal(categoryId)) {
-      return;
-    }
-
-    this.updatePanel(categoryId, { savingCategoryTotal: true, errorMessage: null });
-    this.api
-      .upsertCategoryAssets(this.year(), this.month(), categoryId, {
-        assets: [],
-        category_amount_eur: this.categoryTotalDisplay(categoryId),
-      })
-      .subscribe({
-        next: (response) => {
-          this.applyDetail(categoryId, response);
-          this.loadOverview();
-        },
-        error: (err) => {
-          this.updatePanel(categoryId, {
-            savingCategoryTotal: false,
-            errorMessage: this.extractError(err, 'No se pudo guardar el total de categoría.'),
-          });
-        },
-      });
+    return this.panel(categoryId).detail?.allocated_amount_eur ?? 0;
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
@@ -869,9 +749,6 @@ export class InvestmentDetailComponent {
         value: a.amount_eur,
         color: this.fallbackColor(i),
       }));
-    if (detail.others_amount_eur > 0) {
-      segments.push({ id: '__others__', label: 'Otros', value: detail.others_amount_eur, color: this.othersColor() });
-    }
     return segments;
   }
 
@@ -1096,10 +973,6 @@ export class InvestmentDetailComponent {
   private fallbackColor(index: number): string {
     const palette = this.fallbackPalette();
     return palette[index % palette.length];
-  }
-
-  private othersColor(): string {
-    return readCssVar(this.host.nativeElement, '--others-color', '#64748b');
   }
 
   private extractError(err: unknown, fallback: string): string {

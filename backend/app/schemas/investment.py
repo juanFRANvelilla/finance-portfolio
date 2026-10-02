@@ -91,15 +91,6 @@ class LinkedInvestedTotalResponse(BaseModel):
     asset_count: int
 
 
-class CategoryInvestmentInput(BaseModel):
-    category_id: str
-    amount_eur: float = Field(ge=0)
-
-
-class CategoryInvestmentsUpsert(BaseModel):
-    categories: list[CategoryInvestmentInput]
-
-
 class CategoryOverview(BaseModel):
     category_id: str
     name: str
@@ -117,6 +108,8 @@ class InvestmentOverviewResponse(BaseModel):
     """Suma de todas las categorías del detalle de inversión (puede diferir del panel principal)."""
     has_month_record: bool
     """Indica si el mes tiene balances guardados en el panel principal (monthly_records)."""
+    has_investment_data: bool = False
+    """True si hay al menos una fila en monthly_asset_investments para ese mes."""
     categories: list[CategoryOverview]
     previous_year: int
     previous_month: int
@@ -130,11 +123,6 @@ class AssetInvestmentInput(BaseModel):
 
 class AssetInvestmentsUpsert(BaseModel):
     assets: list[AssetInvestmentInput]
-    category_amount_eur: float | None = Field(
-        default=None,
-        ge=0,
-        description="Total declarado de la categoría en EUR. Debe ser >= suma de activos; el excedente es «Otros».",
-    )
 
 
 class AssetInvestmentDetail(BaseModel):
@@ -162,10 +150,11 @@ class CategoryDetailResponse(BaseModel):
     category_id: str
     category_name: str
     is_computed: bool
-    """True para Acciones: category_amount_eur es la suma de sus activos, no un valor manual."""
+    """True: category_amount_eur es la suma en EUR de monthly_asset_investments."""
     category_amount_eur: float
     fx_usd_to_eur: float | None = None
     """Tipo de cambio USD→EUR usado para convertir activos de este mes (informativo)."""
     assets: list[AssetInvestmentDetail]
     allocated_amount_eur: float
-    others_amount_eur: float
+    others_amount_eur: float = 0.0
+    """Siempre 0; legacy en API (antes «Otros» sobre total manual de categoría)."""
