@@ -37,19 +37,14 @@ cuando entra una transacción nueva.
   **ejecución** de la operación (la que viene del correo o de KuCoin), nunca
   la fecha de "hoy" en que corre el script.
 
-## Campo nuevo: `asset_transactions.executed_at`
+## Campo `asset_transactions.executed_at`
 
-- `transaction_date` (Date) no cambia de significado: sigue siendo el día de
-  negocio usado para cortes de mes, ledger, etc.
-- Se añade `executed_at` (timestamp) con la fecha y hora exacta de la
-  operación:
-  - **KuCoin**: `createdAt` del fill (ya viene en ms; hoy se trunca a día al
-    calcular `transaction_date`. Hay que conservar también la hora).
-  - **MyInvestor**: el grupo "Fecha y Hora Ejecución" del correo (hoy
-    `parse_trade.py` solo usa "Fecha Operación" para `transaction_date`; hay
-    que capturar también la hora de ejecución, hoy sin usar en el dataclass).
-- Esta hora es la que se compara contra `last_update`. El día solo no basta:
-  un cambio a mano y una automatización pueden caer el mismo día.
+- `transaction_date` (Date): día de negocio del exchange/correo (KuCoin
+  `createdAt`, MyInvestor fecha operación). Cortes de mes, ledger, ventas diarias.
+- `executed_at` (timestamp): **momento del insert en BD** (`insert_transactions_batch`
+  usa `datetime.now()`). No es la hora del fill en KuCoin ni del correo.
+- El snapshot mensual y la regla frente a `last_update` usan **`executed_at`**
+  (mes natural = mes en que se registra la fila, salvo fills duplicados que no insertan).
 
 ## Regla de actualización
 

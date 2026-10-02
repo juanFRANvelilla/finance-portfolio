@@ -1,6 +1,9 @@
+import logging
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
@@ -46,6 +49,41 @@ COMPUTED_CATEGORY_IDS = {"acciones"}
 
 def _round2(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01")))
+
+
+def _round8_units(value) -> float:
+    return float(Decimal(str(value)).quantize(Decimal("0.00000001")))
+
+
+def _pick_canonical_monthly_rows(
+    rows: list[MonthlyAssetInvestment],
+) -> dict[UUID, MonthlyAssetInvestment]:
+    """Si hay filas duplicadas (mismo activo/mes), queda la de `last_update` más reciente."""
+    canonical: dict[UUID, MonthlyAssetInvestment] = {}
+    for row in rows:
+        previous = canonical.get(row.asset_type_id)
+        if previous is None:
+            canonical[row.asset_type_id] = row
+            continue
+        row_ts = row.last_update or datetime.min
+        prev_ts = previous.last_update or datetime.min
+        if row_ts >= prev_ts:
+            canonical[row.asset_type_id] = row
+    return canonical
+
+
+def _monthly_rows_for_asset_month(
+    db: Session, *, year: int, month: int, asset_type_id: UUID
+) -> list[MonthlyAssetInvestment]:
+    return list(
+        db.scalars(
+            select(MonthlyAssetInvestment).where(
+                MonthlyAssetInvestment.year == year,
+                MonthlyAssetInvestment.month == month,
+                MonthlyAssetInvestment.asset_type_id == asset_type_id,
+            )
+        ).all()
+    )
 
 
 def _previous_year_month(year: int, month: int) -> tuple[int, int]:
@@ -537,28 +575,30 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
     saved_assets: dict[UUID, MonthlyAssetInvestment] = {}
     prev_assets: dict[UUID, MonthlyAssetInvestment] = {}
     if asset_type_ids:
-        saved_assets = {
-            row.asset_type_id: row
-            for row in db.scalars(
-                select(MonthlyAssetInvestment).where(
-                    MonthlyAssetInvestment.year == year,
-                    MonthlyAssetInvestment.month == month,
-                    MonthlyAssetInvestment.asset_type_id.in_(asset_type_ids),
-                )
-            ).all()
-        }
+        saved_assets = _pick_canonical_monthly_rows(
+            list(
+                db.scalars(
+                    select(MonthlyAssetInvestment).where(
+                        MonthlyAssetInvestment.year == year,
+                        MonthlyAssetInvestment.month == month,
+                        MonthlyAssetInvestment.asset_type_id.in_(asset_type_ids),
+                    )
+                ).all()
+            )
+        )
 
         prev_year, prev_month = _previous_year_month(year, month)
-        prev_assets = {
-            row.asset_type_id: row
-            for row in db.scalars(
-                select(MonthlyAssetInvestment).where(
-                    MonthlyAssetInvestment.year == prev_year,
-                    MonthlyAssetInvestment.month == prev_month,
-                    MonthlyAssetInvestment.asset_type_id.in_(asset_type_ids),
-                )
-            ).all()
-        }
+        prev_assets = _pick_canonical_monthly_rows(
+            list(
+                db.scalars(
+                    select(MonthlyAssetInvestment).where(
+                        MonthlyAssetInvestment.year == prev_year,
+                        MonthlyAssetInvestment.month == prev_month,
+                        MonthlyAssetInvestment.asset_type_id.in_(asset_type_ids),
+                    )
+                ).all()
+            )
+        )
 
     tx_totals_by_asset = transaction_totals_by_asset_type(db, asset_type_ids, year=year, month=month)
     asset_ids_with_sale = asset_type_ids_with_sale_in_month(db, asset_type_ids, year, month)
@@ -590,9 +630,9 @@ def _build_category_detail(db: Session, year: int, month: int, category: Investm
                 entity_name=asset.entity.name if asset.entity else None,
                 amount=amount,
                 amount_eur=amount_eur,
-                units=float(saved.units) if saved and saved.units is not None else None,
+                units=_round8_units(saved.units) if saved and saved.units is not None else None,
                 previous_amount=prev_amount,
-                previous_units=float(prev.units) if prev and prev.units is not None else None,
+                previous_units=_round8_units(prev.units) if prev and prev.units is not None else None,
                 suggested_amount=suggested_amount,
                 suggested_units=suggested_units,
                 has_transactions=tx_totals is not None,
@@ -647,6 +687,31 @@ def upsert_category_assets(
     se puede registrar/actualizar en cualquier momento, con o sin datos del mes anterior."""
     category = _get_category_or_404(db, category_id)
 
+    if not payload.assets:
+        logger.warning(
+            "POST upsert_category_assets: category=%s %s-%02d sin activos en payload "
+            "(solo puede actualizar total de categoría)",
+            category_id,
+            year,
+            month,
+        )
+
+    logger.info(
+        "POST upsert_category_assets: category=%s %s-%02d payload.assets=%s category_amount_eur=%s",
+        category_id,
+        year,
+        month,
+        [
+            {
+                "asset_type_id": str(item.asset_type_id),
+                "amount": item.amount,
+                "units": item.units,
+            }
+            for item in payload.assets
+        ],
+        payload.category_amount_eur,
+    )
+
     asset_types_by_id = {
         a.id: a for a in db.scalars(select(AssetType).where(AssetType.category_id == category.id)).all()
     }
@@ -660,19 +725,42 @@ def upsert_category_assets(
         )
 
     for item in payload.assets:
-        existing = db.scalars(
-            select(MonthlyAssetInvestment).where(
-                MonthlyAssetInvestment.year == year,
-                MonthlyAssetInvestment.month == month,
-                MonthlyAssetInvestment.asset_type_id == item.asset_type_id,
+        asset_name = asset_types_by_id.get(item.asset_type_id)
+        asset_label = asset_name.name if asset_name else str(item.asset_type_id)
+        matching_rows = _monthly_rows_for_asset_month(
+            db, year=year, month=month, asset_type_id=item.asset_type_id
+        )
+        if len(matching_rows) > 1:
+            logger.warning(
+                "monthly_asset_investments: %s filas duplicadas para %s (%s) %s-%02d; "
+                "se actualizarán todas",
+                len(matching_rows),
+                asset_label,
+                item.asset_type_id,
+                year,
+                month,
             )
-        ).first()
+
         manual_touch = datetime.now()
-        if existing is not None:
-            existing.amount = item.amount
-            existing.units = item.units
-            existing.last_update = manual_touch
+        if matching_rows:
+            action = "actualizado"
+            for row in matching_rows:
+                logger.info(
+                    "monthly_asset_investments ANTES id=%s %s (%s) %s-%02d: amount=%s units=%s last_update=%s",
+                    row.id,
+                    asset_label,
+                    item.asset_type_id,
+                    year,
+                    month,
+                    row.amount,
+                    row.units,
+                    row.last_update,
+                )
+                row.amount = item.amount
+                row.units = item.units
+                row.last_update = manual_touch
         else:
+            action = "creado"
             db.add(
                 MonthlyAssetInvestment(
                     year=year,
@@ -683,6 +771,16 @@ def upsert_category_assets(
                     last_update=manual_touch,
                 )
             )
+        logger.info(
+            "monthly_asset_investments %s manualmente: %s (%s) %s-%02d amount=%s units=%s",
+            action,
+            asset_label,
+            item.asset_type_id,
+            year,
+            month,
+            item.amount,
+            item.units,
+        )
 
     allocated_eur = Decimal("0")
     saved_rows = db.scalars(
@@ -733,4 +831,40 @@ def upsert_category_assets(
 
     db.commit()
 
-    return _build_category_detail(db, year, month, category)
+    for item in payload.assets:
+        asset_meta = asset_types_by_id.get(item.asset_type_id)
+        asset_label = asset_meta.name if asset_meta else str(item.asset_type_id)
+        after_rows = _monthly_rows_for_asset_month(
+            db, year=year, month=month, asset_type_id=item.asset_type_id
+        )
+        logger.info(
+            "monthly_asset_investments DESPUÉS commit: %s (%s) %s-%02d → %s fila(s) %s",
+            asset_label,
+            item.asset_type_id,
+            year,
+            month,
+            len(after_rows),
+            [
+                {
+                    "id": str(r.id),
+                    "amount": float(r.amount),
+                    "units": _round8_units(r.units) if r.units is not None else None,
+                    "last_update": r.last_update.isoformat() if r.last_update else None,
+                }
+                for r in after_rows
+            ],
+        )
+
+    detail = _build_category_detail(db, year, month, category)
+    for asset_detail in detail.assets:
+        if payload.assets and any(
+            item.asset_type_id == asset_detail.asset_type_id for item in payload.assets
+        ):
+            logger.info(
+                "POST upsert respuesta API: %s amount=%s units=%s amount_eur=%s",
+                asset_detail.name,
+                asset_detail.amount,
+                asset_detail.units,
+                asset_detail.amount_eur,
+            )
+    return detail

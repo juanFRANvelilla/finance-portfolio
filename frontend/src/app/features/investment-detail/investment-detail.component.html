@@ -413,7 +413,11 @@
                                   </div>
                                 </td>
                                 <td class="px-3 py-2 text-right tabular-nums text-slate-400">
-                                  {{ asset.units ?? '—' }}
+                                  @if (asset.units !== null && asset.units !== undefined) {
+                                    {{ asset.units | number: '1.0-8' }}
+                                  } @else {
+                                    —
+                                  }
                                 </td>
                                 <td class="px-3 py-2 text-right tabular-nums text-slate-300">
                                   @if (importeDisplayForAsset(asset); as importe) {
@@ -680,7 +684,7 @@
     [livePriceUpdatedAt]="livePriceFor(assetMonthlyTarget()!.asset_type_id)?.updated_at ?? null"
     [livePriceEurMode]="isLivePriceEurMode(assetMonthlyTarget()!.asset_type_id)"
     (close)="closeAssetMonthlyDialog()"
-    (saved)="onAssetMonthlySaved(assetMonthlyCategoryId()!)"
+    (saved)="onAssetMonthlySaved(assetMonthlyCategoryId()!, $event)"
     (toggleEurMode)="toggleMonthlyDialogEurMode()"
     (draftChange)="onAssetMonthlyDraftChange($event)"
   />

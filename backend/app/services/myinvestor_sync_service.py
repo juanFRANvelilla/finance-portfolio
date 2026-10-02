@@ -181,7 +181,6 @@ def sync_myinvestor_transactions(
                         "exchange_trade_id": exchange_trade_id,
                         "asset_type_id": asset.asset_type_id,
                         "transaction_date": trade.transaction_date,
-                        "executed_at": trade.execution_datetime,
                         "invested_amount": amounts.invested_amount,
                         "asset_amount": amounts.asset_amount,
                         "execution_price": amounts.execution_price,

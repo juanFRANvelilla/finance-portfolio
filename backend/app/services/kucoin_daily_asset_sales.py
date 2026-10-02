@@ -99,12 +99,12 @@ def build_daily_kucoin_sale_row(
     sells = db.execute(
         text(
             """
-            SELECT asset_amount, execution_price, fee_amount, executed_at
+            SELECT asset_amount, execution_price, fee_amount, id
             FROM public.asset_transactions
             WHERE asset_type_id = :asset_type_id
               AND transaction_date = :sale_date
               AND asset_amount < 0
-            ORDER BY executed_at NULLS LAST, id
+            ORDER BY id
             """
         ),
         {"asset_type_id": asset_type_id, "sale_date": sale_date},
@@ -113,7 +113,7 @@ def build_daily_kucoin_sale_row(
     if not sells:
         return None
 
-    first_executed_at = sells[0].executed_at
+    first_sell_id = sells[0].id
 
     position_row = db.execute(
         text(
@@ -123,38 +123,19 @@ def build_daily_kucoin_sale_row(
             WHERE asset_type_id = :asset_type_id
               AND (
                 transaction_date < :sale_date
-                OR (
-                  transaction_date = :sale_date
-                  AND executed_at IS NOT NULL
-                  AND executed_at < :first_executed_at
-                )
+                OR (transaction_date = :sale_date AND id < :first_sell_id)
               )
             """
         ),
         {
             "asset_type_id": asset_type_id,
             "sale_date": sale_date,
-            "first_executed_at": first_executed_at,
+            "first_sell_id": str(first_sell_id),
         },
     ).one()
 
     position_units = Decimal(str(position_row[0]))
     position_invested = Decimal(str(position_row[1]))
-
-    if first_executed_at is None:
-        position_row = db.execute(
-            text(
-                """
-                SELECT COALESCE(SUM(asset_amount), 0), COALESCE(SUM(invested_amount), 0)
-                FROM public.asset_transactions
-                WHERE asset_type_id = :asset_type_id
-                  AND transaction_date < :sale_date
-                """
-            ),
-            {"asset_type_id": asset_type_id, "sale_date": sale_date},
-        ).one()
-        position_units = Decimal(str(position_row[0]))
-        position_invested = Decimal(str(position_row[1]))
 
     if position_units <= 0:
         position_units = Decimal("0")

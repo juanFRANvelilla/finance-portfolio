@@ -1,5 +1,7 @@
 """Consultas e inserciones sobre asset_transactions."""
 
+import logging
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -8,6 +10,8 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models.asset_transaction import AssetTransaction
+
+logger = logging.getLogger(__name__)
 
 FALLBACK_SYNC_START = datetime(2025, 11, 20)
 
@@ -117,13 +121,13 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int,
     (los duplicados por `exchange_trade_id` no salen en esa lista). Se usa para
     actualizar monthly_asset_investments solo con lo que es realmente nuevo.
     """
-    import uuid
-
     insertados = 0
     omitidos = 0
     fills_insertados: list[dict] = []
 
     for fill in fills:
+        row_id = str(uuid.uuid4())
+        recorded_at = datetime.now()
         result = db.execute(
             text(
                 """
@@ -137,10 +141,10 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int,
                 """
             ),
             {
-                "id": str(uuid.uuid4()),
+                "id": row_id,
                 "asset_type_id": fill["asset_type_id"],
                 "transaction_date": fill["transaction_date"],
-                "executed_at": fill.get("executed_at"),
+                "executed_at": recorded_at,
                 "invested_amount": fill["invested_amount"],
                 "asset_amount": fill["asset_amount"],
                 "execution_price": fill["execution_price"],
@@ -152,7 +156,15 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int,
             omitidos += 1
         else:
             insertados += 1
-            fills_insertados.append(fill)
+            stored = {**fill, "executed_at": recorded_at}
+            fills_insertados.append(stored)
+            logger.debug(
+                "asset_transactions insertado id=%s trade=%s transaction_date=%s executed_at=%s",
+                row_id,
+                fill.get("exchange_trade_id"),
+                fill.get("transaction_date"),
+                recorded_at.isoformat(),
+            )
 
     db.commit()
     return insertados, omitidos, fills_insertados

@@ -20,7 +20,11 @@ import { AssetSaleDialogComponent } from './components/asset-sale-dialog/asset-s
 import { MONTH_NAMES } from '../../core/models/month-names';
 import { EurCurrencyPipe } from '../../core/pipes/eur-currency.pipe';
 import { DonutSegment, SegmentDonutChartComponent } from '../../shared/components/segment-donut-chart/segment-donut-chart.component';
-import { parseDecimalInput } from '../../core/utils/parse-decimal';
+import {
+  formatAmountForInput,
+  formatUnitsForInput,
+  parseDecimalInput,
+} from '../../core/utils/parse-decimal';
 import { readCssVar } from '../../core/utils/read-css-var';
 import {
   amountToEur,
@@ -902,8 +906,8 @@ export class InvestmentDetailComponent {
   openAssetMonthlyDialog(categoryId: string, asset: AssetInvestmentDetail): void {
     this.assetMonthlyCategoryId.set(categoryId);
     this.assetMonthlyTarget.set(asset);
-    this.assetMonthlyDraftAmount.set(toInputString(asset.amount));
-    this.assetMonthlyDraftUnits.set(toInputString(asset.units));
+    this.assetMonthlyDraftAmount.set(formatAmountForInput(asset.amount));
+    this.assetMonthlyDraftUnits.set(formatUnitsForInput(asset.units));
     this.assetMonthlyDialogOpen.set(true);
   }
 
@@ -938,19 +942,10 @@ export class InvestmentDetailComponent {
     );
   }
 
-  onAssetMonthlySaved(categoryId: string): void {
+  onAssetMonthlySaved(categoryId: string, detail: CategoryDetailResponse): void {
     this.closeAssetMonthlyDialog();
-    this.api.getCategoryDetail(this.year(), this.month(), categoryId).subscribe({
-      next: (detail) => {
-        this.applyDetail(categoryId, detail);
-        this.loadOverview();
-      },
-      error: () => {
-        this.updatePanel(categoryId, {
-          errorMessage: 'Se guardó la posición, pero no se pudo refrescar el detalle.',
-        });
-      },
-    });
+    this.applyDetail(categoryId, detail);
+    this.loadOverview();
   }
 
   toggleMonthlyDialogEurMode(): void {

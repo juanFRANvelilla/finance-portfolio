@@ -2,9 +2,16 @@ import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { AssetInvestmentDetail } from '../../../../core/models/investment.model';
+import {
+  AssetInvestmentDetail,
+  CategoryDetailResponse,
+} from '../../../../core/models/investment.model';
 import { InvestmentApiService } from '../../../../core/services/investment-api.service';
-import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
+import {
+  formatAmountForInput,
+  formatUnitsForInput,
+  parseDecimalInput,
+} from '../../../../core/utils/parse-decimal';
 
 /** Métricas en vivo pasadas desde el padre (precio, valor, P/L). */
 export interface AssetMonthlyLiveMetrics {
@@ -14,10 +21,6 @@ export interface AssetMonthlyLiveMetrics {
   marketValue: number | null;
   profit: number | null;
   profitPct: number | null;
-}
-
-function toInputString(value: number | null | undefined): string {
-  return value === null || value === undefined ? '' : String(value);
 }
 
 @Component({
@@ -39,7 +42,7 @@ export class AssetMonthlyPositionDialogComponent {
   readonly livePriceEurMode = input(false);
 
   readonly close = output<void>();
-  readonly saved = output<void>();
+  readonly saved = output<CategoryDetailResponse>();
   readonly toggleEurMode = output<void>();
   readonly draftChange = output<{ amount: string; units: string }>();
 
@@ -48,17 +51,26 @@ export class AssetMonthlyPositionDialogComponent {
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
+  /** Evita que un refresh del `asset` input borre lo que el usuario está escribiendo. */
+  private seededDialogKey: string | null = null;
+
   constructor() {
     effect(() => {
       if (!this.open()) {
+        this.seededDialogKey = null;
         return;
       }
       const asset = this.asset();
       if (!asset) {
         return;
       }
-      this.amount.set(toInputString(asset.amount));
-      this.units.set(toInputString(asset.units));
+      const key = `${asset.asset_type_id}:${this.year()}:${this.month()}`;
+      if (this.seededDialogKey === key) {
+        return;
+      }
+      this.seededDialogKey = key;
+      this.amount.set(formatAmountForInput(asset.amount));
+      this.units.set(formatUnitsForInput(asset.units));
       this.errorMessage.set(null);
       this.emitDraft();
     });
@@ -120,23 +132,36 @@ export class AssetMonthlyPositionDialogComponent {
       return;
     }
 
-    this.saving.set(true);
     this.errorMessage.set(null);
+
+    const amount = parseDecimalInput(this.amount());
+    if (amount === null) {
+      this.errorMessage.set('Importe inválido. Usa coma o punto decimal (p. ej. 15000,50).');
+      return;
+    }
+    const unitsRaw = this.units().trim();
+    const units = unitsRaw === '' ? null : parseDecimalInput(unitsRaw);
+    if (unitsRaw !== '' && units === null) {
+      this.errorMessage.set('Títulos inválidos.');
+      return;
+    }
+
+    this.saving.set(true);
 
     this.investmentApi
       .upsertCategoryAssets(this.year(), this.month(), this.categoryId(), {
         assets: [
           {
             asset_type_id: asset.asset_type_id,
-            amount: parseDecimalInput(this.amount()) ?? 0,
-            units: parseDecimalInput(this.units()),
+            amount,
+            units,
           },
         ],
       })
       .subscribe({
-        next: () => {
+        next: (detail) => {
           this.saving.set(false);
-          this.saved.emit();
+          this.saved.emit(detail);
         },
         error: (err) => {
           this.saving.set(false);

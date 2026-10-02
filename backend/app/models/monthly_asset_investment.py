@@ -33,7 +33,7 @@ class MonthlyAssetInvestment(Base):
         UUID(as_uuid=True), ForeignKey("asset_types.id"), nullable=False
     )
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
-    units: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
+    units: Mapped[float | None] = mapped_column(Numeric(18, 8), nullable=True)
     last_update: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     """Última vez que se tocó esta fila: a mano (momento del guardado) o por una
     automatización (fecha/hora de EJECUCIÓN de la transacción, no la de hoy)."""

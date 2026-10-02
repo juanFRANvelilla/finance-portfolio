@@ -18,6 +18,7 @@ Resumen de la regla:
   toca la fila (se asume que ya se aplicó a mano o en una pasada anterior).
 - `last_update` pasa a ser el `executed_at` más tardío de lo aplicado, nunca
   la fecha de "hoy" en que corre el script.
+- `asset_transactions.executed_at` = timestamp del insert en BD (no hora KuCoin/correo).
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ from app.models.monthly_asset_investment import MonthlyAssetInvestment
 logger = logging.getLogger(__name__)
 
 _AMOUNT_QUANT = Decimal("0.01")
-_UNITS_QUANT = Decimal("0.0001")
+_UNITS_QUANT = Decimal("0.00000001")
 
 
 def _previous_year_month(year: int, month: int) -> tuple[int, int]:
