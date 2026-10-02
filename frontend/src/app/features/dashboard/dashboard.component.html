@@ -167,7 +167,7 @@
     />
   }
 
-  @if (hasTimeline()) {
+  @if (hasTimeline() && !editing()) {
     <section class="rounded-2xl bg-slate-800/60 p-4 ring-1 ring-white/10 sm:p-6">
       <div class="mb-3 flex flex-wrap items-start justify-between gap-2 sm:mb-4">
         <div>
