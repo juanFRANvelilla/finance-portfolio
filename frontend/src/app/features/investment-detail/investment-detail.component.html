@@ -193,18 +193,7 @@
               } @else if (panel(cat.category_id).detail) {
                 <!-- ---- Total de categoría ---- -->
                 <div class="mb-5">
-                  <span class="mb-1 flex items-center justify-between text-sm font-medium text-slate-300">
-                    Total de la categoría
-                    @if (cat.entity_amount_eur > 0) {
-                      <span class="text-xs text-emerald-400">
-                        Previsión {{ cat.entity_names.join(', ') }}: {{ cat.entity_amount_eur | eurCurrency }}
-                      </span>
-                    } @else if (cat.previous_amount_eur !== null) {
-                      <span class="text-xs text-slate-500">
-                        Previsión: {{ suggestedAmount(cat) | eurCurrency }}
-                      </span>
-                    }
-                  </span>
+                  <span class="mb-1 block text-sm font-medium text-slate-300">Total de la categoría</span>
                   @if (!isCategoryTotalEditing(cat.category_id)) {
                     <div class="flex items-center gap-2">
                       <div

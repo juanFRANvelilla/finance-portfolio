@@ -619,17 +619,6 @@ export class InvestmentDetailComponent {
     return String(Math.max(detail.category_amount_eur, detail.allocated_amount_eur)).replace('.', ',');
   }
 
-  /** Previsión del total: entidades vinculadas o mes anterior. */
-  suggestedAmount(cat: CategoryOverview): number {
-    if (cat.entity_amount_eur > 0) {
-      return cat.entity_amount_eur;
-    }
-    if (cat.suggested_amount_eur !== null && cat.suggested_amount_eur !== undefined) {
-      return cat.suggested_amount_eur;
-    }
-    return cat.previous_amount_eur ?? 0;
-  }
-
   categoryInputPercentage(categoryId: string): string {
     const total = this.overview()?.total_invested ?? 0;
     if (!total) return '0.0';
@@ -749,20 +738,16 @@ export class InvestmentDetailComponent {
   }
 
   private buildAssetRows(detail: CategoryDetailResponse): AssetRow[] {
-    const rows = detail.assets.map((asset) => {
-      const hasSaved = asset.amount > 0 || asset.units !== null;
-      const fallbackAmount = asset.suggested_amount ?? asset.previous_amount ?? 0;
-      return {
-        assetTypeId: asset.asset_type_id,
-        name: asset.name,
-        ticker: asset.ticker,
-        currency: asset.currency,
-        displayOrder: String(asset.display_order),
-        amount: toInputString(hasSaved ? asset.amount : fallbackAmount),
-        units: toInputString(hasSaved ? asset.units : (asset.suggested_units ?? asset.previous_units ?? null)),
-        hasTransactions: asset.has_transactions ?? false,
-      };
-    });
+    const rows = detail.assets.map((asset) => ({
+      assetTypeId: asset.asset_type_id,
+      name: asset.name,
+      ticker: asset.ticker,
+      currency: asset.currency,
+      displayOrder: String(asset.display_order),
+      amount: formatAmountForInput(asset.amount),
+      units: formatUnitsForInput(asset.units),
+      hasTransactions: asset.has_transactions ?? false,
+    }));
     return this.sortAssetRows(rows);
   }
 

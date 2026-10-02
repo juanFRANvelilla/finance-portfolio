@@ -14,7 +14,6 @@ import {
   InvestmentCategory,
   InvestmentOverviewResponse,
   LinkedInvestedTotalResponse,
-  AssetTransactionPreviewResponse,
   AssetSaleContextResponse,
   AssetSaleCreate,
   AssetSaleRead,
@@ -96,16 +95,6 @@ export class InvestmentApiService {
   ): Observable<LinkedInvestedTotalResponse> {
     return this.http.get<LinkedInvestedTotalResponse>(
       `${this.baseUrl}/${year}/${month}/entities/${encodeURIComponent(entityId)}/linked-invested-total`,
-    );
-  }
-
-  getAssetTransactionPreview(
-    year: number,
-    month: number,
-    assetTypeId: string,
-  ): Observable<AssetTransactionPreviewResponse> {
-    return this.http.get<AssetTransactionPreviewResponse>(
-      `${this.baseUrl}/${year}/${month}/asset-types/${encodeURIComponent(assetTypeId)}/transaction-preview`,
     );
   }
 

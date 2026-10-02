@@ -91,19 +91,6 @@ class LinkedInvestedTotalResponse(BaseModel):
     asset_count: int
 
 
-class AssetTransactionPreviewResponse(BaseModel):
-    asset_type_id: UUID
-    year: int
-    month: int
-    currency: str
-    amount: float
-    """Suma de invested_amount. La divisa es `currency` (asset_types); no se convierte."""
-    amount_eur: float
-    """Mismo número que amount. Se mantiene por compatibilidad; no es un cambio a euros."""
-    units: float
-    """Cantidad acumulada (SUM asset_amount)."""
-
-
 class CategoryInvestmentInput(BaseModel):
     category_id: str
     amount_eur: float = Field(ge=0)
@@ -119,14 +106,8 @@ class CategoryOverview(BaseModel):
     color: str | None = None
     amount_eur: float
     percentage: float
-    previous_amount_eur: float | None = None
-    entity_amount_eur: float = 0.0
-    entity_names: list[str] = Field(default_factory=list)
-    """Entidades con depósitos fiat (p. ej. KuCoin) cuya previsión alimenta la categoría."""
     editable: bool = True
     saved_this_month: bool = False
-    suggested_amount_eur: float | None = None
-    """Previsión: depósitos fiat vinculados o total del mes anterior."""
 
 
 class InvestmentOverviewResponse(BaseModel):
@@ -169,12 +150,6 @@ class AssetInvestmentDetail(BaseModel):
     amount_eur: float
     """Equivalente en EUR calculado al vuelo; no se persiste en BD."""
     units: float | None = None
-    previous_amount: float | None = None
-    previous_units: float | None = None
-    suggested_amount: float | None = None
-    """Previsión: suma asset_transactions del mes o importe del mes anterior."""
-    suggested_units: float | None = None
-    """Previsión de títulos desde asset_transactions cuando aplica."""
     has_transactions: bool = False
     """True si el activo tiene operaciones en asset_transactions hasta fin del mes consultado."""
     has_sale_this_month: bool = False

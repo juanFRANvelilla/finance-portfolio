@@ -27,10 +27,6 @@ function makeAsset(
     entity_name: null,
     amount: partial.amount ?? partial.amount_eur,
     units: partial.units ?? null,
-    previous_amount: null,
-    previous_units: null,
-    suggested_amount: null,
-    suggested_units: null,
     has_transactions: false,
     ...partial,
   };

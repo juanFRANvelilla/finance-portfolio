@@ -54,16 +54,6 @@ export interface LinkedInvestedTotalResponse {
   asset_count: number;
 }
 
-export interface AssetTransactionPreviewResponse {
-  asset_type_id: string;
-  year: number;
-  month: number;
-  currency: string;
-  amount: number;
-  amount_eur: number;
-  units: number;
-}
-
 export interface CategoryInvestmentInput {
   category_id: string;
   amount_eur: number;
@@ -79,15 +69,10 @@ export interface CategoryOverview {
   color: string | null;
   amount_eur: number;
   percentage: number;
-  previous_amount_eur: number | null;
-  entity_amount_eur: number;
-  entity_names: string[];
   /** false para categorías cuyo total se calcula solo a partir de sus activos (Acciones). */
   editable: boolean;
   /** true si ya hay un valor manual guardado para este mes concreto (solo aplica a editables). */
   saved_this_month: boolean;
-  /** Previsión: depósitos fiat vinculados o total del mes anterior. */
-  suggested_amount_eur: number | null;
 }
 
 export interface InvestmentOverviewResponse {
@@ -126,10 +111,6 @@ export interface AssetInvestmentDetail {
   /** Equivalente en EUR calculado al vuelo por el backend; no se persiste. */
   amount_eur: number;
   units: number | null;
-  previous_amount: number | null;
-  previous_units: number | null;
-  suggested_amount: number | null;
-  suggested_units: number | null;
   has_transactions: boolean;
   /** Venta registrada en asset_sales para este mes (el registro mensual no se altera solo). */
   has_sale_this_month?: boolean;
