@@ -165,6 +165,8 @@ export interface AssetSaleListItem {
   sale_date: string | null;
   units: number;
   sale_price: number;
+  net_liquidity: number;
+  net_liquidity_eur: number;
   profit: number;
   profit_percentage: number;
   profit_eur: number;

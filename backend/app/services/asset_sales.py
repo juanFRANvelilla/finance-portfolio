@@ -301,6 +301,10 @@ def list_asset_sales(db: Session) -> dict:
         profit_native = Decimal(str(sale.profit))
         profit_eur = Decimal(str(amount_to_eur(float(profit_native), currency, sale.sale_year, sale.sale_month)))
         total_profit_eur += profit_eur
+        net_liq_native = Decimal(str(sale.net_liquidity))
+        net_liq_eur = Decimal(
+            str(amount_to_eur(float(net_liq_native), currency, sale.sale_year, sale.sale_month))
+        )
 
         items.append(
             {
@@ -313,7 +317,8 @@ def list_asset_sales(db: Session) -> dict:
                 "sale_date": sale.sale_date,
                 "units": _round8(sale.units),
                 "sale_price": _round4(sale.sale_price),
-                "net_liquidity": _round4(sale.net_liquidity),
+                "net_liquidity": _round4(net_liq_native),
+                "net_liquidity_eur": _round4(net_liq_eur),
                 "profit": _round4(profit_native),
                 "profit_percentage": _round4(sale.profit_percentage),
                 "profit_eur": _round4(profit_eur),

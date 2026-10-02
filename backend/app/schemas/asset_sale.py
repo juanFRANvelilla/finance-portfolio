@@ -74,6 +74,7 @@ class AssetSaleListItem(BaseModel):
     units: float
     sale_price: float
     net_liquidity: float
+    net_liquidity_eur: float
     profit: float
     profit_percentage: float
     profit_eur: float
