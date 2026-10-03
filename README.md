@@ -18,7 +18,7 @@ Consulta el README de cada paquete para más detalle:
 
 ## Requisitos previos
 
-- **PostgreSQL** corriendo en local (`localhost:5432`), con la base de datos `finance_portfolio` y las tablas `entities`, `monthly_records`, `monthly_entity_balances` ya creadas (y `monthly_hybrid_accounts`, que no se usa todavía).
+- **PostgreSQL** corriendo en local (`localhost:5432`), con la base de datos `finance_portfolio` y las tablas `entities`, `monthly_entity_positions`, etc.
 - Python 3.11+
 - Node.js 20+ y npm
 

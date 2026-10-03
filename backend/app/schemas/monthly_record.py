@@ -57,7 +57,7 @@ class EntityBalancesPatch(BaseModel):
 
 
 class MonthlyRecordDto(BaseModel):
-    """DTO con totales persistidos en monthly_records (+ diff y % calculados en backend)."""
+    """DTO del mes: posiciones por entidad y totales calculados desde monthly_entity_positions."""
 
     id: UUID
     year: int

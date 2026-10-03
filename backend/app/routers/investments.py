@@ -14,7 +14,7 @@ from app.models.asset_type import AssetType
 from app.models.entity import Entity, EntityType
 from app.models.investment_category import InvestmentCategory
 from app.models.monthly_asset_investment import MonthlyAssetInvestment
-from app.models.monthly_record import MonthlyRecord
+from app.models.monthly_entity_position import MonthlyEntityPosition
 from app.schemas.investment import (
     AssetInvestmentDetail,
     AssetInvestmentsUpsert,
@@ -81,18 +81,13 @@ def _previous_year_month(year: int, month: int) -> tuple[int, int]:
     return year, month - 1
 
 
-def _find_record(db: Session, year: int, month: int) -> MonthlyRecord | None:
-    from sqlalchemy.orm import selectinload
-
-    stmt = (
-        select(MonthlyRecord)
-        .options(
-            selectinload(MonthlyRecord.balances),
-            selectinload(MonthlyRecord.hybrid_accounts),
-        )
-        .where(MonthlyRecord.year == year, MonthlyRecord.month == month)
+def _month_has_entity_positions(db: Session, year: int, month: int) -> bool:
+    count = db.scalar(
+        select(func.count())
+        .select_from(MonthlyEntityPosition)
+        .where(MonthlyEntityPosition.year == year, MonthlyEntityPosition.month == month)
     )
-    return db.scalars(stmt).first()
+    return bool(count and count > 0)
 
 
 def _get_categories(db: Session) -> list[InvestmentCategory]:
@@ -336,7 +331,7 @@ def _build_overview(db: Session, year: int, month: int) -> InvestmentOverviewRes
         year=year,
         month=month,
         total_invested=total_invested_f,
-        has_month_record=_find_record(db, year, month) is not None,
+        has_month_record=_month_has_entity_positions(db, year, month),
         has_investment_data=has_investment_data,
         categories=category_overviews,
         previous_year=prev_year,
@@ -349,7 +344,7 @@ def get_investment_overview(year: int, month: int, db: Session = Depends(get_db)
     """Resumen de inversión de un mes.
 
     `total_invested` es la suma en EUR de monthly_asset_investments por categoría,
-    independiente del total invertido del panel principal (monthly_records).
+    independiente del total invertido del panel principal (monthly_entity_positions).
     """
     return _build_overview(db, year, month)
 

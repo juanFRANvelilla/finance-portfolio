@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from app.models.entity import Entity, EntityType
-from app.models.monthly_record import MonthlyRecord
+from app.models.monthly_entity_position import MonthlyEntityPosition
 from app.schemas.monthly_record import EntityBalanceInput, HybridBalanceImport, ImportPayload
 
 
@@ -9,20 +9,14 @@ def _round2(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01")))
 
 
-def compute_totals_from_record(record: MonthlyRecord) -> dict[str, float]:
-    """Calcula totales al vuelo a partir de balances simples e híbridos del registro."""
+def compute_totals_from_positions(positions: list[MonthlyEntityPosition]) -> dict[str, float]:
+    """Calcula totales a partir de filas monthly_entity_positions del mes."""
     total_liquid = Decimal("0")
     total_invested = Decimal("0")
 
-    for balance in record.balances:
-        entity_type = balance.entity.entity_type if balance.entity else None
-        amount = Decimal(str(balance.balance_amount))
-        if entity_type == EntityType.LIQUID:
-            total_liquid += amount
-
-    for hybrid in record.hybrid_accounts:
-        total_liquid += Decimal(str(hybrid.liquid_amount))
-        total_invested += Decimal(str(hybrid.cumulative_invested))
+    for position in positions:
+        total_liquid += Decimal(str(position.liquid_amount))
+        total_invested += Decimal(str(position.cumulative_invested))
 
     total_net_worth = total_liquid + total_invested
     invested_percentage = (

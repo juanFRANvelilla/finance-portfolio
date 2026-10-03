@@ -22,11 +22,7 @@ class Entity(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    balances: Mapped[list["MonthlyEntityBalance"]] = relationship(
-        back_populates="entity",
-        cascade="all, delete-orphan",
-    )
-    hybrid_accounts: Mapped[list["MonthlyHybridAccount"]] = relationship(
+    monthly_positions: Mapped[list["MonthlyEntityPosition"]] = relationship(
         back_populates="entity",
         cascade="all, delete-orphan",
     )

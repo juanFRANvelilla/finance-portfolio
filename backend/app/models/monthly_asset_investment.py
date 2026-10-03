@@ -11,7 +11,7 @@ from app.core.database import Base
 class MonthlyAssetInvestment(Base):
     """Reparto atómico por activo concreto, mes a mes.
 
-    Desacoplada de monthly_records: se referencia directamente por (year, month).
+    Desacoplada del panel por entidad: se referencia directamente por (year, month).
     `amount` se guarda en la divisa definida en asset_types (EUR o USD).
     `units` (nº de títulos/participaciones) es opcional para cualquier activo.
     La conversión a EUR se calcula al vuelo, nunca se persiste aquí.

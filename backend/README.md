@@ -5,7 +5,7 @@ API REST construida con **FastAPI + SQLAlchemy + Pydantic** para el seguimiento 
 ## Requisitos
 
 - Python 3.11+
-- PostgreSQL corriendo en local con la base de datos `finance_portfolio` y las tablas `entities`, `monthly_records`, `monthly_entity_balances` ya creadas.
+- PostgreSQL corriendo en local con la base de datos `finance_portfolio` y las tablas `entities`, `monthly_entity_positions`, etc.
 
 ## Configuración
 
@@ -38,7 +38,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 app/
   core/       # configuración y conexión a la base de datos
-  models/     # modelos SQLAlchemy (Entity, MonthlyRecord, MonthlyEntityBalance)
+  models/     # modelos SQLAlchemy (Entity, MonthlyEntityPosition, …)
   schemas/    # schemas Pydantic de entrada/salida
   routers/    # endpoints agrupados por recurso
   main.py     # instancia de FastAPI, CORS y montaje de routers
