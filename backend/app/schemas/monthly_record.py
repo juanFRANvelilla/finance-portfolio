@@ -19,7 +19,7 @@ class HybridAccountRead(BaseModel):
 
     entity_id: str
     liquid_amount: float
-    cumulative_invested: float
+    invested_amount: float
     entity: EntityRead | None = None
 
 

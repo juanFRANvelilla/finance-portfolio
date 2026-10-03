@@ -100,7 +100,7 @@ export class BalanceFormComponent {
         }
         continue;
       }
-      if (currentLiquid !== previous.liquid_amount || currentInvested !== previous.cumulative_invested) {
+      if (currentLiquid !== previous.liquid_amount || currentInvested !== previous.invested_amount) {
         return true;
       }
     }
@@ -164,7 +164,7 @@ export class BalanceFormComponent {
       const overridden: Record<string, boolean> = {};
       for (const hybrid of record.hybrid_accounts) {
         liquid[hybrid.entity_id] = hybrid.liquid_amount;
-        invested[hybrid.entity_id] = hybrid.cumulative_invested;
+        invested[hybrid.entity_id] = hybrid.invested_amount;
         overridden[hybrid.entity_id] = true;
       }
       this.hybridLiquid.set(liquid);

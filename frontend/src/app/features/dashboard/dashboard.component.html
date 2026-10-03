@@ -139,13 +139,13 @@
                 </span>
               </div>
               <span class="shrink-0 font-semibold tabular-nums text-white">
-                {{ (hybrid.liquid_amount + hybrid.cumulative_invested) | eurCurrency }}
+                {{ (hybrid.liquid_amount + hybrid.invested_amount) | eurCurrency }}
               </span>
             </div>
             <div class="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-xs text-slate-400">
               <span class="text-sky-300">Líq. {{ hybrid.liquid_amount | eurCurrency }}</span>
               <span class="text-slate-600">•</span>
-              <span class="text-purple-300">Inv. {{ hybrid.cumulative_invested | eurCurrency }}</span>
+              <span class="text-purple-300">Inv. {{ hybrid.invested_amount | eurCurrency }}</span>
             </div>
           </li>
         }

@@ -19,7 +19,7 @@ class MonthlyEntityPosition(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     entity_id: Mapped[str] = mapped_column(String(30), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
     liquid_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
-    cumulative_invested: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    invested_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     entity: Mapped["Entity"] = relationship(back_populates="monthly_positions")

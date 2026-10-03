@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 from app.services.kucoin_fiat_cash_flows_sync_service import run_scheduled_kucoin_fiat_cash_flows_sync
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
 from app.services.monthly_asset_snapshot import run_ensure_current_month_snapshots
+from app.services.monthly_entity_position_snapshot import run_ensure_current_month_entity_positions
 from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
 from app.services.myinvestor_transfers_sync_service import run_scheduled_myinvestor_transfers_sync
 
@@ -24,10 +23,6 @@ _scheduler: AsyncIOScheduler | None = None
 KUCOIN_SYNC_INTERVAL_HOURS = 4
 # Confirmaciones MyInvestor por IMAP. Independiente del job de KuCoin.
 MYINVESTOR_SYNC_INTERVAL_HOURS = 4
-# Apertura del mes natural en monthly_asset_investments (cron + al arrancar el pod).
-MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR = 2
-MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE = 0
-MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE = ZoneInfo("Europe/Madrid")
 
 
 def _defer_interval_job_first_run(*, hours: int) -> datetime:
@@ -39,10 +34,52 @@ def _defer_interval_job_first_run(*, hours: int) -> datetime:
     return datetime.now(timezone.utc) + timedelta(hours=hours)
 
 
+async def _run_monthly_asset_investments_opening() -> int:
+    logger.info("--- Apertura de mes: monthly_asset_investments ---")
+    try:
+        created = await asyncio.to_thread(run_ensure_current_month_snapshots)
+        if created:
+            logger.info("monthly_asset_investments: %s fila(s) nueva(s)", created)
+        else:
+            logger.info("monthly_asset_investments: sin filas nuevas")
+        return created
+    except Exception:
+        logger.exception("Error abriendo mes en monthly_asset_investments")
+        raise
+    finally:
+        logger.info("--- Fin apertura: monthly_asset_investments ---")
+
+
+async def _run_monthly_entity_positions_opening() -> int:
+    logger.info("--- Apertura de mes: monthly_entity_positions ---")
+    try:
+        created = await asyncio.to_thread(run_ensure_current_month_entity_positions)
+        if created:
+            logger.info("monthly_entity_positions: %s fila(s) nueva(s)", created)
+        else:
+            logger.info("monthly_entity_positions: sin filas nuevas")
+        return created
+    except Exception:
+        logger.exception("Error abriendo mes en monthly_entity_positions")
+        raise
+    finally:
+        logger.info("--- Fin apertura: monthly_entity_positions ---")
+
+
+async def _ensure_current_month_tables_before_sync() -> None:
+    """Abre el mes en curso en activos y entidades antes de importar operaciones."""
+    await asyncio.gather(
+        _run_monthly_asset_investments_opening(),
+        _run_monthly_entity_positions_opening(),
+    )
+
+
 async def _kucoin_sync_job() -> None:
     """Wrapper async: fills de trading + fiat EUR → entity_cash_flows (hilos)."""
     logger.info("--- Inicio tarea programada: sync KuCoin ---")
     try:
+        await _ensure_current_month_tables_before_sync()
+
         trades = await asyncio.to_thread(run_scheduled_kucoin_sync)
         if trades.success:
             logger.info(
@@ -80,6 +117,8 @@ async def _myinvestor_sync_job() -> None:
     """Wrapper async: IMAP bloqueante en hilo (operaciones + transferencias)."""
     logger.info("--- Inicio tarea programada: sync MyInvestor ---")
     try:
+        await _ensure_current_month_tables_before_sync()
+
         trades = await asyncio.to_thread(run_scheduled_myinvestor_sync)
         if trades.success:
             logger.info(
@@ -108,28 +147,6 @@ async def _myinvestor_sync_job() -> None:
         logger.exception("Error inesperado en la tarea programada de MyInvestor")
     finally:
         logger.info("--- Fin tarea programada: sync MyInvestor ---")
-
-
-async def _monthly_snapshot_rollover_job() -> None:
-    """Wrapper async: abre el mes natural actual en monthly_asset_investments si falta.
-
-    Independiente de KuCoin/MyInvestor: no trae transacciones nuevas, solo se
-    asegura de que el mes en curso tenga fila (copiando el cierre anterior).
-    """
-    logger.info("--- Inicio tarea programada: apertura de mes en monthly_asset_investments ---")
-    try:
-        created = await asyncio.to_thread(run_ensure_current_month_snapshots)
-        if created:
-            logger.info("Apertura de mes: %s fila(s) nueva(s) creada(s)", created)
-        else:
-            logger.info("Apertura de mes: no hacía falta crear filas nuevas")
-    except asyncio.CancelledError:
-        logger.info("Apertura de mes cancelada")
-        raise
-    except Exception:
-        logger.exception("Error inesperado abriendo el mes en monthly_asset_investments")
-    finally:
-        logger.info("--- Fin tarea programada: apertura de mes ---")
 
 
 def start_scheduler() -> AsyncIOScheduler:
@@ -161,36 +178,17 @@ def start_scheduler() -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
     )
-    _scheduler.add_job(
-        _monthly_snapshot_rollover_job,
-        trigger=CronTrigger(
-            hour=MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
-            minute=MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
-            timezone=MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE,
-        ),
-        id="monthly_snapshot_rollover",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
 
     _scheduler.start()
     logger.info(
         "Tarea programada KuCoin activa: sync de arranque tras apertura de mes; "
-        "luego cada %s horas",
+        "luego cada %s horas (con apertura de mes antes de cada sync)",
         KUCOIN_SYNC_INTERVAL_HOURS,
     )
     logger.info(
         "Tarea programada MyInvestor activa: sync de arranque tras apertura de mes; "
-        "luego cada %s horas",
+        "luego cada %s horas (con apertura de mes antes de cada sync)",
         MYINVESTOR_SYNC_INTERVAL_HOURS,
-    )
-    logger.info(
-        "Tarea programada de apertura de mes: primero al arrancar; "
-        "después cada noche a las %02d:%02d (%s)",
-        MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
-        MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
-        MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE.key,
     )
     return _scheduler
 
@@ -217,6 +215,6 @@ def start_myinvestor_sync_background() -> asyncio.Task:
 
 
 async def run_startup_monthly_snapshot_rollover() -> None:
-    """Apertura de mes al arrancar el API, antes que KuCoin/MyInvestor."""
-    logger.info("Arranque: apertura de mes en monthly_asset_investments (prioridad)...")
-    await _monthly_snapshot_rollover_job()
+    """Apertura de mes al arrancar el API (activos + entidades), antes que KuCoin/MyInvestor."""
+    logger.info("Arranque: apertura de mes en monthly_asset_investments y monthly_entity_positions...")
+    await _ensure_current_month_tables_before_sync()

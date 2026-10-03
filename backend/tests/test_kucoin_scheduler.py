@@ -11,8 +11,10 @@ class KucoinSchedulerJobTests(unittest.TestCase):
 
     @patch("app.core.scheduler.run_scheduled_kucoin_fiat_cash_flows_sync")
     @patch("app.core.scheduler.run_scheduled_kucoin_sync")
+    @patch("app.core.scheduler.run_ensure_current_month_entity_positions", return_value=0)
+    @patch("app.core.scheduler.run_ensure_current_month_snapshots", return_value=0)
     @patch("app.core.scheduler.asyncio.to_thread", new_callable=AsyncMock)
-    async def _run_job(self, mock_to_thread, mock_sync, mock_fiat):
+    async def _run_job(self, mock_to_thread, mock_snapshots, mock_entities, mock_sync, mock_fiat):
         mock_sync_result = KucoinSyncResult(
             start_date=MagicMock(date=lambda: __import__("datetime").date(2026, 9, 28)),
             end_date=MagicMock(date=lambda: __import__("datetime").date(2026, 9, 30)),

@@ -9,7 +9,7 @@ export interface EntityBalance {
 export interface HybridAccount {
   entity_id: string;
   liquid_amount: number;
-  cumulative_invested: number;
+  invested_amount: number;
   entity?: Entity | null;
 }
 

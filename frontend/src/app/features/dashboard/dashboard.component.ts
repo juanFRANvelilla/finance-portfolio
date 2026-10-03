@@ -331,13 +331,13 @@ export class DashboardComponent {
 
   private hybridChanged(
     hybrid: HybridBalanceImport,
-    previous: { liquid_amount: number; cumulative_invested: number } | undefined,
+    previous: { liquid_amount: number; invested_amount: number } | undefined,
   ): boolean {
     if (previous === undefined) {
       return true;
     }
     const invested = hybrid.invested_amount ?? 0;
-    return previous.liquid_amount !== hybrid.liquid_amount || previous.cumulative_invested !== invested;
+    return previous.liquid_amount !== hybrid.liquid_amount || previous.invested_amount !== invested;
   }
 
   private applyPartialSave(submission: BalanceFormSubmission, editMode: boolean): void {

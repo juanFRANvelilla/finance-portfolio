@@ -1,21 +1,14 @@
 import unittest
 
 from app.core import scheduler as scheduler_module
-from app.core.scheduler import (
-    MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR,
-    MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE,
-    MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE,
-)
 
 
 class MonthlySnapshotSchedulerTests(unittest.TestCase):
-    def test_monthly_rollover_cron_is_two_am_madrid(self) -> None:
-        self.assertEqual(MONTHLY_SNAPSHOT_ROLLOVER_CRON_HOUR, 2)
-        self.assertEqual(MONTHLY_SNAPSHOT_ROLLOVER_CRON_MINUTE, 0)
-        self.assertEqual(MONTHLY_SNAPSHOT_ROLLOVER_TIMEZONE.key, "Europe/Madrid")
-
     def test_startup_runner_exists(self) -> None:
         self.assertTrue(callable(scheduler_module.run_startup_monthly_snapshot_rollover))
+
+    def test_sync_jobs_run_month_opening_before_trades(self) -> None:
+        self.assertTrue(callable(scheduler_module._ensure_current_month_tables_before_sync))
 
 
 if __name__ == "__main__":

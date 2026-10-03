@@ -16,7 +16,8 @@ def compute_totals_from_positions(positions: list[MonthlyEntityPosition]) -> dic
 
     for position in positions:
         total_liquid += Decimal(str(position.liquid_amount))
-        total_invested += Decimal(str(position.cumulative_invested))
+        if position.invested_amount is not None:
+            total_invested += Decimal(str(position.invested_amount))
 
     total_net_worth = total_liquid + total_invested
     invested_percentage = (

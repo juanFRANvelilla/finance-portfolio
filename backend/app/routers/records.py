@@ -93,7 +93,7 @@ def _split_positions_for_dto(
                 HybridAccountRead(
                     entity_id=position.entity_id,
                     liquid_amount=float(position.liquid_amount),
-                    cumulative_invested=float(position.cumulative_invested),
+                    invested_amount=float(position.invested_amount or 0),
                     entity=entity_read,
                 )
             )
@@ -252,7 +252,7 @@ def _validate_import_payload(payload: ImportPayload, entities_by_id: dict[str, E
 
 
 def _resolve_hybrid_invested(hybrid_balances: list) -> list[tuple[str, float, float]]:
-    """Devuelve (entity_id, liquid_amount, cumulative_invested) listo para persistir."""
+    """Devuelve (entity_id, liquid_amount, invested_amount) listo para persistir."""
     resolved: list[tuple[str, float, float]] = []
     for hybrid in hybrid_balances:
         liquid = float(hybrid.liquid_amount)
@@ -286,7 +286,7 @@ def _upsert_liquid_positions(
         existing = _get_position(db, year, month, balance.entity_id)
         if existing is not None:
             existing.liquid_amount = amount
-            existing.cumulative_invested = 0
+            existing.invested_amount = None
         else:
             db.add(
                 MonthlyEntityPosition(
@@ -294,7 +294,7 @@ def _upsert_liquid_positions(
                     month=month,
                     entity_id=balance.entity_id,
                     liquid_amount=amount,
-                    cumulative_invested=0,
+                    invested_amount=None,
                 )
             )
 
@@ -310,7 +310,7 @@ def _upsert_hybrid_positions(
         existing = _get_position(db, year, month, entity_id)
         if existing is not None:
             existing.liquid_amount = liquid
-            existing.cumulative_invested = invested
+            existing.invested_amount = invested
         else:
             db.add(
                 MonthlyEntityPosition(
@@ -318,7 +318,7 @@ def _upsert_hybrid_positions(
                     month=month,
                     entity_id=entity_id,
                     liquid_amount=liquid,
-                    cumulative_invested=invested,
+                    invested_amount=invested,
                 )
             )
 
@@ -374,10 +374,11 @@ def get_records_timeline(db: Session = Depends(get_db)) -> TimelineResponse:
         select(
             MonthlyEntityPosition.year,
             MonthlyEntityPosition.month,
-            func.sum(MonthlyEntityPosition.liquid_amount + MonthlyEntityPosition.cumulative_invested).label(
-                "total_net_worth"
-            ),
-            func.sum(MonthlyEntityPosition.cumulative_invested).label("total_invested"),
+            func.sum(
+                MonthlyEntityPosition.liquid_amount
+                + func.coalesce(MonthlyEntityPosition.invested_amount, 0)
+            ).label("total_net_worth"),
+            func.sum(func.coalesce(MonthlyEntityPosition.invested_amount, 0)).label("total_invested"),
         )
         .group_by(MonthlyEntityPosition.year, MonthlyEntityPosition.month)
         .order_by(MonthlyEntityPosition.year, MonthlyEntityPosition.month)
@@ -465,7 +466,7 @@ def upsert_monthly_record(
 
     positions = _get_month_positions(db, year, month)
     existing_hybrids = [
-        (p.entity_id, float(p.liquid_amount), float(p.cumulative_invested))
+        (p.entity_id, float(p.liquid_amount), float(p.invested_amount or 0))
         for p in positions
         if p.entity and p.entity.entity_type == EntityType.HYBRID
     ]
