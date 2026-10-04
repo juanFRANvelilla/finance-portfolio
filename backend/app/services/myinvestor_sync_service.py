@@ -21,6 +21,7 @@ from app.myinvestor.trades.parse_trade import (
     parse_myinvestor_trade,
 )
 from app.repositories.asset_transactions import insert_transactions_batch, load_asset_match_index
+from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,8 @@ def sync_myinvestor_transactions(
             snapshot_result = apply_transactions_to_monthly_snapshot(db, inserted_fills)
             result.snapshot_fills_skipped_not_current_month = snapshot_result.fills_skipped_not_current_month
             result.snapshot_groups_processed = snapshot_result.groups_processed
+            if inserted_fills:
+                apply_auto_trades_to_hybrid_entities(db, inserted_fills, source="myinvestor")
 
         logger.info(
             "MyInvestor sync OK: %s insertados, %s duplicados omitidos (%s correos)",

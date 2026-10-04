@@ -21,6 +21,7 @@ from app.repositories.asset_transactions import (
     resolve_sync_start_datetime,
     sum_position_by_asset_type_ids,
 )
+from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,15 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
 
             if snapshot_fills:
                 apply_transactions_to_monthly_snapshot(db, snapshot_fills)
+
+            if inserted_fills:
+                hybrid_fills = list(snapshot_fills) if snapshot_fills else [
+                    f
+                    for f in inserted_fills
+                    if Decimal(str(f.get("asset_amount", 0))) > 0
+                ]
+                if hybrid_fills:
+                    apply_auto_trades_to_hybrid_entities(db, hybrid_fills, source="kucoin")
 
         logger.info(
             "KuCoin sync OK: %s tx insertadas, %s ventas insertadas, %s duplicados (desde %s)",
