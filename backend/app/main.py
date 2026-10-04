@@ -8,10 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import check_db_connection
 from app.core.scheduler import (
-    run_startup_monthly_snapshot_rollover,
     shutdown_scheduler,
-    start_kucoin_sync_background,
-    start_myinvestor_sync_background,
+    start_portfolio_sync_background,
     start_scheduler,
 )
 from app.routers import asset_sales, entities, investments, ledger, market_prices, records
@@ -36,20 +34,17 @@ async def lifespan(app: FastAPI):
         logger.warning("PostgreSQL no disponible al arrancar: %s", exc)
 
     start_scheduler()
-    await run_startup_monthly_snapshot_rollover()
-    app.state.kucoin_sync_task = start_kucoin_sync_background()
-    app.state.myinvestor_sync_task = start_myinvestor_sync_background()
+    app.state.portfolio_sync_task = start_portfolio_sync_background()
 
     yield
 
-    for task_name in ("kucoin_sync_task", "myinvestor_sync_task"):
-        task = getattr(app.state, task_name, None)
-        if task is not None and not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+    task = getattr(app.state, "portfolio_sync_task", None)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     shutdown_scheduler()
 
 
