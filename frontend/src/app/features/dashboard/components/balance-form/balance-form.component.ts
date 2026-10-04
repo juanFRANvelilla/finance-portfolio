@@ -1,9 +1,8 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { Entity } from '../../../../core/models/entity.model';
 import { EntityBalanceInput, HybridBalanceImport, MonthlyRecord } from '../../../../core/models/monthly-record.model';
-import { InvestmentApiService } from '../../../../core/services/investment-api.service';
 import { parseDecimalInput } from '../../../../core/utils/parse-decimal';
 
 export interface BalanceFormSubmission {
@@ -22,8 +21,6 @@ export interface HybridFormSubmission {
   styleUrl: './balance-form.component.scss',
 })
 export class BalanceFormComponent {
-  private readonly investmentApi = inject(InvestmentApiService);
-
   readonly entities = input.required<Entity[]>();
   readonly year = input.required<number>();
   readonly month = input.required<number>();
@@ -40,35 +37,10 @@ export class BalanceFormComponent {
 
   readonly hybridEntities = computed(() => this.entities().filter((e) => e.entity_type === 'HYBRID'));
 
-  hasLinkedAssetTypes(entityId: string): boolean {
-    return this.hybridEntitiesWithLinkedAssets().has(entityId);
-  }
-
-  isLoadingLinkedInvested(entityId: string): boolean {
-    return this.loadingLinkedInvested()[entityId] ?? false;
-  }
-
-  private loadHybridEntitiesWithLinkedAssets(): void {
-    this.investmentApi.getAssetTypes().subscribe({
-      next: (assets) => {
-        const linked = new Set<string>();
-        for (const asset of assets) {
-          if (asset.entity_id) {
-            linked.add(asset.entity_id);
-          }
-        }
-        this.hybridEntitiesWithLinkedAssets.set(linked);
-      },
-      error: () => this.hybridEntitiesWithLinkedAssets.set(new Set()),
-    });
-  }
-
   readonly values = signal<Record<string, number | null>>({});
   readonly hybridLiquid = signal<Record<string, number | null>>({});
   readonly hybridInvested = signal<Record<string, number | null>>({});
   readonly hybridInvestedOverridden = signal<Record<string, boolean>>({});
-  readonly hybridEntitiesWithLinkedAssets = signal<Set<string>>(new Set());
-  readonly loadingLinkedInvested = signal<Record<string, boolean>>({});
 
   /** En modo edición, true solo si algún campo difiere del registro cargado. */
   readonly hasPendingChanges = computed(() => {
@@ -129,7 +101,6 @@ export class BalanceFormComponent {
       this.hybridLiquid.set({});
       this.hybridInvested.set({});
       this.hybridInvestedOverridden.set({});
-      this.loadHybridEntitiesWithLinkedAssets();
     });
 
     effect(() => {
@@ -202,20 +173,6 @@ export class BalanceFormComponent {
     const parsed = parseDecimalInput(value);
     this.hybridInvested.update((current) => ({ ...current, [entityId]: parsed }));
     this.hybridInvestedOverridden.update((current) => ({ ...current, [entityId]: true }));
-  }
-
-  applyLinkedAssetsInvested(entityId: string): void {
-    this.loadingLinkedInvested.update((current) => ({ ...current, [entityId]: true }));
-    this.investmentApi.getLinkedInvestedTotal(this.year(), this.month(), entityId).subscribe({
-      next: (response) => {
-        this.hybridInvested.update((current) => ({ ...current, [entityId]: response.total_eur }));
-        this.hybridInvestedOverridden.update((current) => ({ ...current, [entityId]: true }));
-        this.loadingLinkedInvested.update((current) => ({ ...current, [entityId]: false }));
-      },
-      error: () => {
-        this.loadingLinkedInvested.update((current) => ({ ...current, [entityId]: false }));
-      },
-    });
   }
 
   private resolveHybridInvested(entityId: string): number {

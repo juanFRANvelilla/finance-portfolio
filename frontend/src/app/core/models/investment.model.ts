@@ -46,14 +46,6 @@ export interface CategoryAssetDisplayOrderUpdate {
   items: AssetDisplayOrderItem[];
 }
 
-export interface LinkedInvestedTotalResponse {
-  entity_id: string;
-  year: number;
-  month: number;
-  total_eur: number;
-  asset_count: number;
-}
-
 export interface CategoryOverview {
   category_id: string;
   name: string;

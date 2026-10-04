@@ -83,14 +83,6 @@ class CategoryAssetDisplayOrderUpdate(BaseModel):
     items: list[AssetDisplayOrderItem] = Field(min_length=1)
 
 
-class LinkedInvestedTotalResponse(BaseModel):
-    entity_id: str
-    year: int
-    month: int
-    total_eur: float
-    asset_count: int
-
-
 class CategoryOverview(BaseModel):
     category_id: str
     name: str
