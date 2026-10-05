@@ -28,4 +28,9 @@ export class AssetSalesListDialogComponent {
     }
     return 'text-slate-300';
   }
+
+  /** Equivalencia en € solo para importes en USD (en EUR ya se muestra el valor en euros). */
+  showEurEquivalent(currency: string): boolean {
+    return currency.trim().toUpperCase() === 'USD';
+  }
 }

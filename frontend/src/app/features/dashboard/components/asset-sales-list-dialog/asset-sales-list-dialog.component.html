@@ -57,12 +57,16 @@
                   <td class="px-3 py-2.5 text-right tabular-nums text-slate-200">
                     {{ row.net_liquidity | number: '1.2-2' }}
                     <span class="text-xs text-slate-500">{{ row.currency }}</span>
-                    <span class="mt-0.5 block text-xs text-slate-500">≈ {{ row.net_liquidity_eur | eurCurrency }}</span>
+                    @if (showEurEquivalent(row.currency)) {
+                      <span class="mt-0.5 block text-xs text-slate-500">≈ {{ row.net_liquidity_eur | eurCurrency }}</span>
+                    }
                   </td>
                   <td class="px-3 py-2.5 text-right tabular-nums" [class]="profitClass(row.profit)">
                     {{ row.profit > 0 ? '+' : '' }}{{ row.profit | number: '1.2-2' }}
                     <span class="text-xs text-slate-500">{{ row.currency }}</span>
-                    <span class="mt-0.5 block text-xs text-slate-500">≈ {{ row.profit_eur | eurCurrency }}</span>
+                    @if (showEurEquivalent(row.currency)) {
+                      <span class="mt-0.5 block text-xs text-slate-500">≈ {{ row.profit_eur | eurCurrency }}</span>
+                    }
                   </td>
                   <td class="px-3 py-2.5 text-right tabular-nums" [class]="profitClass(row.profit)">
                     {{ row.profit_percentage > 0 ? '+' : '' }}{{ row.profit_percentage | number: '1.1-2' }}%
