@@ -53,7 +53,7 @@
       <h4 class="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-300">
         Cuentas híbridas
       </h4>
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:flex-wrap">
+      <div class="flex flex-col gap-4">
         @for (entity of hybridEntities(); track entity.id) {
           <div class="hybrid-card min-w-0 rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5">
             <p class="mb-2 text-sm font-medium text-slate-300">{{ entity.name }}</p>
