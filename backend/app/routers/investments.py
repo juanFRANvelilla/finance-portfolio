@@ -26,10 +26,12 @@ from app.schemas.investment import (
     CategoryOverview,
     InvestmentCategoryRead,
     InvestmentOverviewResponse,
+    LinkedInvestedTotalResponse,
 )
 from app.services.asset_sales import asset_type_ids_with_sale_in_month
 from app.services.asset_transactions import transaction_totals_by_asset_type
 from app.services.fx_converter import amount_to_eur, get_usd_to_eur_rate
+from app.services.linked_asset_investments import sum_linked_asset_investments_eur
 from app.services.market_price_service import market_price_service
 
 router = APIRouter(prefix="/api/investment", tags=["investment"])
@@ -269,6 +271,28 @@ def update_category_asset_display_order(
             .where(AssetType.category_id == category_id, AssetType.is_active.is_(True))
             .order_by(AssetType.display_order)
         ).all()
+    )
+
+
+@router.get("/{year}/{month}/entities/{entity_id}/linked-invested-total", response_model=LinkedInvestedTotalResponse)
+def get_entity_linked_invested_total(
+    year: int, month: int, entity_id: str, db: Session = Depends(get_db)
+) -> LinkedInvestedTotalResponse:
+    """Suma en EUR los importes de monthly_asset_investments de activos vinculados a la entidad."""
+    entity = _get_entity_or_404(db, entity_id)
+    if entity.entity_type != EntityType.HYBRID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La entidad '{entity_id}' no es híbrida",
+        )
+
+    totals = sum_linked_asset_investments_eur(db, entity_id, year, month)
+    return LinkedInvestedTotalResponse(
+        entity_id=entity_id,
+        year=year,
+        month=month,
+        total_eur=float(totals["total_eur"]),
+        asset_count=int(totals["asset_count"]),
     )
 
 
