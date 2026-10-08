@@ -15,7 +15,7 @@ extraEnv:
 - name: "TZ"
   value: "UTC"
 - name: "CORS_ORIGINS"
-  value: "http://finance.pre.local"
+  value: "http://pre.finance.juanfran.home"
 # DATABASE_URL, KUCOIN_*, IMAP_* (cuenta), MYINVESTOR_IMAP_MAILBOX_*, MYINVESTOR_ENTITY_ID
 # El DATABASE_URL del secret debe apuntar a la base de datos finance_portfolio_pre
 extraEnvFrom:
@@ -36,7 +36,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   class: "nginx"
   # Mismo host que el frontend: /api y /health al backend; / al frontend cuando exista
-  host: "finance.pre.local"
+  host: "pre.finance.juanfran.home"
   path: /api
   extraPaths:
     - /health

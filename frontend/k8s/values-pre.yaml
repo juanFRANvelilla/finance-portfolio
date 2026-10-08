@@ -38,5 +38,5 @@ ingress:
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
   class: "nginx"
   # Mismo host que el backend: / al frontend, /api y /health al backend
-  host: "finance.pre.local"
+  host: "pre.finance.juanfran.home"
   tls: false
