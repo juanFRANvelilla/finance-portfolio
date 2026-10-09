@@ -15,7 +15,7 @@ extraEnv:
 - name: "TZ"
   value: "UTC"
 - name: "CORS_ORIGINS"
-  value: "http://pro.finance.juanfran.home,http://finance.192.168.0.176.nip.io"
+  value: "http://pro.finance.juanfran.home"
 # DATABASE_URL del secret debe apuntar a finance_portfolio_pro
 extraEnvFrom:
 - secretRef:
@@ -35,9 +35,6 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   class: "nginx"
   host: "pro.finance.juanfran.home"
-  # Acceso iPhone/VPN sin /etc/hosts (resolución pública → 192.168.0.176)
-  extraHosts:
-    - "finance.192.168.0.176.nip.io"
   path: /api
   extraPaths:
     - /health

@@ -38,7 +38,4 @@ ingress:
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
   class: "nginx"
   host: "pro.finance.juanfran.home"
-  # Acceso iPhone/VPN sin /etc/hosts (resolución pública → 192.168.0.176)
-  extraHosts:
-    - "finance.192.168.0.176.nip.io"
   tls: false
