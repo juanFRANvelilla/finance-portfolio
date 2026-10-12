@@ -36,6 +36,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-set-header: X-Real-IP $remote_addr
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-ovh-prod
   class: "nginx"
-  host: "pro.finance.juanfran.home"
-  tls: false
+  host: "pro.finance.juanfranciscoperez.es"
+  tls: true

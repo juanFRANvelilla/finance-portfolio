@@ -15,7 +15,7 @@ extraEnv:
 - name: "TZ"
   value: "UTC"
 - name: "CORS_ORIGINS"
-  value: "http://pro.finance.juanfran.home"
+  value: "https://pro.finance.juanfranciscoperez.es"
 # DATABASE_URL del secret debe apuntar a finance_portfolio_pro
 extraEnvFrom:
 - secretRef:
@@ -34,7 +34,8 @@ ingress:
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   class: "nginx"
-  host: "pro.finance.juanfran.home"
+  # TLS solo en el Ingress del front (un certificado por host; nginx fusiona rutas)
+  host: "pro.finance.juanfranciscoperez.es"
   path: /api
   extraPaths:
     - /health
