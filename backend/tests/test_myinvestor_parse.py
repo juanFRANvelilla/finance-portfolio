@@ -9,6 +9,7 @@ from app.myinvestor.trades.parse_trade import (
     amounts_for_asset_currency,
     parse_decimal_amount,
     parse_myinvestor_trade,
+    sell_amounts_for_asset_currency,
 )
 from app.services.myinvestor_sync_service import myinvestor_asset_lookup_keys
 
@@ -53,6 +54,25 @@ Comisiones Gastos Tasas e Impuestos
 1.00 EUR   0.00 EUR   0.00 EUR
 Retención Origen Retención Destino Importe Efectivo Neto (1)
 0.00 EUR   0.00 EUR   434.65 EUR
+(1) El Importe Neto ha sido anotado en su cuenta corriente en la fecha indicada.
+"""
+
+SAMPLE_MSFT_SELL_EUR = """
+CONFIRMACIÓN DE OPERACIÓN DE VALORES
+DETALLE OPERACIÓN
+Mercado Valor
+CONTINUO ITALIA    MICROSOFT CORP - MSFT IM
+Código ISIN: US5949181045
+Operación Referencia Operación
+VENTA   159274832/1
+Fecha Operación Fecha Valor Fecha y Hora Ejecución
+13/10/2026   15/10/2026   13/10/2026 09:00:11
+Número de títulos/Participaciones Precio Bruto Importe Bruto
+2   485.200 EUR   970.40 EUR
+Comisiones Gastos Tasas e Impuestos
+3.00 EUR   0.00 EUR   0.00 EUR
+Retención Origen Retención Destino Importe Efectivo Neto (1)
+0.00 EUR   0.00 EUR   967.40 EUR
 (1) El Importe Neto ha sido anotado en su cuenta corriente en la fecha indicada.
 """
 
@@ -163,6 +183,29 @@ class ParseMyInvestorTradeTest(unittest.TestCase):
         assert amounts is not None
         self.assertEqual(amounts.invested_amount, Decimal("434.65000000"))
         self.assertEqual(amounts.execution_price, (Decimal("434.65") / Decimal("3")).quantize(Decimal("0.00000001")))
+
+    def test_msft_venta_eur(self) -> None:
+        trade = parse_myinvestor_trade(SAMPLE_MSFT_SELL_EUR)
+        self.assertIsNotNone(trade)
+        assert trade is not None
+        self.assertEqual(trade.side, "VENTA")
+        self.assertEqual(trade.reference, "159274832/1")
+        self.assertEqual(trade.ticker, "MSFT")
+        self.assertEqual(trade.asset_amount, Decimal("2"))
+        self.assertEqual(trade.gross_price, Decimal("485.200"))
+        self.assertEqual(trade.net_trade_amount, Decimal("967.40"))
+        self.assertEqual(trade.fee_amount, Decimal("3.00"))
+
+    def test_msft_venta_amounts_gross_price_and_net(self) -> None:
+        trade = parse_myinvestor_trade(SAMPLE_MSFT_SELL_EUR)
+        assert trade is not None
+        amounts = sell_amounts_for_asset_currency(trade, "EUR")
+        self.assertIsNotNone(amounts)
+        assert amounts is not None
+        self.assertEqual(amounts.asset_amount, Decimal("-2"))
+        self.assertEqual(amounts.execution_price, Decimal("485.20000000"))
+        self.assertEqual(amounts.net_liquidity, Decimal("967.40000000"))
+        self.assertEqual(amounts.fee_amount, Decimal("3.00000000"))
 
     def test_fund_suscripcion(self) -> None:
         trade = parse_myinvestor_trade(SAMPLE_FUND_SUSCRIPCION)

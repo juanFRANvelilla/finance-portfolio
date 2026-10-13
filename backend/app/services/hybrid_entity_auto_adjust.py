@@ -60,7 +60,12 @@ def _native_cash_delta_for_fill(
 
     if asset_amount < 0:
         if source == "myinvestor":
-            return None
+            net = fill.get("net_liquidity")
+            if net is not None:
+                return Decimal(str(net))
+            units = abs(asset_amount)
+            price = Decimal(str(fill.get("execution_price") or 0))
+            return units * price - fee
         units = abs(asset_amount)
         price = Decimal(str(fill.get("execution_price") or 0))
         return units * price - fee
@@ -177,11 +182,6 @@ def apply_auto_trades_to_hybrid_entities(
             source=source,
         )
         if delta_eur is None:
-            if source == "myinvestor" and Decimal(str(fill["asset_amount"])) < 0:
-                logger.info(
-                    "MyInvestor venta omitida en ajuste híbrido (TODO): trade=%s",
-                    fill.get("exchange_trade_id"),
-                )
             result.fills_skipped += 1
             result.skip_reasons.append(
                 f"sin delta líquido trade={fill.get('exchange_trade_id')}"

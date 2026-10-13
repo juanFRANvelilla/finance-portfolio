@@ -36,14 +36,16 @@ class NativeCashDeltaTests(unittest.TestCase):
         expected = Decimal("0.0006") * Decimal("74450") - Decimal("0.04")
         self.assertEqual(delta, expected)
 
-    def test_myinvestor_sell_returns_none(self) -> None:
+    def test_myinvestor_sell_uses_net_liquidity(self) -> None:
         fill = {
-            "asset_amount": Decimal("-1"),
-            "invested_amount": Decimal("100"),
-            "fee_amount": Decimal("1"),
-            "execution_price": Decimal("100"),
+            "asset_amount": Decimal("-2"),
+            "invested_amount": None,
+            "fee_amount": Decimal("3"),
+            "execution_price": Decimal("485.2"),
+            "net_liquidity": Decimal("967.40"),
         }
-        self.assertIsNone(_native_cash_delta_for_fill(fill, source="myinvestor"))
+        delta = _native_cash_delta_for_fill(fill, source="myinvestor")
+        self.assertEqual(delta, Decimal("967.40"))
 
 
 if __name__ == "__main__":

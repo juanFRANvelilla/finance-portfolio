@@ -23,6 +23,7 @@ from app.repositories.asset_transactions import (
 )
 from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
+from app.services.transaction_pmp import negative_invested_for_sell
 
 logger = logging.getLogger(__name__)
 
@@ -375,11 +376,12 @@ def _transform_fills(
             continue
 
         sold_units = item["size"]
-        avg_buy_price = (
-            (invested_before / units_before).quantize(Decimal("0.0001"))
-            if units_before > 0
-            else Decimal("0")
+        _, invested_out = negative_invested_for_sell(
+            units_before=units_before,
+            invested_before=invested_before,
+            sold_units=sold_units,
         )
+        cost_removed = -invested_out
 
         tx_rows.append(
             {
@@ -387,7 +389,7 @@ def _transform_fills(
                 "exchange_trade_id": item["exchange_trade_id"],
                 "asset_type_id": asset_type_id,
                 "transaction_date": item["transaction_date"],
-                "invested_amount": None,
+                "invested_amount": invested_out,
                 "asset_amount": -sold_units,
                 "execution_price": item["execution_price"],
                 "fee_amount": item["fee_amount"],
@@ -396,7 +398,6 @@ def _transform_fills(
 
         daily_sale_keys.add((asset_type_id, item["transaction_date"]))
 
-        cost_removed = avg_buy_price * sold_units
         running[asset_type_id] = (
             units_before - sold_units,
             invested_before - cost_removed,

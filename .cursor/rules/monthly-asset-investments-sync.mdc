@@ -147,20 +147,24 @@ Para que un mes nuevo nazca siempre con fila (y el front deje de tener que
 - El front sigue permitiendo editar a mano cualquier mes; esto solo evita que
   nazca sin fila.
 
-## Ventas KuCoin (snapshot + txs)
+## Ventas (KuCoin + MyInvestor IMAP/PDF → snapshot + txs)
 
 - En `asset_transactions`, las ventas llevan `asset_amount` < 0 e
-  **`invested_amount` = NULL** (el importe bruto/neto vive en `asset_sales`).
+  **`invested_amount` negativo** = −(PMP × unidades vendidas), calculado en
+  `app/services/transaction_pmp.py` al importar (KuCoin, MyInvestor mail, PDF
+  Inversis). Así `SUM(invested_amount)` / `SUM(asset_amount)` refleja coste y
+  unidades netas; el **ledger** usa el valor persistido (fallback PMP si NULL en
+  histórico antiguo). Precio de mercado / `net_liquidity` en `asset_sales`.
 - El snapshot mensual solo aplica ventas del **mes natural actual** cuyo
   `executed_at` cae en ese mes, y **solo después** de que exista la fila
-  `asset_sales` del día (KuCoin: upsert diario OK).
+  `asset_sales` (KuCoin: upsert diario; MyInvestor: una fila por referencia).
 - Por activo en el batch: se suma `|asset_amount|` de todas las ventas del
   mes actual; `PMP = amount/units` de la fila monthly **antes** de restar;
   `units' = units − Q`, `amount' = units' × PMP` (PMP estable en la venta).
 - Regla de `last_update` igual que en compras (estrictamente posterior).
 
-Ventas manuales / MyInvestor: pendiente alinear con FIFO; no pasan por esta
-rama de snapshot hasta entonces.
+Ventas **manuales** vía API (`create_asset_sale`): solo `asset_sales`, no crean
+tx en `asset_transactions` (distinto flujo).
 
 ## Fuera de alcance (de momento)
 

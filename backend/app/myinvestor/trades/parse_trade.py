@@ -110,6 +110,16 @@ class TradeAmounts:
 
 
 @dataclass(frozen=True)
+class SellTradeAmounts:
+    """Importes de venta en divisa del activo (precio bruto unitario, neto sin comisión duplicada)."""
+
+    net_liquidity: Decimal
+    asset_amount: Decimal
+    execution_price: Decimal
+    fee_amount: Decimal
+
+
+@dataclass(frozen=True)
 class _NetParsed:
     net_trade_amount: Decimal
     settlement_amount: Decimal
@@ -149,6 +159,10 @@ def _parse_side(raw: str) -> str:
 
 def is_purchase_side(side: str) -> bool:
     return side in ("COMPRA", "SUSCRIPCION")
+
+
+def is_sale_side(side: str) -> bool:
+    return side == "VENTA"
 
 
 def _parse_instrument(text: str) -> tuple[str, str, str, str] | None:
@@ -349,6 +363,34 @@ def amounts_for_asset_currency(trade: ParsedMyInvestorTrade, asset_currency: str
         invested_amount=_q(invested),
         asset_amount=trade.asset_amount,
         execution_price=_q(price),
+        fee_amount=_q(fee),
+    )
+
+
+def sell_amounts_for_asset_currency(
+    trade: ParsedMyInvestorTrade, asset_currency: str
+) -> SellTradeAmounts | None:
+    """Venta: precio unitario bruto del correo; net_liquidity = importe efectivo neto en divisa del activo."""
+    if not is_sale_side(trade.side):
+        return None
+
+    currency = asset_currency.upper()
+    if trade.trade_currency == currency:
+        net = trade.net_trade_amount
+        fee = trade.fee_amount
+        gross_unit = trade.gross_price
+    elif trade.settlement_currency == currency and trade.net_trade_amount > 0:
+        net = trade.settlement_amount
+        rate = trade.settlement_amount / trade.net_trade_amount
+        fee = trade.fee_amount * rate
+        gross_unit = trade.gross_price * rate
+    else:
+        return None
+
+    return SellTradeAmounts(
+        net_liquidity=_q(net),
+        asset_amount=-trade.asset_amount,
+        execution_price=_q(gross_unit),
         fee_amount=_q(fee),
     )
 

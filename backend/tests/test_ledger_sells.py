@@ -42,6 +42,28 @@ class LedgerSellNullInvestedTest(unittest.TestCase):
         self.assertEqual(sell.asset_acumulado, 0.5)
         self.assertEqual(sell.precio_promedio, 1000.0)
 
+    def test_sell_with_stored_negative_invested(self) -> None:
+        asset_id = uuid4()
+        asset = AssetType(
+            id=asset_id,
+            name="MSF.DE",
+            currency="EUR",
+            entity_id="myinvestor",
+            category_id="stocks",
+            display_order=0,
+        )
+        tx_by_asset = {
+            asset_id: [
+                (date(2026, 1, 1), Decimal("2000"), Decimal("4"), Decimal("500")),
+                (date(2026, 2, 1), Decimal("-1000"), Decimal("-2"), Decimal("485.2")),
+            ],
+        }
+        group = _build_asset_ledger_group(asset, tx_by_asset)
+        sell = group.transactions[1]
+        self.assertEqual(sell.euros_metidos, -1000.0)
+        self.assertEqual(sell.euros_totales, 1000.0)
+        self.assertEqual(sell.precio_promedio, 500.0)
+
 
 if __name__ == "__main__":
     unittest.main()

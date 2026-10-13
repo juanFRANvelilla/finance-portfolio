@@ -75,6 +75,20 @@ def load_asset_match_index(db: Session) -> dict[str, AssetMatch]:
     return resolved
 
 
+def load_exchange_trade_ids_with_prefix(db: Session, prefix: str) -> set[str]:
+    rows = db.execute(
+        text(
+            """
+            SELECT exchange_trade_id
+            FROM public.asset_transactions
+            WHERE exchange_trade_id LIKE :pattern
+            """
+        ),
+        {"pattern": f"{prefix}%"},
+    ).fetchall()
+    return {str(row[0]) for row in rows if row[0]}
+
+
 def sum_position_by_asset_type_ids(
     db: Session, asset_type_ids: list[str]
 ) -> dict[str, tuple[Decimal, Decimal]]:
@@ -127,7 +141,7 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int,
 
     for fill in fills:
         row_id = str(uuid.uuid4())
-        recorded_at = datetime.now()
+        recorded_at = fill.get("executed_at") or datetime.now()
         result = db.execute(
             text(
                 """

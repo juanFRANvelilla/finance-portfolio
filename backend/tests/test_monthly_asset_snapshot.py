@@ -167,7 +167,7 @@ class GroupFillsCurrentMonthTest(unittest.TestCase):
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 9, 30),
             "executed_at": datetime(2026, 10, 1, 20, 21, 41),
-            "invested_amount": None,
+            "invested_amount": Decimal("-5"),
             "asset_amount": Decimal("-0.01"),
             "exchange_trade_id": "sell-1",
         }
@@ -241,7 +241,7 @@ class ApplySellSnapshotTest(unittest.TestCase):
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 10, 1),
             "executed_at": datetime(2026, 10, 1, 20, 21, 41),
-            "invested_amount": None,
+            "invested_amount": Decimal("-250.00000000"),
             "asset_amount": Decimal("-0.5"),
             "exchange_trade_id": "kucoin:1",
         }
@@ -269,7 +269,7 @@ class ApplySnapshotEnsureTest(unittest.TestCase):
             "asset_type_id": ASSET_ID,
             "transaction_date": date(2026, 9, 30),
             "executed_at": datetime(2026, 10, 1, 20, 21, 41),
-            "invested_amount": None,
+            "invested_amount": Decimal("-50.00000000"),
             "asset_amount": Decimal("-0.1"),
             "exchange_trade_id": "kucoin:1",
         }

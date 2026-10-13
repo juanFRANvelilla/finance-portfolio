@@ -9,7 +9,7 @@ from app.core.database import Base
 
 
 class AssetTransaction(Base):
-    """Operaciones de exchange (compras + ventas KuCoin). Ventas: importes/unidades negativos."""
+    """Operaciones de exchange (compras + ventas). Ventas: unidades negativas, invested_amount negativo (coste PMP)."""
 
     __tablename__ = "asset_transactions"
     __table_args__ = (UniqueConstraint("exchange_trade_id", name="uq_asset_transactions_exchange_trade_id"),)
@@ -24,7 +24,7 @@ class AssetTransaction(Base):
     """Momento en que la fila se registra en BD (insert), no la hora del exchange.
     Se usa frente a monthly_asset_investments.last_update y el mes del snapshot."""
     invested_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
-    """Importe en divisa del activo. Obligatorio en compras; NULL en ventas (solo unidades negativas)."""
+    """Importe en divisa del activo: positivo en compras; negativo (coste PMP) en ventas."""
     asset_amount: Mapped[float] = mapped_column(Numeric(16, 8), nullable=False)
     execution_price: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)
     fee_amount: Mapped[float | None] = mapped_column(Numeric(16, 8), nullable=True)

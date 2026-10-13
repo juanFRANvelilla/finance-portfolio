@@ -106,8 +106,9 @@ async def _run_myinvestor_sync_pipeline() -> None:
     trades = await asyncio.to_thread(run_scheduled_myinvestor_sync)
     if trades.success:
         logger.info(
-            "Sync MyInvestor operaciones: %s insertados, %s duplicados, %s correos",
+            "Sync MyInvestor operaciones: %s insertados, %s ventas asset_sales, %s duplicados, %s correos",
             trades.inserted,
+            trades.sales_inserted,
             trades.skipped_duplicate,
             trades.raw_emails_count,
         )
