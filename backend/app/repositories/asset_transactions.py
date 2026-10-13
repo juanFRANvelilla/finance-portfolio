@@ -10,10 +10,12 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models.asset_transaction import AssetTransaction
+from app.models.asset_type import AssetType
 
 logger = logging.getLogger(__name__)
 
 FALLBACK_SYNC_START = datetime(2025, 11, 20)
+KUCOIN_SYNC_FALLBACK_START = FALLBACK_SYNC_START
 
 
 def get_max_transaction_date(db: Session) -> date | None:
@@ -21,11 +23,29 @@ def get_max_transaction_date(db: Session) -> date | None:
     return db.scalar(select(func.max(AssetTransaction.transaction_date)))
 
 
+def get_max_transaction_date_for_entity(db: Session, entity_id: str) -> date | None:
+    """MAX(transaction_date) solo en txs de activos ligados a esa entidad (p. ej. kucoin)."""
+    return db.scalar(
+        select(func.max(AssetTransaction.transaction_date))
+        .select_from(AssetTransaction)
+        .join(AssetType, AssetTransaction.asset_type_id == AssetType.id)
+        .where(AssetType.entity_id == entity_id)
+    )
+
+
 def resolve_sync_start_datetime(db: Session) -> datetime:
-    """Punto de partida para sincronizar KuCoin: MAX(transaction_date) o fallback fijo."""
+    """MAX(transaction_date) global (histórico / scripts genéricos)."""
     max_date = get_max_transaction_date(db)
     if max_date is None:
         return FALLBACK_SYNC_START
+    return datetime.combine(max_date, datetime.min.time())
+
+
+def resolve_kucoin_sync_start_datetime(db: Session, *, entity_id: str) -> datetime:
+    """Inicio del sync KuCoin: MAX(transaction_date) solo activos de la entidad exchange."""
+    max_date = get_max_transaction_date_for_entity(db, entity_id)
+    if max_date is None:
+        return KUCOIN_SYNC_FALLBACK_START
     return datetime.combine(max_date, datetime.min.time())
 
 

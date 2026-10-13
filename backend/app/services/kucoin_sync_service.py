@@ -18,7 +18,7 @@ from app.services.kucoin_daily_asset_sales import build_daily_kucoin_sale_row
 from app.repositories.asset_transactions import (
     insert_transactions_batch,
     load_kucoin_asset_name_map,
-    resolve_sync_start_datetime,
+    resolve_kucoin_sync_start_datetime,
     sum_position_by_asset_type_ids,
 )
 from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
@@ -53,11 +53,16 @@ class KucoinSyncResult:
 
 
 def get_sync_start_datetime(db: Session | None = None) -> datetime:
-    """Resuelve la fecha de inicio dinámica (MAX en BD o fallback)."""
+    """MAX(transaction_date) solo en activos con entity_id=kucoin (no MyInvestor ni otros)."""
+    entity_id = get_settings().kucoin_entity_id
+
+    def _resolve(session: Session) -> datetime:
+        return resolve_kucoin_sync_start_datetime(session, entity_id=entity_id)
+
     if db is not None:
-        return resolve_sync_start_datetime(db)
+        return _resolve(db)
     with SessionLocal() as session:
-        return resolve_sync_start_datetime(session)
+        return _resolve(session)
 
 
 def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
@@ -161,8 +166,9 @@ def run_scheduled_kucoin_sync() -> KucoinSyncResult:
     """Ejecuta la sincronización usando la fecha de inicio dinámica desde BD."""
     start_date = get_sync_start_datetime()
     logger.info(
-        "Sync KuCoin: consultando fills desde %s (fecha MAX en BD o fallback 2025-11-20)",
+        "Sync KuCoin: consultando fills desde %s (MAX txs entidad %r o fallback 2025-11-20)",
         start_date.date(),
+        get_settings().kucoin_entity_id,
     )
     return sync_kucoin_transactions(start_date)
 

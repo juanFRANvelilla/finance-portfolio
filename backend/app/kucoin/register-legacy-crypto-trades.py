@@ -25,7 +25,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(dotenv_path=BACKEND_ROOT / ".env")
 
 from app.core.database import SessionLocal
-from app.repositories.asset_transactions import resolve_sync_start_datetime
+from app.core.config import get_settings
+from app.repositories.asset_transactions import resolve_kucoin_sync_start_datetime
 from app.services.kucoin_sync_service import KucoinSyncResult, sync_kucoin_transactions
 
 # Fecha fija para importaciones históricas manuales.
@@ -55,14 +56,16 @@ def main() -> None:
     parser.add_argument(
         "--dynamic-start",
         action="store_true",
-        help="Usar MAX(transaction_date) de la BD como fecha de inicio (igual que el scheduler)",
+        help="Usar MAX(transaction_date) de txs KuCoin (entity_id=kucoin), igual que el scheduler",
     )
     args = parser.parse_args()
 
     if args.dynamic_start:
         with SessionLocal() as db:
-            start_date = resolve_sync_start_datetime(db)
-        print(f"Fecha de inicio dinámica: {start_date.date()}")
+            start_date = resolve_kucoin_sync_start_datetime(
+                db, entity_id=get_settings().kucoin_entity_id
+            )
+        print(f"Fecha de inicio dinámica (solo entidad KuCoin): {start_date.date()}")
     else:
         start_date = START_DATE
         print(f"Fecha de inicio fija: {start_date.date()}")

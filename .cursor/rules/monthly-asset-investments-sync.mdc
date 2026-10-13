@@ -123,9 +123,9 @@ mismo post-proceso. La única diferencia entre proveedores es cómo cada uno
 arma el `fill` (divisa, `executed_at`), no cómo se aplica a
 `monthly_asset_investments`.
 
-- **KuCoin** sigue arrancando su ventana desde `MAX(transaction_date)` en BD
-  (o el fallback fijo si la tabla está vacía). No se toca esa lógica: ya hay
-  histórico cargado.
+- **KuCoin** arranca desde `MAX(transaction_date)` **solo en txs de activos
+  con `entity_id = kucoin`** (`resolve_kucoin_sync_start_datetime`), no el MAX
+  global (MyInvestor u otros no acortan la ventana). Fallback fijo si no hay txs KuCoin.
 - **MyInvestor** no usa ventanas: cada corrida lee toda la etiqueta IMAP
   configurada (son pocos correos). Los duplicados los frena
   `exchange_trade_id`, igual que en KuCoin.
