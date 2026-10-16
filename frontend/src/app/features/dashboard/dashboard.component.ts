@@ -14,6 +14,7 @@ import {
   InvestmentOverviewResponse,
 } from '../../core/models/investment.model';
 import { MarketPriceResponse } from '../../core/models/market-price.model';
+import { sumSalesProfitEurUpToReference } from '../../core/utils/asset-sales-period';
 import {
   computePortfolioLiveSummaryFromDetails,
   LiveInvestmentSummary,
@@ -110,6 +111,15 @@ export class DashboardComponent {
   });
 
   readonly canImportJson = computed(() => this.isPastMonth() && !this.hasFullRecord());
+
+  /** Beneficio en ventas hasta el mes navegado (excluye ventas en meses posteriores al de referencia). */
+  readonly salesProfitEurForReferencePeriod = computed(() => {
+    const sales = this.assetSalesList()?.sales;
+    if (!sales?.length) {
+      return 0;
+    }
+    return sumSalesProfitEurUpToReference(sales, this.year(), this.month());
+  });
 
   readonly displayInvestedEur = computed(() => {
     const liveSummary = this.livePortfolioSummary();
