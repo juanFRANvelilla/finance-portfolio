@@ -42,6 +42,7 @@ _APP_PROFILE, _ENV_PATH = bootstrap_backend_env()
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.services.myinvestor_sync_service import MYINVESTOR_ID_ALIASES
 from app.services.transaction_pmp import negative_invested_for_sell
 from app.repositories.asset_transactions import (
     insert_transactions_batch,
@@ -63,6 +64,29 @@ def _quantize(value: Decimal) -> Decimal:
     return value.quantize(MONEY_QUANT)
 
 
+def _pdf_lookup_keys(ticker: str) -> set[str]:
+    """Claves para emparejar nombre de PDF con --ticker (ticker, ISIN, alias MyInvestor)."""
+    upper = ticker.strip().upper()
+    keys = {upper, upper.replace(".", ""), upper.replace(".", "_")}
+    for isin, alias in MYINVESTOR_ID_ALIASES.items():
+        if alias.upper() == upper:
+            keys.add(isin.upper())
+        if isin.upper() == upper:
+            keys.add(alias.upper())
+    return keys
+
+
+def _pdf_matches_ticker(path: Path, keys: set[str]) -> bool:
+    stem = path.stem.upper()
+    stem_flat = stem.replace(".", "").replace("_", "")
+    for key in keys:
+        ku = key.upper()
+        kf = ku.replace(".", "").replace("_", "")
+        if stem == ku or ku in stem or stem in ku or kf in stem_flat or stem_flat in kf:
+            return True
+    return False
+
+
 def _resolve_asset(ticker: str, db) -> tuple[str, str]:
     index = load_asset_match_index(db)
     key = ticker.strip().upper()
@@ -82,6 +106,7 @@ def _collect_pdf_rows(
         raise SystemExit(f"Directorio inexistente: {pdf_dir}")
 
     ticker_upper = ticker.upper()
+    lookup_keys = _pdf_lookup_keys(ticker_upper)
     pdfs = sorted(pdf_dir.glob("*.pdf"))
     if not pdfs:
         raise SystemExit(f"No hay PDF en {pdf_dir}")
@@ -90,12 +115,12 @@ def _collect_pdf_rows(
     if preferred.is_file():
         targets = [preferred]
     else:
-        targets = [p for p in pdfs if ticker_upper in p.stem.upper()]
+        targets = [p for p in pdfs if _pdf_matches_ticker(p, lookup_keys)]
         if not targets:
             names = ", ".join(p.name for p in pdfs)
             raise SystemExit(
-                f"No se encontró {preferred.name} ni PDF con '{ticker_upper}' en el nombre. "
-                f"Encontrados: {names}"
+                f"No se encontró {preferred.name} ni PDF emparejado con {ticker_upper!r} "
+                f"(claves: {', '.join(sorted(lookup_keys))}). Encontrados: {names}"
             )
 
     if verbose:
@@ -120,7 +145,8 @@ def _collect_pdf_rows(
                 (
                     line.strip()
                     for line in text.splitlines()
-                    if "CONT. ITALIANO" in line and ("COMPRA" in line or "VENTA" in line)
+                    if ("COMPRA" in line or "VENTA" in line)
+                    and re.search(r"\d{2}/\d{2}/\d{4}\d{2}/\d{2}/\d{4}\d+", line)
                 ),
                 None,
             )
