@@ -53,6 +53,7 @@ python -m scripts.myinvestor_pdf_import.import_transactions \
 - Por defecto lee `scripts/myinvestor_pdf_import/pdfs/`. Otro directorio: `--pdf-dir /ruta/a/pdfs`.
 - `--dry-run`: muestra filas y `executed_at` que se usarían; **no inserta**.
 - Sin `--dry-run`: inserta en `asset_transactions` (`exchange_trade_id` = columna Transacción del PDF).
+- No inserta si ese activo **ya tiene alguna operación** con la misma `transaction_date` en BD.
 - Equivalente a `--profile pre`: `APP_PROFILE=server` antes del comando.
 
 Cuando termines la carga, borra esta carpeta y los PDF; no hace falta commitear.

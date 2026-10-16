@@ -32,13 +32,15 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
 from scripts.myinvestor_pdf_import.bootstrap_env import BACKEND_ROOT, bootstrap_backend_env
 
 _APP_PROFILE, _ENV_PATH = bootstrap_backend_env()
+
+from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
@@ -85,6 +87,22 @@ def _pdf_matches_ticker(path: Path, keys: set[str]) -> bool:
         if stem == ku or ku in stem or stem in ku or kf in stem_flat or stem_flat in kf:
             return True
     return False
+
+
+def _load_existing_transaction_dates(db, asset_type_id: str) -> set[date]:
+    """Días que ya tienen al menos una fila en asset_transactions para este activo."""
+    rows = db.execute(
+        text(
+            """
+            SELECT DISTINCT transaction_date
+            FROM public.asset_transactions
+            WHERE asset_type_id = :asset_type_id
+              AND transaction_date IS NOT NULL
+            """
+        ),
+        {"asset_type_id": asset_type_id},
+    ).fetchall()
+    return {row[0] for row in rows if isinstance(row[0], date)}
 
 
 def _resolve_asset(ticker: str, db) -> tuple[str, str]:
@@ -167,15 +185,23 @@ def _build_fills(
     asset_type_id: str,
     asset_currency: str,
     position_totals: dict[str, tuple[Decimal, Decimal]],
-) -> tuple[list[dict], int]:
+    existing_transaction_dates: set[date],
+) -> tuple[list[dict], int, list[tuple[date, str, str]]]:
     """Misma semántica que `_transform_fills` en kucoin_sync_service (compras/ventas)."""
     skipped_invalid_sell = 0
+    skipped_existing_date: list[tuple[date, str, str]] = []
     running: dict[str, tuple[Decimal, Decimal]] = {
         asset_type_id: position_totals.get(asset_type_id, (Decimal("0"), Decimal("0")))
     }
     fills: list[dict] = []
 
     for row in rows:
+        if row.transaction_date in existing_transaction_dates:
+            skipped_existing_date.append(
+                (row.transaction_date, row.transaccion, row.side)
+            )
+            continue
+
         if row.currency != asset_currency:
             raise SystemExit(
                 f"Transacción {row.transaccion}: divisa {row.currency} "
@@ -244,7 +270,7 @@ def _build_fills(
                 invested_before - cost_removed,
             )
 
-    return fills, skipped_invalid_sell
+    return fills, skipped_invalid_sell, skipped_existing_date
 
 
 def _mask_database_url(url: str) -> str:
@@ -318,11 +344,25 @@ def main() -> None:
     with SessionLocal() as db:
         asset_type_id, asset_currency = _resolve_asset(args.ticker, db)
         position_totals = sum_position_by_asset_type_ids(db, [asset_type_id])
-        fills, skipped_sells = _build_fills(
-            rows, asset_type_id, asset_currency, position_totals
+        existing_dates = _load_existing_transaction_dates(db, asset_type_id)
+        fills, skipped_sells, skipped_existing_date = _build_fills(
+            rows,
+            asset_type_id,
+            asset_currency,
+            position_totals,
+            existing_dates,
         )
 
     print(f"Candidatos a insertar: {len(fills)}")
+    if skipped_existing_date:
+        print(
+            f"Omitidas (ya existía operación ese día en BD): {len(skipped_existing_date)}"
+        )
+        for tx_date, transaccion, side in skipped_existing_date:
+            print(
+                f"  día {tx_date.isoformat()} — id={transaccion} {side} "
+                f"(ya hay fila en BD para ese activo y fecha)"
+            )
     if skipped_sells:
         print(f"Ventas omitidas (sin posición): {skipped_sells}")
 
@@ -351,7 +391,9 @@ def main() -> None:
 
     with SessionLocal() as db:
         inserted, skipped, _ = insert_transactions_batch(db, fills)
-    print(f"\nInsertados: {inserted}, omitidos por exchange_trade_id duplicado: {skipped}")
+    print(
+        f"\nInsertados: {inserted}, omitidos por exchange_trade_id duplicado: {skipped}"
+    )
 
 
 if __name__ == "__main__":
