@@ -1,69 +1,87 @@
 <div class="flex flex-col gap-8">
   @for (entity of entities(); track entity.entity_name) {
-    <section class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/10">
-      <div class="mb-5 flex items-center gap-3 border-b border-white/5 pb-4">
-        <span class="h-2.5 w-2.5 rounded-full bg-indigo-400"></span>
-        <h2 class="text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
-      </div>
+    <section class="rounded-2xl bg-slate-800/60 ring-1 ring-white/10">
+      <button
+        type="button"
+        class="ledger-entity-toggle flex w-full items-center gap-3 border-b border-white/5 px-5 py-4 text-left transition hover:bg-white/[0.03]"
+        [attr.aria-expanded]="entityExpanded(entity.entity_name)"
+        (click)="toggleEntity(entity.entity_name)"
+      >
+        <span
+          class="ledger-chevron shrink-0 text-slate-400"
+          [class.ledger-chevron--open]="entityExpanded(entity.entity_name)"
+          aria-hidden="true"
+        ></span>
+        <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"></span>
+        <h2 class="min-w-0 flex-1 text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
+      </button>
 
-      @if (hasCashFlows(entity)) {
-        <div class="ledger-table-card mb-6 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[420px] text-sm">
-              <thead>
-                <tr class="ledger-thead-fiat text-left text-xs font-semibold uppercase tracking-wide">
-                  <th class="px-4 py-2.5">Fecha</th>
-                  <th class="px-4 py-2.5 text-right">Cantidad EUR</th>
-                  <th class="px-4 py-2.5 text-right">Total acumulado</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (flow of entity.entity_cash_flows; track flow.fecha) {
-                  <tr class="border-t border-white/5 transition hover:bg-white/5">
-                    <td class="px-4 py-2 text-slate-300">{{ flow.fecha | date: 'dd/MM/yyyy' }}</td>
-                    <td
-                      class="px-4 py-2 text-right tabular-nums"
-                      [class.fiat-amount-positive]="flow.cantidad > 0"
-                      [class.fiat-amount-negative]="flow.cantidad < 0"
-                      [class.fiat-amount-zero]="flow.cantidad === 0"
-                    >
-                      {{ flow.cantidad | currency: 'EUR' }}
-                    </td>
-                    <td class="px-4 py-2 text-right tabular-nums font-semibold text-amber-200">
-                      {{ flow.total_acumulado | currency: 'EUR' }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
-
-      @if (hasAssetCategories(entity)) {
-        <div class="flex flex-col gap-6">
-          @for (category of entity.asset_categories!; track category.category_id) {
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full" [style.background-color]="category.color ?? '#6366f1'"></span>
-                <h3 class="text-xs font-bold uppercase tracking-wide text-slate-300">{{ category.category_name }}</h3>
-              </div>
-              <div class="flex flex-col gap-5">
-                @for (asset of category.assets; track asset.asset_type_id) {
-                  <ng-container *ngTemplateOutlet="assetLedgerCard; context: { asset: asset }" />
-                }
+      @if (entityExpanded(entity.entity_name)) {
+        <div class="p-5 pt-4">
+          @if (hasCashFlows(entity)) {
+            <div class="ledger-table-card mb-6 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[420px] text-sm">
+                  <thead>
+                    <tr class="ledger-thead-fiat text-left text-xs font-semibold uppercase tracking-wide">
+                      <th class="px-4 py-2.5">Fecha</th>
+                      <th class="px-4 py-2.5 text-right">Cantidad EUR</th>
+                      <th class="px-4 py-2.5 text-right">Total acumulado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (flow of entity.entity_cash_flows; track flow.fecha) {
+                      <tr class="border-t border-white/5 transition hover:bg-white/5">
+                        <td class="px-4 py-2 text-slate-300">{{ flow.fecha | date: 'dd/MM/yyyy' }}</td>
+                        <td
+                          class="px-4 py-2 text-right tabular-nums"
+                          [class.fiat-amount-positive]="flow.cantidad > 0"
+                          [class.fiat-amount-negative]="flow.cantidad < 0"
+                          [class.fiat-amount-zero]="flow.cantidad === 0"
+                        >
+                          {{ flow.cantidad | currency: 'EUR' }}
+                        </td>
+                        <td class="px-4 py-2 text-right tabular-nums font-semibold text-amber-200">
+                          {{ flow.total_acumulado | currency: 'EUR' }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
               </div>
             </div>
           }
-        </div>
-      } @else if (entity.assets.length > 0) {
-        <div class="flex flex-col gap-5">
-          @for (asset of entity.assets; track asset.asset_type_id) {
-            <ng-container *ngTemplateOutlet="assetLedgerCard; context: { asset: asset }" />
+
+          @if (hasAssetCategories(entity)) {
+            <div class="flex flex-col gap-6">
+              @for (category of entity.asset_categories!; track category.category_id) {
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full" [style.background-color]="category.color ?? '#6366f1'"></span>
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-slate-300">{{ category.category_name }}</h3>
+                  </div>
+                  <div class="flex flex-col gap-5">
+                    @for (asset of category.assets; track asset.asset_type_id) {
+                      <ng-container
+                        *ngTemplateOutlet="assetLedgerCard; context: { asset: asset, entityName: entity.entity_name }"
+                      />
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          } @else if (entity.assets.length > 0) {
+            <div class="flex flex-col gap-5">
+              @for (asset of entity.assets; track asset.asset_type_id) {
+                <ng-container
+                  *ngTemplateOutlet="assetLedgerCard; context: { asset: asset, entityName: entity.entity_name }"
+                />
+              }
+            </div>
+          } @else if (!hasCashFlows(entity)) {
+            <p class="py-6 text-center text-sm text-slate-500">Esta entidad todavía no tiene activos registrados.</p>
           }
         </div>
-      } @else if (!hasCashFlows(entity)) {
-        <p class="py-6 text-center text-sm text-slate-500">Esta entidad todavía no tiene activos registrados.</p>
       }
     </section>
   } @empty {
@@ -71,61 +89,75 @@
   }
 </div>
 
-<ng-template #assetLedgerCard let-asset="asset">
+<ng-template #assetLedgerCard let-asset="asset" let-entityName="entityName">
   <div class="ledger-table-card overflow-hidden rounded-lg shadow-sm ring-1 ring-white/5">
-    <div class="ledger-asset-title flex items-center justify-between gap-3 px-4 py-2.5">
-      <span class="text-xs font-bold uppercase tracking-wide text-indigo-300">
-        {{ asset.exchange_ticker }}
-        <span class="ml-2 font-semibold text-slate-400">{{ asset.currency }}</span>
-      </span>
+    <div class="ledger-asset-title flex items-center justify-between gap-3 px-2 py-1.5">
+      <button
+        type="button"
+        class="ledger-asset-toggle flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
+        [attr.aria-expanded]="assetExpanded(entityName, asset)"
+        (click)="toggleAsset(entityName, asset)"
+      >
+        <span
+          class="ledger-chevron shrink-0 text-indigo-300/70"
+          [class.ledger-chevron--open]="assetExpanded(entityName, asset)"
+          aria-hidden="true"
+        ></span>
+        <span class="min-w-0 truncate text-xs font-bold uppercase tracking-wide text-indigo-300">
+          {{ asset.exchange_ticker }}
+          <span class="ml-2 font-semibold text-slate-400">{{ asset.currency }}</span>
+        </span>
+      </button>
       @if (hasTransactions(asset)) {
-        <button type="button" class="ledger-profit-btn" (click)="openProfitDialog(asset)">Beneficios</button>
+        <button type="button" class="ledger-profit-btn mr-2" (click)="openProfitDialog(asset)">Beneficios</button>
       }
     </div>
 
-    @if (hasTransactions(asset)) {
-      <div class="overflow-x-auto">
-        <table class="w-full min-w-[860px] text-sm">
-          <thead>
-            <tr class="ledger-thead-crypto text-left text-xs font-semibold uppercase tracking-wide">
-              <th class="px-4 py-2.5">Fecha</th>
-              <th class="px-4 py-2.5 text-right">Precio promedio</th>
-              <th class="px-4 py-2.5 text-right">Precio compra</th>
-              <th class="px-4 py-2.5 text-right">Importe</th>
-              <th class="px-4 py-2.5 text-right">Total</th>
-              <th class="px-4 py-2.5 text-right">Cantidad activo</th>
-              <th class="px-4 py-2.5 text-right">Acumulado activo</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (tx of groupedTransactions(asset); track tx.fecha + tx.asset_acumulado) {
-              <tr class="border-t border-white/5 transition hover:bg-white/5">
-                <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
-                <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                  {{ tx.precio_promedio | currency: tx.currency : 'symbol' : '1.2-2' }}
-                </td>
-                <td class="px-4 py-2 text-right tabular-nums text-slate-400">
-                  {{ tx.precio_compra | currency: tx.currency : 'symbol' : '1.2-2' }}
-                </td>
-                <td class="px-4 py-2 text-right tabular-nums text-slate-300">
-                  {{ tx.euros_metidos | currency: tx.currency }}
-                </td>
-                <td class="px-4 py-2 text-right tabular-nums font-medium text-white">
-                  {{ tx.euros_totales | currency: tx.currency }}
-                </td>
-                <td class="px-4 py-2 text-right tabular-nums text-slate-300">
-                  {{ tx.asset_comprado | number: '1.2-8' }}
-                </td>
-                <td class="px-4 py-2 text-right tabular-nums font-medium text-slate-100">
-                  {{ tx.asset_acumulado | number: '1.2-8' }}
-                </td>
+    @if (assetExpanded(entityName, asset)) {
+      @if (hasTransactions(asset)) {
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr class="ledger-thead-crypto text-left text-xs font-semibold uppercase tracking-wide">
+                <th class="px-4 py-2.5">Fecha</th>
+                <th class="px-4 py-2.5 text-right">Precio promedio</th>
+                <th class="px-4 py-2.5 text-right">Precio compra</th>
+                <th class="px-4 py-2.5 text-right">Importe</th>
+                <th class="px-4 py-2.5 text-right">Total</th>
+                <th class="px-4 py-2.5 text-right">Cantidad activo</th>
+                <th class="px-4 py-2.5 text-right">Acumulado activo</th>
               </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    } @else {
-      <p class="px-4 py-4 text-center text-xs text-slate-500">Sin operaciones registradas.</p>
+            </thead>
+            <tbody>
+              @for (tx of groupedTransactions(asset); track tx.fecha + tx.asset_acumulado) {
+                <tr class="border-t border-white/5 transition hover:bg-white/5">
+                  <td class="px-4 py-2 text-slate-300">{{ tx.fecha | date: 'dd/MM/yyyy' }}</td>
+                  <td class="px-4 py-2 text-right tabular-nums text-slate-400">
+                    {{ tx.precio_promedio | currency: tx.currency : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums text-slate-400">
+                    {{ tx.precio_compra | currency: tx.currency : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums text-slate-300">
+                    {{ tx.euros_metidos | currency: tx.currency }}
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums font-medium text-white">
+                    {{ tx.euros_totales | currency: tx.currency }}
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums text-slate-300">
+                    {{ tx.asset_comprado | number: '1.2-8' }}
+                  </td>
+                  <td class="px-4 py-2 text-right tabular-nums font-medium text-slate-100">
+                    {{ tx.asset_acumulado | number: '1.2-8' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="px-4 py-4 text-center text-xs text-slate-500">Sin operaciones registradas.</p>
+      }
     }
   </div>
 </ng-template>

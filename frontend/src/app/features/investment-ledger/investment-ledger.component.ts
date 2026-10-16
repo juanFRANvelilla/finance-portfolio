@@ -36,6 +36,47 @@ export class InvestmentLedgerComponent {
   readonly profitDialogOpen = signal(false);
   readonly profitDialogAsset = signal<AssetGroup | null>(null);
 
+  /** Solo en memoria; al entrar en la vista todo permanece cerrado. */
+  private readonly expandedEntityNames = signal<Set<string>>(new Set());
+  private readonly expandedAssetKeys = signal<Set<string>>(new Set());
+
+  entityExpanded(entityName: string): boolean {
+    return this.expandedEntityNames().has(entityName);
+  }
+
+  toggleEntity(entityName: string): void {
+    this.expandedEntityNames.update((current) => {
+      const next = new Set(current);
+      if (next.has(entityName)) {
+        next.delete(entityName);
+      } else {
+        next.add(entityName);
+      }
+      return next;
+    });
+  }
+
+  assetKey(entityName: string, asset: AssetGroup): string {
+    return `${entityName}:${asset.asset_type_id}`;
+  }
+
+  assetExpanded(entityName: string, asset: AssetGroup): boolean {
+    return this.expandedAssetKeys().has(this.assetKey(entityName, asset));
+  }
+
+  toggleAsset(entityName: string, asset: AssetGroup): void {
+    const key = this.assetKey(entityName, asset);
+    this.expandedAssetKeys.update((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   hasCashFlows(entity: EntityGroup): boolean {
     return !!entity.entity_cash_flows && entity.entity_cash_flows.length > 0;
   }

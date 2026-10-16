@@ -2,6 +2,33 @@
   display: block;
 }
 
+.ledger-entity-toggle {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.ledger-asset-toggle {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.ledger-chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  transition: transform 0.15s ease;
+}
+
+.ledger-chevron--open {
+  transform: rotate(90deg);
+}
+
 /* Fondo base de cada tarjeta de tabla; los thead lo sobreescriben con su tinte. */
 .ledger-table-card {
   background-color: rgb(15 23 42 / 0.5); // slate-900/50
