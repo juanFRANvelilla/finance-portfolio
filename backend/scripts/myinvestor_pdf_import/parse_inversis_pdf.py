@@ -125,8 +125,8 @@ def _split_price_amount(tail: str, *, units: Decimal) -> tuple[str, str] | None:
         amount_ref = parse_decimal_amount(best[1])
     except Exception:
         return None
-    # Fondos: precio con 3+ decimales redondeado vs importe ~400 € (p. ej. 10,420).
-    allowed = max(tolerance, amount_ref * Decimal("0.0005"))
+    # Fondos: precio redondeado en PDF (p. ej. 14,146 × 14,13 ≈ 199,88 vs 200,00).
+    allowed = max(tolerance, amount_ref * Decimal("0.00065"))
     if best_diff > allowed:
         return None
     return best
@@ -141,31 +141,53 @@ def _normalize_side(raw: str) -> str:
     return upper
 
 
+def _normalize_fund_rest_text(rest: str) -> str:
+    """Ajusta ' SEUR ' (clase S + divisa) y participaciones pegadas a EUR."""
+    text = rest.strip()
+    text = re.sub(r"\s+SEUR\s+", " S ", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"(\d+,\d+)EUR\s+",
+        r"\1 EUR ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text
+
+
 def _parse_fund_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
     """Fondos: participaciones con coma (31,74000000) + EUR + precio/importe neto."""
-    rest = rest.strip()
+    rest = _normalize_fund_rest_text(rest)
     compact = re.sub(r"\s+", "", rest)
-    match = _FUND_UNITS_CUR_TAIL_RE.search(compact)
-    if not match:
-        return None
-    units = parse_decimal_amount(match.group("units"))
-    split = _split_price_amount(match.group("tail"), units=units)
-    if split is None:
-        return None
-    price_raw, amount_raw = split
-    units_token = match.group("units")
-    name = rest
-    idx = rest.replace(" ", "").find(units_token)
-    if idx > 0:
-        name = rest[:idx]
-    name = re.sub(r"\s+", " ", name).strip()
-    return (
-        name,
-        units,
-        match.group("currency").upper(),
-        parse_decimal_amount(price_raw),
-        parse_decimal_amount(amount_raw),
-    )
+    best_row: tuple[str, Decimal, str, Decimal, Decimal] | None = None
+    best_diff: Decimal | None = None
+
+    for match in _FUND_UNITS_CUR_TAIL_RE.finditer(compact):
+        units = parse_decimal_amount(match.group("units"))
+        split = _split_price_amount(match.group("tail"), units=units)
+        if split is None:
+            continue
+        price_raw, amount_raw = split
+        price = parse_decimal_amount(price_raw)
+        amount = parse_decimal_amount(amount_raw)
+        diff = abs(units * price - amount)
+        if best_diff is not None and diff >= best_diff:
+            continue
+        units_token = match.group("units")
+        name = rest
+        idx = rest.replace(" ", "").find(units_token)
+        if idx > 0:
+            name = rest[:idx]
+        name = re.sub(r"\s+", " ", name).strip()
+        best_diff = diff
+        best_row = (
+            name,
+            units,
+            match.group("currency").upper(),
+            price,
+            amount,
+        )
+
+    return best_row
 
 
 def _parse_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
