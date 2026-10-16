@@ -49,7 +49,7 @@ python -m scripts.myinvestor_pdf_import.import_transactions \
 
 - `--ticker`: debe existir en `asset_types` (ej. `MSF.DE`, `BABA`, `FR0013416716.SG`, ISIN como `JE00BQRFDY49`).
 - PDF: preferido `{TICKER}.pdf`; si no existe, busca otro `.pdf` cuyo nombre contenga el ticker/ISIN/alias MyInvestor.
-- Mercados soportados en el export Inversis: **CONT. ITALIANO**, **XETRA**, **NYSE**, **PARÍS** (dividendos ignorados).
+- Mercados soportados en el export Inversis: **CONT. ITALIANO**, **XETRA**, **NYSE**, **PARÍS**, **FONDOS EXTRANJEROS** (SUSCRIPCION → compra; dividendos ignorados).
 - Por defecto lee `scripts/myinvestor_pdf_import/pdfs/`. Otro directorio: `--pdf-dir /ruta/a/pdfs`.
 - `--dry-run`: muestra filas y `executed_at` que se usarían; **no inserta**.
 - Sin `--dry-run`: inserta en `asset_transactions` (`exchange_trade_id` = columna Transacción del PDF).

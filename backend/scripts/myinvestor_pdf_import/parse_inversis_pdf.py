@@ -11,7 +11,7 @@ from pathlib import Path
 from app.myinvestor.trades.parse_trade import parse_decimal_amount
 
 _WS = r"\s*"
-_MARKET = r"(?:CONT\.\ ITALIANO|XETRA|NYSE|PAR[IÍ]S)"
+_MARKET = r"(?:CONT\.\ ITALIANO|XETRA|NYSE|PAR[IÍ]S|FONDOS\s+EXTRANJEROS)"
 
 _TRADE_LINE_RE = re.compile(
     r"^(?P<tx_date>\d{2}/\d{2}/\d{4})"
@@ -19,10 +19,15 @@ _TRADE_LINE_RE = re.compile(
     r"(?P<transaccion>\d+)"
     rf"{_MARKET}"
     f"{_WS}"
-    r"(?P<side>COMPRA|VENTA)"
+    r"(?P<side>COMPRA|VENTA|SUSCRIPCION|REEMBOLSO)"
     f"{_WS}"
     r"(?P<isin>[A-Z]{2}[A-Z0-9]{10})"
     r"(?P<rest>.+)$",
+    re.IGNORECASE,
+)
+
+_FUND_UNITS_CUR_TAIL_RE = re.compile(
+    r"(?P<units>\d+,\d+)(?P<currency>EUR|USD)(?P<tail>[\d,\s]+)$",
     re.IGNORECASE,
 )
 
@@ -114,14 +119,33 @@ def _split_price_amount(tail: str, *, units: Decimal) -> tuple[str, str] | None:
             best_diff = diff
             best = (price_raw, amount_raw)
 
-    if best is None or best_diff is None or best_diff > tolerance:
+    if best is None or best_diff is None:
+        return None
+    try:
+        amount_ref = parse_decimal_amount(best[1])
+    except Exception:
+        return None
+    # Fondos: precio con 3+ decimales redondeado vs importe ~400 € (p. ej. 10,420).
+    allowed = max(tolerance, amount_ref * Decimal("0.0005"))
+    if best_diff > allowed:
         return None
     return best
 
 
-def _parse_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
+def _normalize_side(raw: str) -> str:
+    upper = raw.upper()
+    if upper == "SUSCRIPCION":
+        return "COMPRA"
+    if upper == "REEMBOLSO":
+        return "VENTA"
+    return upper
+
+
+def _parse_fund_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
+    """Fondos: participaciones con coma (31,74000000) + EUR + precio/importe neto."""
     rest = rest.strip()
-    match = _REST_RE.match(rest)
+    compact = re.sub(r"\s+", "", rest)
+    match = _FUND_UNITS_CUR_TAIL_RE.search(compact)
     if not match:
         return None
     units = parse_decimal_amount(match.group("units"))
@@ -129,13 +153,38 @@ def _parse_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
     if split is None:
         return None
     price_raw, amount_raw = split
+    units_token = match.group("units")
+    name = rest
+    idx = rest.replace(" ", "").find(units_token)
+    if idx > 0:
+        name = rest[:idx]
+    name = re.sub(r"\s+", " ", name).strip()
     return (
-        re.sub(r"\s+", " ", match.group("name")).strip(),
+        name,
         units,
         match.group("currency").upper(),
         parse_decimal_amount(price_raw),
         parse_decimal_amount(amount_raw),
     )
+
+
+def _parse_rest(rest: str) -> tuple[str, Decimal, str, Decimal, Decimal] | None:
+    rest = rest.strip()
+    match = _REST_RE.match(rest)
+    if match:
+        units = parse_decimal_amount(match.group("units"))
+        split = _split_price_amount(match.group("tail"), units=units)
+        if split is None:
+            return _parse_fund_rest(rest)
+        price_raw, amount_raw = split
+        return (
+            re.sub(r"\s+", " ", match.group("name")).strip(),
+            units,
+            match.group("currency").upper(),
+            parse_decimal_amount(price_raw),
+            parse_decimal_amount(amount_raw),
+        )
+    return _parse_fund_rest(rest)
 
 
 def parse_inversis_operations_text(text: str, *, source_pdf: str = "") -> list[InversisTradeRow]:
@@ -160,7 +209,7 @@ def parse_inversis_operations_text(text: str, *, source_pdf: str = "") -> list[I
                 transaction_date=_parse_date(match.group("tx_date")),
                 settlement_date=_parse_date(match.group("liq_date")),
                 transaccion=match.group("transaccion"),
-                side=match.group("side").upper(),
+                side=_normalize_side(match.group("side")),
                 isin=match.group("isin").upper(),
                 instrument_name=name,
                 units=units,
