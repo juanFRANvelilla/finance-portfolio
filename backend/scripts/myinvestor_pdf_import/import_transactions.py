@@ -89,6 +89,24 @@ def _pdf_matches_ticker(path: Path, keys: set[str]) -> bool:
     return False
 
 
+def _pdf_stem_belongs_to_ticker(stem: str, ticker_upper: str) -> bool:
+    """`TICKER.pdf`, `TICKER-0.pdf`, `TICKER-1.pdf`, … (mismo activo, varios exports)."""
+    stem_u = stem.upper()
+    if stem_u == ticker_upper:
+        return True
+    pattern = re.compile(rf"^{re.escape(ticker_upper)}-\d+$", re.IGNORECASE)
+    return pattern.fullmatch(stem_u) is not None
+
+
+def _select_target_pdfs(
+    pdfs: list[Path], ticker_upper: str, lookup_keys: set[str]
+) -> list[Path]:
+    primary = sorted(p for p in pdfs if _pdf_stem_belongs_to_ticker(p.stem, ticker_upper))
+    if primary:
+        return primary
+    return sorted(p for p in pdfs if _pdf_matches_ticker(p, lookup_keys))
+
+
 def _load_existing_transaction_dates(db, asset_type_id: str) -> set[date]:
     """Días que ya tienen al menos una fila en asset_transactions para este activo."""
     rows = db.execute(
@@ -129,17 +147,14 @@ def _collect_pdf_rows(
     if not pdfs:
         raise SystemExit(f"No hay PDF en {pdf_dir}")
 
-    preferred = pdf_dir / f"{ticker_upper}.pdf"
-    if preferred.is_file():
-        targets = [preferred]
-    else:
-        targets = [p for p in pdfs if _pdf_matches_ticker(p, lookup_keys)]
-        if not targets:
-            names = ", ".join(p.name for p in pdfs)
-            raise SystemExit(
-                f"No se encontró {preferred.name} ni PDF emparejado con {ticker_upper!r} "
-                f"(claves: {', '.join(sorted(lookup_keys))}). Encontrados: {names}"
-            )
+    targets = _select_target_pdfs(pdfs, ticker_upper, lookup_keys)
+    if not targets:
+        names = ", ".join(p.name for p in pdfs)
+        raise SystemExit(
+            f"No hay PDF para {ticker_upper!r} "
+            f"(esperado {ticker_upper}.pdf o {ticker_upper}-0.pdf, …). "
+            f"Claves: {', '.join(sorted(lookup_keys))}. Encontrados: {names}"
+        )
 
     if verbose:
         print(f"[verbose] pdf-dir: {pdf_dir.resolve()}")
