@@ -118,9 +118,11 @@ async def _run_myinvestor_sync_pipeline() -> None:
     transfers = await asyncio.to_thread(run_scheduled_myinvestor_transfers_sync)
     if transfers.success:
         logger.info(
-            "Sync MyInvestor transferencias: %s insertados, %s duplicados, %s correos",
+            "Sync MyInvestor transferencias: %s insertados, %s duplicados, "
+            "%s líquido ajustado, %s correos",
             transfers.inserted,
             transfers.skipped_duplicate,
+            transfers.liquid_adjusted,
             transfers.raw_emails_count,
         )
     else:

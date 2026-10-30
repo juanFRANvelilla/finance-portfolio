@@ -1,9 +1,10 @@
-"""Sincronización IMAP MyInvestor/Transferencias → entity_cash_flows."""
+"""Sincronización IMAP MyInvestor/Transferencias → entity_cash_flows + líquido híbrido."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 
 from app.core.config import get_settings
@@ -15,6 +16,8 @@ from app.myinvestor.transfers.parse_transfer import (
     parse_myinvestor_transfer,
 )
 from app.repositories.entity_cash_flows import insert_cash_flows_batch
+from app.services.hybrid_entity_auto_adjust import apply_hybrid_liquid_from_cash_flows
+from app.services.monthly_entity_position_snapshot import ensure_current_month_entity_positions
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,8 @@ class MyInvestorTransfersSyncResult:
     skipped_unparsed: int = 0
     skipped_not_transfer: int = 0
     skipped_non_eur: int = 0
+    liquid_adjusted: int = 0
+    liquid_skipped: int = 0
     success: bool = True
     error: str | None = None
     messages: list[str] = field(default_factory=list)
@@ -111,15 +116,30 @@ def sync_myinvestor_transfers(
 
         if rows_to_insert:
             with SessionLocal() as db:
-                inserted, duplicates = insert_cash_flows_batch(db, rows_to_insert)
+                processing_date = date.today()
+                ensure_current_month_entity_positions(db, today=processing_date)
+                inserted, duplicates, inserted_rows = insert_cash_flows_batch(db, rows_to_insert)
+                if inserted_rows:
+                    liquid_result = apply_hybrid_liquid_from_cash_flows(
+                        db,
+                        inserted_rows,
+                        position_as_of=processing_date,
+                    )
+                    result.liquid_adjusted = liquid_result.flows_liquid_adjusted
+                    result.liquid_skipped = liquid_result.flows_skipped
+                    for reason in liquid_result.skip_reasons:
+                        logger.warning("Transferencia sin ajuste líquido: %s", reason)
                 db.commit()
                 result.inserted = inserted
                 result.skipped_duplicate = duplicates
 
         logger.info(
-            "MyInvestor transfers sync: %s insertados, %s duplicados (%s correos)",
+            "MyInvestor transfers sync: %s insertados, %s duplicados, "
+            "%s líquido ajustado, %s líquido omitido (%s correos)",
             result.inserted,
             result.skipped_duplicate,
+            result.liquid_adjusted,
+            result.liquid_skipped,
             result.raw_emails_count,
         )
     except Exception as exc:

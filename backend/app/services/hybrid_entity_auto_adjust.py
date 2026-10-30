@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -29,6 +29,13 @@ class HybridAutoAdjustResult:
     fills_liquid_adjusted: int = 0
     fills_skipped: int = 0
     entities_recalculated: int = 0
+    skip_reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
+class HybridCashFlowAdjustResult:
+    flows_liquid_adjusted: int = 0
+    flows_skipped: int = 0
     skip_reasons: list[str] = field(default_factory=list)
 
 
@@ -118,6 +125,59 @@ def _recalc_hybrid_invested(db: Session, *, entity_id: str, year: int, month: in
     totals = sum_linked_asset_investments_eur(db, entity_id, year, month)
     position.invested_amount = float(totals["total_eur"])
     return True
+
+
+def apply_hybrid_liquid_from_cash_flows(
+    db: Session,
+    inserted_flows: list[dict],
+    *,
+    position_as_of: date | None = None,
+) -> HybridCashFlowAdjustResult:
+    """Suma importes EUR al líquido híbrido del mes en curso al procesar el sync."""
+    result = HybridCashFlowAdjustResult()
+    if not inserted_flows:
+        return result
+
+    as_of = position_as_of or date.today()
+    year, month = as_of.year, as_of.month
+
+    for flow in inserted_flows:
+        entity_id = flow.get("entity_id")
+        amount = flow.get("amount")
+        source_reference = flow.get("source_reference")
+
+        if not entity_id or amount is None:
+            result.flows_skipped += 1
+            result.skip_reasons.append(f"flow incompleto ref={source_reference}")
+            continue
+
+        entity = db.get(Entity, entity_id)
+        if entity is None or entity.entity_type != EntityType.HYBRID:
+            result.flows_skipped += 1
+            result.skip_reasons.append(f"entidad no HYBRID ref={source_reference}")
+            continue
+        position = _load_entity_position(db, entity_id=entity_id, year=year, month=month)
+        if position is None:
+            result.flows_skipped += 1
+            result.skip_reasons.append(
+                f"sin monthly_entity_positions {entity_id} {year}-{month:02d} ref={source_reference}"
+            )
+            continue
+
+        delta = Decimal(str(amount)).quantize(_MONEY)
+        liquid = Decimal(str(position.liquid_amount))
+        position.liquid_amount = float((liquid + delta).quantize(_MONEY))
+        result.flows_liquid_adjusted += 1
+        logger.info(
+            "híbrida líquido (cash flow) entity=%s %s-%02d delta_eur=%s ref=%s",
+            entity_id,
+            year,
+            month,
+            delta,
+            source_reference,
+        )
+
+    return result
 
 
 def apply_auto_trades_to_hybrid_entities(

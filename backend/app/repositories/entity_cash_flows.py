@@ -36,14 +36,15 @@ def resolve_kucoin_fiat_sync_start_datetime(db: Session, entity_id: str) -> date
     return start
 
 
-def insert_cash_flows_batch(db: Session, rows: list[dict]) -> tuple[int, int]:
+def insert_cash_flows_batch(db: Session, rows: list[dict]) -> tuple[int, int, list[dict]]:
     """Inserta filas con ON CONFLICT (source_reference) DO NOTHING.
 
     Cada dict: entity_id, amount, flow_date, source_reference.
-    Devuelve (insertados, omitidos_por_duplicado).
+    Devuelve (insertados, omitidos_por_duplicado, filas_realmente_insertadas).
     """
     insertados = 0
     omitidos = 0
+    inserted_rows: list[dict] = []
 
     for row in rows:
         result = db.execute(
@@ -68,5 +69,6 @@ def insert_cash_flows_batch(db: Session, rows: list[dict]) -> tuple[int, int]:
             omitidos += 1
         else:
             insertados += 1
+            inserted_rows.append(row)
 
-    return insertados, omitidos
+    return insertados, omitidos, inserted_rows

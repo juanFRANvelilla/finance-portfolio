@@ -107,7 +107,7 @@ def sync_kucoin_fiat_cash_flows(
 
         if rows_to_insert:
             with SessionLocal() as db:
-                inserted, duplicates = insert_cash_flows_batch(db, rows_to_insert)
+                inserted, duplicates, _ = insert_cash_flows_batch(db, rows_to_insert)
                 db.commit()
                 result.inserted = inserted
                 result.skipped_duplicate = duplicates
