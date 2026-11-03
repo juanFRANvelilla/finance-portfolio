@@ -28,17 +28,18 @@ resources:
     memory: "512Mi"
     cpu: 500m
 ingress:
+  enabled: false
+gatewayRoute:
   enabled: true
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-set-header: X-Real-IP $remote_addr
-    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-  class: "nginx"
-  # TLS solo en el Ingress del front (un certificado por host; nginx fusiona rutas)
   host: "pro.finance.juanfranciscoperez.es"
   path: /api
   extraPaths:
     - /health
-  tls: false
+  bodySize: 10Mi
+gateway:
+  enabled: true
+  name: lab
+  namespace: jenkins
+  sectionName: https-finance-pro
 database:
   host: "postgres-service.postgres.svc.cluster.local"

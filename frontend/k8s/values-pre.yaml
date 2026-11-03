@@ -32,12 +32,16 @@ volumeMounts:
 - name: tmpfs-run-nginx
   mountPath: /run/nginx
 ingress:
+  enabled: false
+gatewayRoute:
   enabled: true
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-set-header: X-Real-IP $remote_addr
-    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-ovh-prod
-  class: "nginx"
   # Mismo host que el backend: / al frontend, /api y /health al backend
   host: "pre.finance.juanfranciscoperez.es"
-  tls: true
+  path: "/"
+gateway:
+  enabled: true
+  name: lab
+  namespace: jenkins
+  sectionName: https-finance-pre
+  issuer: letsencrypt-ovh-prod
+  tlsSecret: finance-pre-gateway-tls
