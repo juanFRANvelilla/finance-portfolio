@@ -157,6 +157,10 @@ class ParseMyInvestorTradeTest(unittest.TestCase):
         self.assertIn("FR0013416716.SG", keys)
         self.assertEqual(myinvestor_asset_lookup_keys("BABA", "US01609W1027"), ["BABA", "US01609W1027"])
 
+    def test_je00bqrfdy49_isin_aliases_to_yahoo_ticker(self) -> None:
+        keys = myinvestor_asset_lookup_keys("JE00BQRFDY49", "JE00BQRFDY49")
+        self.assertIn("JE00BQRFDY49.SG", keys)
+
     def test_microsoft_isin_aliases_to_xetra_yahoo_ticker(self) -> None:
         keys = myinvestor_asset_lookup_keys("MSFT", "US5949181045")
         self.assertEqual(keys[0], "MSFT")
