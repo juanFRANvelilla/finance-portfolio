@@ -26,6 +26,7 @@ from app.myinvestor.trades.parse_trade import (
 )
 from app.repositories.asset_sales import upsert_kucoin_daily_asset_sale
 from app.repositories.asset_transactions import (
+    AssetMatch,
     insert_transactions_batch,
     load_asset_match_index,
     load_exchange_trade_ids_with_prefix,
@@ -33,6 +34,7 @@ from app.repositories.asset_transactions import (
 )
 from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
+from app.services.purchase_asset_type import create_myinvestor_asset_for_purchase
 from app.services.transaction_pmp import negative_invested_for_sell
 
 logger = logging.getLogger(__name__)
@@ -76,6 +78,7 @@ class MyInvestorSyncResult:
     skipped_not_trade: int = 0
     skipped_unparsed: int = 0
     skipped_unknown_asset: int = 0
+    assets_created: int = 0
     skipped_currency: int = 0
     skipped_invalid_sell: int = 0
     sales_inserted: int = 0
@@ -267,11 +270,6 @@ def sync_myinvestor_transactions(
 
         with SessionLocal() as db:
             asset_index = load_asset_match_index(db)
-            if not asset_index:
-                result.success = False
-                result.error = "No hay activos con ticker o name en asset_types."
-                logger.error(result.error)
-                return result
 
             resolved: list[_ResolvedTrade] = []
             for message in messages:
@@ -319,6 +317,20 @@ def sync_myinvestor_transactions(
                     ),
                     None,
                 )
+                if asset is None and is_purchase_side(trade.side):
+                    created, was_created = create_myinvestor_asset_for_purchase(db, trade)
+                    if created is not None:
+                        asset = AssetMatch(
+                            asset_type_id=str(created.id),
+                            currency=created.currency.upper(),
+                            entity_id=created.entity_id,
+                        )
+                        for key in myinvestor_asset_lookup_keys(trade.ticker, trade.isin):
+                            asset_index.setdefault(key, asset)
+                        if created.name:
+                            asset_index.setdefault(created.name.upper(), asset)
+                        if was_created:
+                            result.assets_created += 1
                 if asset is None:
                     result.skipped_unknown_asset += 1
                     logger.warning(

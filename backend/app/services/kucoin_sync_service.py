@@ -23,6 +23,7 @@ from app.repositories.asset_transactions import (
 )
 from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_entities
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
+from app.services.purchase_asset_type import ensure_kucoin_purchase_assets
 from app.services.transaction_pmp import negative_invested_for_sell
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class KucoinSyncResult:
     sales_skipped_duplicate: int = 0
     skipped_fiat_bridge: int = 0
     skipped_unknown_asset: int = 0
+    assets_created: int = 0
     skipped_invalid_sell: int = 0
     success: bool = True
     error: str | None = None
@@ -84,6 +86,7 @@ def sync_kucoin_transactions(start_date: datetime) -> KucoinSyncResult:
 
         with SessionLocal() as db:
             asset_map = load_kucoin_asset_name_map(db)
+            result.assets_created = ensure_kucoin_purchase_assets(db, raw_fills, asset_map)
             if not asset_map:
                 result.success = False
                 result.error = "No hay activos KuCoin (price_source='kucoin') en asset_types."
