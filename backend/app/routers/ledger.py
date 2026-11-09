@@ -7,10 +7,13 @@ from app.schemas.ledger import (
     LedgerProfitRequest,
     LedgerProfitResponse,
     LedgerUnitPriceResponse,
+    TradeRepublicCsvImportRequest,
+    TradeRepublicCsvImportResponse,
 )
 from app.services.fx_converter import get_usd_to_eur_rate
 from app.services.ledger import build_investment_ledger
 from app.services.ledger_profit import calculate_ledger_profit, default_unit_price_eur_to_currency
+from app.services.trade_republic_csv_service import import_trade_republic_csv
 
 router = APIRouter(prefix="/api/investment", tags=["ledger"])
 
@@ -36,6 +39,17 @@ def get_default_unit_price(
         currency=currency,
         fx_usd_to_eur=get_usd_to_eur_rate(year, month),
     )
+
+
+@router.post("/trade-republic/csv", response_model=TradeRepublicCsvImportResponse)
+def import_trade_republic_transactions(
+    payload: TradeRepublicCsvImportRequest, db: Session = Depends(get_db)
+) -> TradeRepublicCsvImportResponse:
+    """Importa compras y ventas TRADING de un CSV de Trade Republic."""
+    result = import_trade_republic_csv(db, payload.csv_text)
+    if not result.success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.error or "No se pudo importar el CSV.")
+    return TradeRepublicCsvImportResponse.model_validate(result, from_attributes=True)
 
 
 @router.post("/ledger/profit", response_model=LedgerProfitResponse)

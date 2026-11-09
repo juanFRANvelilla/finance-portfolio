@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,6 +11,9 @@ class AssetType(Base):
     """Catálogo estático de activos concretos (BTC, ETH, BABA, MSCI World...)."""
 
     __tablename__ = "asset_types"
+    __table_args__ = (
+        UniqueConstraint("name", "entity_id", name="uq_asset_type_name_entity"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     category_id: Mapped[str] = mapped_column(String(30), ForeignKey("investment_categories.id"), nullable=False)

@@ -30,6 +30,40 @@ _ALLOWED_CURRENCIES = frozenset({"EUR", "USD"})
 _ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
 
 
+def find_asset_by_name_and_entity(db: Session, name: str, entity_id: str) -> AssetType | None:
+    key = " ".join((name or "").split()).upper()[:50]
+    if not key or not entity_id:
+        return None
+    return db.scalars(
+        select(AssetType).where(
+            func.upper(AssetType.name) == key,
+            AssetType.entity_id == entity_id,
+        )
+    ).first()
+
+
+def create_trade_republic_asset(
+    db: Session, *, name: str, ticker: str, currency: str
+) -> AssetType | None:
+    """Compra Trade Republic: activo nuevo ligado a esa entidad, ticker = symbol."""
+    category_id = _trade_republic_category_id(db)
+    if category_id is None:
+        logger.error(
+            "No se crea el activo Trade Republic %s: no hay categoría de acciones",
+            name,
+        )
+        return None
+    return _create_purchase_asset(
+        db,
+        ticker=ticker,
+        name=name,
+        currency=currency,
+        entity_id=get_settings().trade_republic_entity_id,
+        category_id=category_id,
+        price_source="yahoo",
+    )
+
+
 def find_asset_type_by_ticker(db: Session, ticker: str) -> AssetType | None:
     key = (ticker or "").strip().upper()
     if not key:
@@ -149,6 +183,16 @@ def _find_by_name(db: Session, name: str) -> AssetType | None:
     if not key:
         return None
     return db.scalars(select(AssetType).where(func.upper(AssetType.name) == key[:50])).first()
+
+
+def _trade_republic_category_id(db: Session) -> str | None:
+    """Acciones de Trade Republic. En PRE/PRO el id es 'acciones', no 'stocks'."""
+    for candidate in ("acciones", "stocks"):
+        if db.get(InvestmentCategory, candidate) is not None:
+            return candidate
+    return db.scalars(
+        select(InvestmentCategory.id).where(func.lower(InvestmentCategory.name).like("%accion%"))
+    ).first()
 
 
 def _category_id(db: Session, preferred: str) -> str | None:

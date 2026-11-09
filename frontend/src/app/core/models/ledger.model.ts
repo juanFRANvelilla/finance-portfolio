@@ -67,7 +67,23 @@ export interface CategoryLedgerGroup {
   assets: AssetGroup[];
 }
 
+export interface TradeRepublicImportResult {
+  trading_rows: number;
+  inserted: number;
+  sales_inserted: number;
+  assets_created: number;
+  skipped_duplicate: number;
+  skipped_sell_without_asset: number;
+  skipped_invalid: number;
+  skipped_invalid_sell: number;
+  liquid_adjusted: number;
+  success: boolean;
+  error: string | null;
+  messages: string[];
+}
+
 export interface EntityGroup {
+  entity_id: string;
   entity_name: string;
   /** Histórico de movimientos de caja; vacío si la entidad no tiene filas. */
   entity_cash_flows?: EntityCashFlow[];

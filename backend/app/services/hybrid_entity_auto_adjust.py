@@ -20,7 +20,7 @@ from app.services.linked_asset_investments import sum_linked_asset_investments_e
 
 logger = logging.getLogger(__name__)
 
-AutoTradeSource = Literal["kucoin", "myinvestor"]
+AutoTradeSource = Literal["kucoin", "myinvestor", "trade_republic"]
 _MONEY = Decimal("0.01")
 
 
@@ -59,14 +59,14 @@ def _native_cash_delta_for_fill(
 
     if asset_amount > 0:
         invested = Decimal(str(fill.get("invested_amount") or 0))
-        if source == "myinvestor":
-            cash_out = invested
-        else:
+        if source == "kucoin":
             cash_out = invested + fee
+        else:
+            cash_out = invested
         return -cash_out
 
     if asset_amount < 0:
-        if source == "myinvestor":
+        if source != "kucoin":
             net = fill.get("net_liquidity")
             if net is not None:
                 return Decimal(str(net))

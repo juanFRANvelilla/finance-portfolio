@@ -84,7 +84,27 @@ class CategoryLedgerGroup(BaseModel):
     assets: list[AssetLedgerGroup] = Field(default_factory=list)
 
 
+class TradeRepublicCsvImportRequest(BaseModel):
+    csv_text: str = Field(min_length=1)
+
+
+class TradeRepublicCsvImportResponse(BaseModel):
+    trading_rows: int = 0
+    inserted: int = 0
+    sales_inserted: int = 0
+    assets_created: int = 0
+    skipped_duplicate: int = 0
+    skipped_sell_without_asset: int = 0
+    skipped_invalid: int = 0
+    skipped_invalid_sell: int = 0
+    liquid_adjusted: int = 0
+    success: bool = True
+    error: str | None = None
+    messages: list[str] = Field(default_factory=list)
+
+
 class EntityLedgerGroup(BaseModel):
+    entity_id: str
     entity_name: str
     entity_cash_flows: list[EntityCashFlowRow] = Field(default_factory=list)
     """Lista plana cuando la entidad solo tiene activos de una categoría."""

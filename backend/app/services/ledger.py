@@ -14,6 +14,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.asset_transaction import AssetTransaction
 from app.models.asset_type import AssetType
 from app.models.entity import Entity
@@ -189,12 +190,24 @@ def build_investment_ledger(db: Session) -> list[EntityLedgerGroup]:
 
         groups.append(
             EntityLedgerGroup(
+                entity_id=entity_id,
                 entity_name=entity_name,
                 entity_cash_flows=entity_cash_flows,
                 assets=flat_assets,
                 asset_categories=asset_categories,
             )
         )
+
+    trade_republic_id = get_settings().trade_republic_entity_id
+    if trade_republic_id not in entity_ids:
+        entity = entities_by_id.get(trade_republic_id)
+        if entity is not None:
+            groups.append(
+                EntityLedgerGroup(
+                    entity_id=entity.id,
+                    entity_name=entity.name,
+                )
+            )
 
     groups.sort(key=lambda g: g.entity_name)
     return groups

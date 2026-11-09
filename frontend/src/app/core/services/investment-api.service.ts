@@ -18,7 +18,12 @@ import {
   AssetSaleRead,
   AssetSalesListResponse,
 } from '../models/investment.model';
-import { EntityGroup, LedgerProfitRequest, LedgerProfitResponse } from '../models/ledger.model';
+import {
+  EntityGroup,
+  LedgerProfitRequest,
+  LedgerProfitResponse,
+  TradeRepublicImportResult,
+} from '../models/ledger.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvestmentApiService {
@@ -117,6 +122,12 @@ export class InvestmentApiService {
 
   getInvestmentLedger(): Observable<EntityGroup[]> {
     return this.http.get<EntityGroup[]>(`${this.baseUrl}/ledger`);
+  }
+
+  importTradeRepublicCsv(csvText: string): Observable<TradeRepublicImportResult> {
+    return this.http.post<TradeRepublicImportResult>(`${this.baseUrl}/trade-republic/csv`, {
+      csv_text: csvText,
+    });
   }
 
   calculateLedgerProfit(payload: LedgerProfitRequest): Observable<LedgerProfitResponse> {

@@ -1,5 +1,5 @@
 import { CurrencyPipe, DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
-import { Component, input, signal } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 
 import { AssetGroup, AssetTransactionRow, EntityGroup } from '../../core/models/ledger.model';
 import { LedgerProfitDialogComponent } from './components/ledger-profit-dialog/ledger-profit-dialog.component';
@@ -32,6 +32,8 @@ export class InvestmentLedgerComponent {
   readonly entities = input.required<EntityGroup[]>();
   readonly year = input.required<number>();
   readonly month = input.required<number>();
+  readonly importing = input(false);
+  readonly importCsv = output<File>();
 
   readonly profitDialogOpen = signal(false);
   readonly profitDialogAsset = signal<AssetGroup | null>(null);
@@ -39,6 +41,18 @@ export class InvestmentLedgerComponent {
   /** Solo en memoria; al entrar en la vista todo permanece cerrado. */
   private readonly expandedEntityNames = signal<Set<string>>(new Set());
   private readonly expandedAssetKeys = signal<Set<string>>(new Set());
+
+  isTradeRepublic(entity: EntityGroup): boolean {
+    return entity.entity_id === 'trade_republic';
+  }
+
+  onCsvSelected(input: HTMLInputElement): void {
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) {
+      this.importCsv.emit(file);
+    }
+  }
 
   entityExpanded(entityName: string): boolean {
     return this.expandedEntityNames().has(entityName);

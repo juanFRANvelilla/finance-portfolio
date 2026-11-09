@@ -162,10 +162,16 @@ def create_asset_type(payload: AssetTypeCreate, db: Session = Depends(get_db)) -
     _get_category_or_404(db, payload.category_id)
     _validate_asset_entity_link(db, payload.entity_id)
 
-    existing = db.scalars(select(AssetType).where(AssetType.name == payload.name)).first()
+    name_stmt = select(AssetType).where(AssetType.name == payload.name)
+    if payload.entity_id:
+        name_stmt = name_stmt.where(AssetType.entity_id == payload.entity_id)
+    else:
+        name_stmt = name_stmt.where(AssetType.entity_id.is_(None))
+    existing = db.scalars(name_stmt).first()
     if existing is not None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un activo llamado '{payload.name}'"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ya existe un activo llamado '{payload.name}' en esta entidad",
         )
 
     next_order = db.scalar(

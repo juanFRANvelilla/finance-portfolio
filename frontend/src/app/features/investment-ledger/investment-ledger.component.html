@@ -1,20 +1,38 @@
 <div class="flex flex-col gap-8">
   @for (entity of entities(); track entity.entity_name) {
     <section class="rounded-2xl bg-slate-800/60 ring-1 ring-white/10">
-      <button
-        type="button"
-        class="ledger-entity-toggle flex w-full items-center gap-3 border-b border-white/5 px-5 py-4 text-left transition hover:bg-white/[0.03]"
-        [attr.aria-expanded]="entityExpanded(entity.entity_name)"
-        (click)="toggleEntity(entity.entity_name)"
-      >
-        <span
-          class="ledger-chevron shrink-0 text-slate-400"
-          [class.ledger-chevron--open]="entityExpanded(entity.entity_name)"
-          aria-hidden="true"
-        ></span>
-        <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"></span>
-        <h2 class="min-w-0 flex-1 text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
-      </button>
+      <div class="flex w-full items-center gap-2 border-b border-white/5 px-3 py-2 sm:px-5 sm:py-3">
+        <button
+          type="button"
+          class="ledger-entity-toggle flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left transition hover:bg-white/[0.03]"
+          [attr.aria-expanded]="entityExpanded(entity.entity_name)"
+          (click)="toggleEntity(entity.entity_name)"
+        >
+          <span
+            class="ledger-chevron shrink-0 text-slate-400"
+            [class.ledger-chevron--open]="entityExpanded(entity.entity_name)"
+            aria-hidden="true"
+          ></span>
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"></span>
+          <h2 class="min-w-0 flex-1 text-base font-bold uppercase tracking-wide text-white">{{ entity.entity_name }}</h2>
+        </button>
+        @if (isTradeRepublic(entity)) {
+          <label class="ledger-import-btn" [class.ledger-import-btn--busy]="importing()" title="Importar CSV de Trade Republic">
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              class="sr-only"
+              [disabled]="importing()"
+              (change)="onCsvSelected($any($event.target))"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+              <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V6.636l1.955 2.129a.75.75 0 0 0 1.09-1.03l-3.25-3.5a.75.75 0 0 0-1.09 0l-3.25 3.5a.75.75 0 1 0 1.09 1.03L9.25 6.636v6.614Z" />
+              <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+            </svg>
+            <span class="sr-only">Importar CSV de Trade Republic</span>
+          </label>
+        }
+      </div>
 
       @if (entityExpanded(entity.entity_name)) {
         <div class="p-5 pt-4">
