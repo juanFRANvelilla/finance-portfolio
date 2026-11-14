@@ -1,0 +1,4 @@
+.ledger-page-main {
+  /* Evita que la última entidad quede bajo el chrome del navegador / safe area iOS */
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}

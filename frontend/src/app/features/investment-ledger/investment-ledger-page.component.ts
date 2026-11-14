@@ -14,6 +14,7 @@ import { InvestmentLedgerComponent } from './investment-ledger.component';
   selector: 'app-investment-ledger-page',
   imports: [InvestmentLedgerComponent],
   templateUrl: './investment-ledger-page.component.html',
+  styleUrl: './investment-ledger-page.component.scss',
 })
 export class InvestmentLedgerPageComponent implements OnInit {
   private readonly api = inject(InvestmentApiService);

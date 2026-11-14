@@ -1,11 +1,14 @@
 :host {
   display: block;
+  min-height: 100%;
 }
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background-color: #0f172a;
   color: #fff;
 

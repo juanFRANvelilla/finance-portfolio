@@ -1,13 +1,16 @@
 @import "tailwindcss";
 
-html,
-body {
-  height: 100%;
+html {
+  min-height: 100%;
   overflow-x: hidden;
   max-width: 100%;
 }
 
 body {
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100%;
   margin: 0;
   font-family:
     "Inter",
