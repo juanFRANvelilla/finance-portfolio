@@ -76,4 +76,12 @@ export class FinanceApiService {
       payload,
     );
   }
+
+  getTransactionSyncStatus(): Observable<{ running: boolean }> {
+    return this.http.get<{ running: boolean }>(`${this.baseUrl}/sync/transactions/status`);
+  }
+
+  triggerTransactionSync(): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(`${this.baseUrl}/sync/transactions`, {});
+  }
 }

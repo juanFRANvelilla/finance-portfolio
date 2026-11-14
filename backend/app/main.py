@@ -12,7 +12,7 @@ from app.core.scheduler import (
     start_portfolio_sync_background,
     start_scheduler,
 )
-from app.routers import asset_sales, entities, investments, ledger, market_prices, records
+from app.routers import asset_sales, entities, investments, ledger, market_prices, records, sync
 from app.routers.asset_sales import v1_router as asset_sales_v1_router
 
 logging.basicConfig(
@@ -70,6 +70,7 @@ app.include_router(asset_sales.router)
 app.include_router(asset_sales_v1_router)
 app.include_router(ledger.router)
 app.include_router(market_prices.router)
+app.include_router(sync.router)
 
 
 @app.get("/health", tags=["health"])

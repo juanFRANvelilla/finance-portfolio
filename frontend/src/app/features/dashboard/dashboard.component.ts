@@ -2,7 +2,17 @@ import { DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import { Observable, Subscription, catchError, forkJoin, of, switchMap, timer } from 'rxjs';
+import {
+  Observable,
+  Subscription,
+  catchError,
+  forkJoin,
+  of,
+  switchMap,
+  takeWhile,
+  tap,
+  timer,
+} from 'rxjs';
 
 import { FinanceApiService } from '../../core/services/finance-api.service';
 import { InvestmentApiService } from '../../core/services/investment-api.service';
@@ -88,6 +98,8 @@ export class DashboardComponent {
   readonly livePatrimonyMode = signal(false);
   readonly livePortfolioSummary = signal<LiveInvestmentSummary | null>(null);
   readonly livePatrimonyLoading = signal(false);
+  readonly syncingTransactions = signal(false);
+  private transactionSyncPollSub: Subscription | null = null;
 
   readonly hasRecord = computed(() => this.recordResponse()?.exists === true);
   readonly hasFullRecord = computed(() => {
@@ -155,7 +167,18 @@ export class DashboardComponent {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.stopLivePatrimonyPoll());
+    this.destroyRef.onDestroy(() => {
+      this.stopLivePatrimonyPoll();
+      this.stopTransactionSyncPoll();
+    });
+    this.api.getTransactionSyncStatus().subscribe({
+      next: (status) => {
+        if (status.running) {
+          this.syncingTransactions.set(true);
+          this.startTransactionSyncPoll();
+        }
+      },
+    });
     // Reacciona a cambios de query params (navegación desde el shell global)
     this.route.queryParamMap.subscribe((params) => {
       const stored = this.periodStorage.read();
@@ -329,6 +352,54 @@ export class DashboardComponent {
       next: (response) => this.timelinePoints.set(response.points),
       error: () => this.timelinePoints.set([]),
     });
+  }
+
+  triggerTransactionSync(): void {
+    if (this.syncingTransactions()) {
+      return;
+    }
+    this.syncingTransactions.set(true);
+    this.api.triggerTransactionSync().subscribe({
+      next: () => this.startTransactionSyncPoll(),
+      error: (err) => {
+        this.syncingTransactions.set(false);
+        if (err?.status === 409) {
+          this.errorMessage.set('Ya hay una sincronización de transacciones en curso.');
+          this.startTransactionSyncPoll();
+          return;
+        }
+        this.errorMessage.set('No se pudo iniciar la sincronización de transacciones.');
+      },
+    });
+  }
+
+  private startTransactionSyncPoll(): void {
+    this.stopTransactionSyncPoll();
+    this.transactionSyncPollSub = timer(0, 2000)
+      .pipe(
+        switchMap(() => this.api.getTransactionSyncStatus()),
+        tap((status) => {
+          if (!status.running) {
+            this.syncingTransactions.set(false);
+          }
+        }),
+        takeWhile((status) => status.running, true),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        complete: () => {
+          this.loadRecord();
+          this.loadAssetSales();
+          if (this.livePatrimonyMode()) {
+            this.refreshLivePatrimony();
+          }
+        },
+      });
+  }
+
+  private stopTransactionSyncPoll(): void {
+    this.transactionSyncPollSub?.unsubscribe();
+    this.transactionSyncPollSub = null;
   }
 
   private refreshAfterSave(): void {
