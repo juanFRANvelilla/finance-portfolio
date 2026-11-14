@@ -162,11 +162,20 @@ def portfolio_sync_in_progress() -> bool:
 
 
 def schedule_portfolio_sync_cycle() -> bool:
-    """Lanza el ciclo en background. Devuelve False si ya hay uno en curso."""
+    """Lanza el ciclo en background. Devuelve False si ya hay uno en curso.
+
+    Debe llamarse desde un endpoint/handler async (con event loop activo).
+    """
     with _portfolio_sync_gate:
         if _portfolio_sync_in_progress:
             return False
-    asyncio.create_task(_portfolio_sync_cycle_job(), name="portfolio-sync-manual")
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as exc:
+        raise RuntimeError(
+            "schedule_portfolio_sync_cycle requiere un event loop asyncio activo"
+        ) from exc
+    loop.create_task(_portfolio_sync_cycle_job(), name="portfolio-sync-manual")
     return True
 
 

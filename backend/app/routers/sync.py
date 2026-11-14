@@ -16,7 +16,7 @@ def get_transactions_sync_status() -> PortfolioSyncStatusResponse:
     response_model=PortfolioSyncStartResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def trigger_transactions_sync() -> PortfolioSyncStartResponse:
+async def trigger_transactions_sync() -> PortfolioSyncStartResponse:
     if not schedule_portfolio_sync_cycle():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
