@@ -6,6 +6,7 @@ from app.models.monthly_category_investment import MonthlyCategoryInvestment
 from app.models.monthly_entity_position import MonthlyEntityPosition
 from app.models.entity_cash_flow import EntityCashFlow
 from app.models.asset_transaction import AssetTransaction
+from app.models.asset_transaction_conversion import AssetTransactionConversion
 from app.models.asset_sale import AssetSale
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "MonthlyEntityPosition",
     "EntityCashFlow",
     "AssetTransaction",
+    "AssetTransactionConversion",
     "AssetSale",
 ]

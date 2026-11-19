@@ -190,6 +190,29 @@ def insert_transactions_batch(db: Session, fills: list[dict]) -> tuple[int, int,
             omitidos += 1
         else:
             insertados += 1
+            conversion = fill.get("conversion")
+            if conversion:
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO public.asset_transaction_conversions
+                            (transaction_id, quote_currency, original_invested_amount,
+                             original_execution_price, fx_rate, bridge_exchange_trade_id)
+                        VALUES
+                            (:transaction_id, :quote_currency, :original_invested_amount,
+                             :original_execution_price, :fx_rate, :bridge_exchange_trade_id)
+                        ON CONFLICT (transaction_id) DO NOTHING
+                        """
+                    ),
+                    {
+                        "transaction_id": row_id,
+                        "quote_currency": conversion["quote_currency"],
+                        "original_invested_amount": conversion["original_invested_amount"],
+                        "original_execution_price": conversion["original_execution_price"],
+                        "fx_rate": conversion["fx_rate"],
+                        "bridge_exchange_trade_id": conversion.get("bridge_exchange_trade_id"),
+                    },
+                )
             stored = {**fill, "executed_at": recorded_at}
             fills_insertados.append(stored)
             logger.debug(

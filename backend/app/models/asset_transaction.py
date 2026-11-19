@@ -1,11 +1,15 @@
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.asset_transaction_conversion import AssetTransactionConversion
 
 
 class AssetTransaction(Base):
@@ -31,3 +35,6 @@ class AssetTransaction(Base):
     exchange_trade_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     asset_type: Mapped["AssetType"] = relationship()
+    conversion: Mapped["AssetTransactionConversion | None"] = relationship(
+        back_populates="transaction", uselist=False, cascade="all, delete-orphan"
+    )

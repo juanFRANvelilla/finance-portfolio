@@ -61,9 +61,10 @@ def _mark_frankfurter_failure(cache_key: str, exc: Exception) -> float:
     return _fallback_usd_eur_rate(cache_key)
 
 
-def get_usd_to_eur_rate(year: int, month: int) -> float:
-    """Obtiene el tipo USD→EUR para el mes indicado (cacheado en memoria)."""
-    ref = _reference_date(year, month)
+def get_usd_to_eur_rate_for_date(target_date: date) -> float:
+    """Obtiene el tipo USD→EUR para una fecha concreta (cacheado en memoria)."""
+    today = date.today()
+    ref = min(target_date, today)
     cache_key = ref.isoformat()
     if cache_key in _rate_cache:
         return _rate_cache[cache_key]
@@ -89,6 +90,12 @@ def get_usd_to_eur_rate(year: int, month: int) -> float:
         return rate
     except (urllib.error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError) as exc:
         return _mark_frankfurter_failure(cache_key, exc)
+
+
+def get_usd_to_eur_rate(year: int, month: int) -> float:
+    """Obtiene el tipo USD→EUR para el mes indicado (cacheado en memoria)."""
+    ref = _reference_date(year, month)
+    return get_usd_to_eur_rate_for_date(ref)
 
 
 def amount_to_eur(amount: float, currency: str, year: int, month: int) -> float:

@@ -25,10 +25,10 @@ from app.services.hybrid_entity_auto_adjust import apply_auto_trades_to_hybrid_e
 from app.services.monthly_asset_snapshot import apply_transactions_to_monthly_snapshot
 from app.services.purchase_asset_type import ensure_kucoin_purchase_assets
 from app.services.transaction_pmp import negative_invested_for_sell
+from app.services.fx_converter import get_usd_to_eur_rate_for_date
 
 logger = logging.getLogger(__name__)
 
-USDT_EUR_FALLBACK_RATE = 0.8535
 WEEK_WINDOW_DAYS = 6
 KUCOIN_PAGE_SLEEP_SECONDS = 0.3
 
@@ -235,49 +235,104 @@ def _fetch_kucoin_fills(start_date: datetime, end_date: datetime) -> list[dict]:
     return all_fills
 
 
-def _calculate_usdt_eur_rate(raw_fills: list[dict]) -> float:
-    total_eur_spent = 0.0
-    total_usdt_received = 0.0
+@dataclass(frozen=True)
+class BridgeOrder:
+    trade_id: str
+    created_at_ms: int
+    executed_at: datetime
+    rate: float
 
+
+def _extract_usdt_eur_bridge_orders(raw_fills: list[dict]) -> list[BridgeOrder]:
+    orders: list[BridgeOrder] = []
     for fill in raw_fills:
-        symbol = fill.get("symbol", "")
-        side = fill.get("side", "").upper()
-        if symbol.upper() == "USDT-EUR" and side == "BUY":
-            total_eur_spent += float(fill.get("funds", 0))
-            total_usdt_received += float(fill.get("size", 0))
+        symbol = str(fill.get("symbol", "")).upper()
+        side = str(fill.get("side", "")).upper()
+        if symbol == "USDT-EUR" and side == "BUY":
+            trade_id = str(fill.get("tradeId") or fill.get("id") or "")
+            funds = float(fill.get("funds", 0))
+            size = float(fill.get("size", 0))
+            price = float(fill.get("price", 0))
+            rate = funds / size if size > 0 else (price if price > 0 else 0.0)
+            if rate > 0 and trade_id:
+                created_at_ms = int(fill.get("createdAt", 0))
+                executed_at = datetime.fromtimestamp(created_at_ms / 1000)
+                orders.append(
+                    BridgeOrder(
+                        trade_id=trade_id,
+                        created_at_ms=created_at_ms,
+                        executed_at=executed_at,
+                        rate=rate,
+                    )
+                )
+    orders.sort(key=lambda item: item.created_at_ms)
+    return orders
 
-    if total_usdt_received > 0:
-        rate = total_eur_spent / total_usdt_received
-        logger.info(
-            "Tasa USDT→EUR desde fills: %.6f (%.2f EUR / %.2f USDT)",
-            rate,
-            total_eur_spent,
-            total_usdt_received,
+
+def _resolve_usdt_eur_conversion(
+    created_at_ms: int,
+    transaction_date: date,
+    bridge_orders: list[BridgeOrder],
+    fallback_rate: float | None = None,
+) -> tuple[float, str | None]:
+    """Resuelve (fx_rate, bridge_exchange_trade_id).
+
+    1. Prioridad: orden USDT-EUR ejecutada antes o en el mismo momento.
+    2. Si ninguna fue antes pero hay órdenes en el batch, toma la más cercana.
+    3. Fallback: tipo de cambio del BCE para esa fecha (o fallback_rate explícito).
+    """
+    if bridge_orders:
+        earlier = [b for b in bridge_orders if b.created_at_ms <= created_at_ms]
+        if earlier:
+            selected = earlier[-1]
+            return selected.rate, selected.trade_id
+        selected = bridge_orders[0]
+        return selected.rate, selected.trade_id
+
+    if fallback_rate is not None:
+        return fallback_rate, None
+
+    rate = get_usd_to_eur_rate_for_date(transaction_date)
+    return rate, None
+
+
+def _calculate_usdt_eur_rate(raw_fills: list[dict]) -> float:
+    bridge_orders = _extract_usdt_eur_bridge_orders(raw_fills)
+    if bridge_orders:
+        total_eur = sum(
+            float(f.get("funds", 0))
+            for f in raw_fills
+            if str(f.get("symbol", "")).upper() == "USDT-EUR" and str(f.get("side", "")).upper() == "BUY"
         )
-        return rate
+        total_usdt = sum(
+            float(f.get("size", 0))
+            for f in raw_fills
+            if str(f.get("symbol", "")).upper() == "USDT-EUR" and str(f.get("side", "")).upper() == "BUY"
+        )
+        if total_usdt > 0:
+            rate = total_eur / total_usdt
+            logger.info("Tasa media USDT→EUR desde fills: %.6f", rate)
+            return rate
+        return bridge_orders[-1].rate
 
-    logger.info("Sin operaciones USDT-EUR; usando fallback %.4f", USDT_EUR_FALLBACK_RATE)
-    return USDT_EUR_FALLBACK_RATE
-
-
-def _quote_to_native_amount(funds: float, quote_currency: str, usdt_eur_rate: float) -> float | None:
-    if quote_currency == "EUR":
-        return funds
-    if quote_currency == "USDT":
-        return funds * usdt_eur_rate
-    return None
+    today = date.today()
+    rate = get_usd_to_eur_rate_for_date(today)
+    logger.info("Sin operaciones USDT-EUR; usando tasa BCE %.4f para %s", rate, today)
+    return rate
 
 
 def _transform_fills(
     raw_fills: list[dict],
     asset_map: dict[str, str],
-    usdt_eur_rate: float,
-    position_totals: dict[str, tuple[Decimal, Decimal]],
+    usdt_eur_rate: float | None = None,
+    position_totals: dict[str, tuple[Decimal, Decimal]] | None = None,
 ) -> tuple[list[dict], set[tuple[str, date]], dict[str, int]]:
     parsed: list[dict] = []
     skipped_fiat_bridge = 0
     skipped_unknown_asset = 0
     skipped_invalid_sell = 0
+
+    bridge_orders = _extract_usdt_eur_bridge_orders(raw_fills)
 
     for fill in raw_fills:
         symbol = fill.get("symbol", "")
@@ -309,23 +364,45 @@ def _transform_fills(
             continue
 
         created_at_ms = int(fill.get("createdAt", 0))
-        executed_at = datetime.utcfromtimestamp(created_at_ms / 1000)
+        executed_at = datetime.fromtimestamp(created_at_ms / 1000)
         transaction_date = executed_at.date()
         funds = float(fill.get("funds", 0))
         size = float(fill.get("size", 0))
         fee = float(fill.get("fee", 0))
 
-        native_amount = _quote_to_native_amount(funds, quote_currency, usdt_eur_rate)
-        if native_amount is None:
-            logger.warning("Divisa de cotización desconocida '%s' en %s", quote_currency, symbol)
-            skipped_unknown_asset += 1
-            continue
-
         if size <= 0:
             skipped_unknown_asset += 1
             continue
 
-        execution_price = native_amount / size
+        conversion: dict | None = None
+
+        if quote_currency == "EUR":
+            native_amount = funds
+            execution_price = native_amount / size
+            fee_amount = fee
+        elif quote_currency == "USDT":
+            fx_rate, bridge_trade_id = _resolve_usdt_eur_conversion(
+                created_at_ms,
+                transaction_date,
+                bridge_orders,
+                fallback_rate=usdt_eur_rate,
+            )
+            native_amount = funds * fx_rate
+            execution_price = native_amount / size
+            fee_amount = fee * fx_rate
+            price_orig = float(fill.get("price", 0)) or (funds / size)
+            conversion = {
+                "quote_currency": "USDT",
+                "original_invested_amount": Decimal(str(round(funds, 8))),
+                "original_execution_price": Decimal(str(round(price_orig, 8))),
+                "fx_rate": Decimal(str(round(fx_rate, 6))),
+                "bridge_exchange_trade_id": bridge_trade_id,
+            }
+        else:
+            logger.warning("Divisa de cotización desconocida '%s' en %s", quote_currency, symbol)
+            skipped_unknown_asset += 1
+            continue
+
         parsed.append(
             {
                 "side": side,
@@ -337,15 +414,17 @@ def _transform_fills(
                 "native_amount": Decimal(str(round(native_amount, 8))),
                 "size": Decimal(str(size)),
                 "execution_price": Decimal(str(round(execution_price, 8))),
-                "fee_amount": Decimal(str(fee)),
+                "fee_amount": Decimal(str(round(fee_amount, 8))),
+                "conversion": conversion,
             }
         )
 
     parsed.sort(key=lambda item: item["executed_at"])
 
+    totals = position_totals or {}
     running: dict[str, tuple[Decimal, Decimal]] = {
         asset_id: (Decimal(str(units)), Decimal(str(invested)))
-        for asset_id, (units, invested) in position_totals.items()
+        for asset_id, (units, invested) in totals.items()
     }
 
     tx_rows: list[dict] = []
@@ -366,6 +445,7 @@ def _transform_fills(
                     "asset_amount": item["size"],
                     "execution_price": item["execution_price"],
                     "fee_amount": item["fee_amount"],
+                    "conversion": item.get("conversion"),
                 }
             )
             running[asset_type_id] = (
@@ -402,6 +482,7 @@ def _transform_fills(
                 "asset_amount": -sold_units,
                 "execution_price": item["execution_price"],
                 "fee_amount": item["fee_amount"],
+                "conversion": item.get("conversion"),
             }
         )
 
