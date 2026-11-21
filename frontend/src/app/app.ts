@@ -5,7 +5,7 @@ import { filter } from 'rxjs';
 import { MonthNavigatorComponent } from './features/dashboard/components/month-navigator/month-navigator.component';
 import { PeriodStorageService } from './core/services/period-storage.service';
 
-type ActiveView = 'dashboard' | 'investment-detail' | 'investment-ledger';
+type ActiveView = 'dashboard' | 'investment-detail' | 'investment-ledger' | 'expenses';
 
 @Component({
   selector: 'app-root',
@@ -41,6 +41,9 @@ export class App implements OnInit {
     if (url.includes('investment-detail')) {
       return 'investment-detail';
     }
+    if (url.includes('expenses')) {
+      return 'expenses';
+    }
     return 'dashboard';
   }
 
@@ -50,6 +53,8 @@ export class App implements OnInit {
         return '/investment-detail';
       case 'investment-ledger':
         return '/investment-ledger';
+      case 'expenses':
+        return '/expenses';
       default:
         return '/';
     }

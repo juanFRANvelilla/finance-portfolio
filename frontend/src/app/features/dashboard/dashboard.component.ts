@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   Observable,
   Subscription,
@@ -32,6 +32,7 @@ import {
   round2,
 } from '../../core/utils/live-investment-summary';
 import { Entity } from '../../core/models/entity.model';
+import { MonthlyExpensesResponse } from '../../core/models/expense.model';
 import {
   EntityBalanceInput,
   HybridBalanceImport,
@@ -69,6 +70,7 @@ export class DashboardComponent {
   private readonly api = inject(FinanceApiService);
   private readonly investmentApi = inject(InvestmentApiService);
   private readonly marketPriceApi = inject(MarketPriceApiService);
+  private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly periodStorage = inject(PeriodStorageService);
   private readonly destroyRef = inject(DestroyRef);
@@ -90,6 +92,7 @@ export class DashboardComponent {
   readonly showImportDialog = signal<boolean>(false);
   readonly showAssetSalesDialog = signal<boolean>(false);
   readonly assetSalesList = signal<AssetSalesListResponse | null>(null);
+  readonly monthlyExpenses = signal<MonthlyExpensesResponse | null>(null);
   readonly importErrorMessage = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly timelinePoints = signal<TimelinePoint[]>([]);
@@ -329,6 +332,20 @@ export class DashboardComponent {
           'No se pudo conectar con la API. Comprueba que el backend está arrancado.',
         );
       },
+    });
+    this.loadExpenses();
+  }
+
+  loadExpenses(): void {
+    this.api.getMonthlyExpenses(this.year(), this.month()).subscribe({
+      next: (response) => this.monthlyExpenses.set(response),
+      error: () => this.monthlyExpenses.set(null),
+    });
+  }
+
+  openExpensesDetail(): void {
+    this.router.navigate(['/expenses'], {
+      queryParams: { year: this.year(), month: this.month() },
     });
   }
 

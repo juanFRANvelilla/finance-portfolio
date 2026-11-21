@@ -15,8 +15,11 @@ export class DiffBadgeComponent {
   readonly previousNetWorth = input<number | null>(null);
   readonly totalSalesProfitEur = input<number>(0);
   readonly salesCount = input<number>(0);
+  readonly monthlyExpense = input<number | null>(null);
+  readonly hasExpenses = input<boolean>(false);
 
   readonly openDetail = output<void>();
+  readonly openExpensesDetail = output<void>();
 
   readonly isPositive = computed(() => (this.diff() ?? 0) >= 0);
   readonly isInvestedPositive = computed(() => (this.investedDiff() ?? 0) >= 0);

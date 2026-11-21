@@ -1,0 +1,259 @@
+<main
+  class="expenses-page-main mx-auto flex w-full max-w-5xl flex-col gap-4 overflow-x-hidden px-4 py-5 pb-16 sm:gap-6 sm:px-6 sm:py-8"
+  (dragover)="onDragOver($event)"
+  (dragenter)="onDragEnter($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
+  @if (errorMessage()) {
+    <div class="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/20">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  @if (importMessage()) {
+    <div
+      class="rounded-2xl px-4 py-3 text-sm ring-1"
+      [class.bg-emerald-500/10]="!importFailed()"
+      [class.text-emerald-200]="!importFailed()"
+      [class.ring-emerald-500/20]="!importFailed()"
+      [class.bg-rose-500/10]="importFailed()"
+      [class.text-rose-300]="importFailed()"
+      [class.ring-rose-500/20]="importFailed()"
+    >
+      {{ importMessage() }}
+    </div>
+  }
+
+  <section
+    class="relative rounded-2xl bg-slate-800/60 ring-1 ring-white/10 transition-all duration-200"
+    [class.ring-2]="isDraggingOver()"
+    [class.ring-indigo-400]="isDraggingOver()"
+  >
+    <!-- Overlay visual cuando se arrastran archivos encima -->
+    @if (isDraggingOver()) {
+      <div class="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center rounded-2xl bg-slate-900/95 backdrop-blur-sm border-2 border-dashed border-indigo-400 p-6 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14 text-indigo-400 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        <span class="mt-3 text-lg font-bold text-white">Suelta aquí los ficheros Excel (.xls / .xlsx)</span>
+        <span class="mt-1 text-sm text-slate-300">Puedes arrastrar la Cuenta Corriente y la Tarjeta de Crédito juntos</span>
+      </div>
+    }
+
+    <!-- Cabecera de la sección de gastos -->
+    <div class="flex w-full items-center justify-between gap-3 border-b border-white/5 px-4 py-3 sm:px-6 sm:py-4">
+      <div class="flex items-center gap-3">
+        <span class="h-3 w-3 shrink-0 rounded-full bg-rose-400"></span>
+        <div>
+          <h2 class="text-base font-bold uppercase tracking-wide text-white">
+            Gastos · {{ monthLabel() }}
+          </h2>
+          <p class="text-xs text-slate-400">Consolidado Santander (cuenta corriente y tarjeta de crédito)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        @if (hasExpenses()) {
+          <button
+            type="button"
+            class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-700/50 text-slate-400 transition hover:bg-rose-500/20 hover:text-rose-300 ring-1 ring-white/10"
+            title="Eliminar gastos de este mes para poder volver a importarlo"
+            (click)="deleteMonth()"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span class="sr-only">Eliminar gastos del mes</span>
+          </button>
+        }
+
+        <label
+          class="ledger-import-btn"
+          [class.ledger-import-btn--busy]="importing()"
+          title="Importar extractos Excel (.xls / .xlsx) de Santander (puedes seleccionar los 2 a la vez)"
+        >
+          <input
+            type="file"
+            accept=".xls,.xlsx"
+            multiple
+            class="sr-only"
+            [disabled]="importing()"
+            (change)="onFilesSelected($any($event.target))"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+            <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V6.636l1.955 2.129a.75.75 0 0 0 1.09-1.03l-3.25-3.5a.75.75 0 0 0-1.09 0l-3.25 3.5a.75.75 0 1 0 1.09 1.03L9.25 6.636v6.614Z" />
+            <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+          </svg>
+          <span class="sr-only">Importar extractos Excel</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Cuerpo del panel -->
+    <div class="p-4 sm:p-6">
+      @if (loading()) {
+        <div class="flex items-center justify-center py-20 text-slate-400">
+          Cargando gastos...
+        </div>
+      } @else if (!hasExpenses()) {
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800/80 text-rose-400 ring-1 ring-white/10">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 class="text-base font-semibold text-white">Sin gastos registrados en {{ monthLabel() }}</h3>
+          <p class="mt-1 max-w-md text-sm text-slate-400">
+            Importa los extractos Excel (.xls) del Santander para generar el snapshot mensual.
+          </p>
+
+          <!-- Dropzone destacada -->
+          <div class="mt-6 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/40 p-8 text-center transition hover:border-indigo-500/60 w-full max-w-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p class="mt-3 text-sm font-medium text-slate-200">
+              Arrastra y suelta aquí los 2 ficheros Excel desde el Finder
+            </p>
+            <p class="mt-1 text-xs text-slate-400">
+              O usa el botón para seleccionar los dos archivos a la vez (con Cmd / Ctrl)
+            </p>
+
+            <label
+              class="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition hover:bg-indigo-500"
+              [class.opacity-50]="importing()"
+            >
+              <input
+                type="file"
+                accept=".xls,.xlsx"
+                multiple
+                class="sr-only"
+                [disabled]="importing()"
+                (change)="onFilesSelected($any($event.target))"
+              />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+                <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V6.636l1.955 2.129a.75.75 0 0 0 1.09-1.03l-3.25-3.5a.75.75 0 0 0-1.09 0l-3.25 3.5a.75.75 0 1 0 1.09 1.03L9.25 6.636v6.614Z" />
+                <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+              </svg>
+              <span>{{ importing() ? 'Procesando extractos...' : 'Seleccionar los 2 ficheros Excel' }}</span>
+            </label>
+          </div>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-6">
+          <!-- Tarjetas superiores: Resumen + Gráfico Donut -->
+          <div class="grid grid-cols-1 items-center gap-6 rounded-2xl bg-slate-900/50 p-5 ring-1 ring-white/5 md:grid-cols-2">
+            <div class="flex flex-col justify-center">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Gastos Devengados</span>
+              <span class="mt-2 text-3xl font-extrabold tabular-nums text-rose-400 sm:text-4xl">
+                {{ expenses()!.total_amount | eurCurrency }}
+              </span>
+              <p class="mt-3 text-xs text-slate-400 leading-relaxed max-w-md">
+                Gasto real consolidado de cuenta corriente y tarjeta de crédito, con traspasos internos y liquidaciones de tarjeta excluidas, renting compensado y Bizums neteados.
+              </p>
+            </div>
+
+            <!-- Gráfico Donut -->
+            <div class="flex min-h-[16rem] w-full items-center justify-center py-2">
+              <app-segment-donut-chart
+                [segments]="donutSegments()"
+                centerLabel="Gasto Total"
+                [centerValue]="expenses()!.total_amount"
+                [showLegend]="false"
+              />
+            </div>
+          </div>
+
+          <!-- Tabla de Categorías -->
+          <div class="ledger-table-card overflow-x-clip rounded-xl shadow-sm ring-1 ring-white/5">
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[540px] text-sm">
+                <thead>
+                  <tr class="ledger-thead-expenses text-left text-xs font-semibold uppercase tracking-wide">
+                    <th class="px-5 py-3">Categoría</th>
+                    <th class="px-5 py-3 text-right">Importe</th>
+                    <th class="px-5 py-3 text-right">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5 text-slate-200">
+                  @for (cat of expenses()!.categories; track cat.category) {
+                    <!-- Fila principal de categoría -->
+                    <tr
+                      class="cursor-pointer select-none transition hover:bg-white/[0.04]"
+                      [class.bg-white/[0.02]]="isExpanded(cat.category)"
+                      (click)="toggleCategory(cat.category)"
+                      title="Haz clic para ver las transacciones de esta categoría"
+                    >
+                      <td class="px-5 py-3 font-medium">
+                        <div class="flex items-center gap-3">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                            [class.rotate-90]="isExpanded(cat.category)"
+                            aria-hidden="true"
+                          >
+                            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                          </svg>
+                          <span class="h-3 w-3 shrink-0 rounded-full" [style.backgroundColor]="cat.color"></span>
+                          <span class="text-slate-100">{{ cat.category_name }}</span>
+                          @if (cat.items?.length) {
+                            <span class="text-[11px] text-slate-500">
+                              ({{ cat.items!.length }} {{ cat.items!.length === 1 ? 'concepto' : 'conceptos' }})
+                            </span>
+                          }
+                        </div>
+                      </td>
+                      <td class="px-5 py-3 text-right font-semibold tabular-nums text-rose-300">
+                        {{ cat.amount | eurCurrency }}
+                      </td>
+                      <td class="px-5 py-3 text-right tabular-nums text-slate-400">
+                        {{ cat.percentage | number: '1.1-1' }}%
+                      </td>
+                    </tr>
+
+                    <!-- Filas expandibles de detalle de transacciones/conceptos -->
+                    @if (isExpanded(cat.category) && cat.items?.length) {
+                      @for (it of cat.items; track it.concept) {
+                        <tr class="bg-slate-900/60 text-xs transition hover:bg-slate-900/80">
+                          <td class="py-2.5 pl-12 pr-5">
+                            <div class="flex items-center gap-2 text-slate-300">
+                              <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500"></span>
+                              <span class="font-normal">{{ it.concept }}</span>
+                              @if (it.count > 1) {
+                                <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 ring-1 ring-white/10">
+                                  {{ it.count }} trans.
+                                </span>
+                              }
+                            </div>
+                          </td>
+                          <td class="px-5 py-2.5 text-right font-medium tabular-nums text-slate-200">
+                            {{ it.amount | eurCurrency }}
+                          </td>
+                          <td class="px-5 py-2.5 text-right tabular-nums text-slate-500">
+                            {{ (it.amount / cat.amount * 100) | number: '1.1-1' }}%
+                          </td>
+                        </tr>
+                      }
+                    }
+                  }
+                </tbody>
+                <tfoot class="border-t border-white/10 bg-slate-900/70 font-semibold text-white">
+                  <tr>
+                    <td class="px-5 py-3.5 text-xs uppercase tracking-wider text-slate-400">Total</td>
+                    <td class="px-5 py-3.5 text-right text-base font-bold tabular-nums text-rose-400">
+                      {{ expenses()!.total_amount | eurCurrency }}
+                    </td>
+                    <td class="px-5 py-3.5 text-right tabular-nums text-slate-400">100.0%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+</main>

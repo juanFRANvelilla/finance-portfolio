@@ -1,0 +1,38 @@
+# Pruebas locales en el Mac. No incluye secretos: lee backend/.env
+# (gitignored). Postgres sigue siendo el contenedor que ya tienes en :5432.
+#
+# Arranque:
+#   docker compose up --build
+# Front: http://localhost:8080
+# Back (directo, Swagger): http://localhost:8000/docs
+
+services:
+  backend:
+    image: ghcr.io/juanfranvelilla/finance-portfolio-backend:dev
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_HOST: host.docker.internal
+      CORS_ORIGINS: http://localhost:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/juanfranvelilla/finance-portfolio-frontend:dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    tmpfs:
+      - /run/nginx:uid=65532,gid=65532,mode=0755
+      - /var/lib/nginx/tmp:uid=65532,gid=65532,mode=0755
+    restart: unless-stopped

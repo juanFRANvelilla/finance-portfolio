@@ -128,7 +128,10 @@
         [previousNetWorth]="recordResponse()!.previous_net_worth"
         [totalSalesProfitEur]="salesProfitEurForReferencePeriod()"
         [salesCount]="assetSalesList()?.sales?.length ?? 0"
+        [monthlyExpense]="monthlyExpenses()?.total_amount ?? null"
+        [hasExpenses]="monthlyExpenses()?.has_expenses ?? false"
         (openDetail)="openAssetSalesDialog()"
+        (openExpensesDetail)="openExpensesDetail()"
       />
     </section>
 

@@ -20,5 +20,10 @@ export const routes: Routes = [
         (m) => m.InvestmentLedgerPageComponent,
       ),
   },
+  {
+    path: 'expenses',
+    loadComponent: () =>
+      import('./features/expenses/expenses-page.component').then((m) => m.ExpensesPageComponent),
+  },
   { path: '**', redirectTo: '' },
 ];

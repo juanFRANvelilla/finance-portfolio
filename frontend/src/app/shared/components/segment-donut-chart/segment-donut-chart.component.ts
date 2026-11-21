@@ -34,6 +34,7 @@ export class SegmentDonutChartComponent implements AfterViewInit, OnChanges, OnD
   readonly centerLabel = input<string>('');
   readonly centerValue = input<number | null>(null);
   readonly clickable = input<boolean>(false);
+  readonly showLegend = input<boolean>(true);
   readonly segmentClick = output<string>();
 
   @ViewChild('canvasRef') private readonly canvasRef!: ElementRef<HTMLCanvasElement>;

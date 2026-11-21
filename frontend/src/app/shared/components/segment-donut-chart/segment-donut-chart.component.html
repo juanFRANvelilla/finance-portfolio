@@ -9,19 +9,21 @@
   }
 </div>
 
-<div class="chart-legend">
-  @for (segment of segments(); track segment.id) {
-    <button
-      type="button"
-      (click)="onLegendClick(segment.id)"
-      class="chart-legend-item"
-      [class.chart-legend-item--clickable]="clickable()"
-      [class.chart-legend-item--static]="!clickable()"
-      [disabled]="!clickable()"
-    >
-      <span class="chart-legend-dot" [style.background-color]="segment.color"></span>
-      <span class="chart-legend-label">{{ segment.label }}</span>
-      <span class="chart-legend-value">{{ segment.value | eurCurrency }}</span>
-    </button>
-  }
-</div>
+@if (showLegend()) {
+  <div class="chart-legend">
+    @for (segment of segments(); track segment.id) {
+      <button
+        type="button"
+        (click)="onLegendClick(segment.id)"
+        class="chart-legend-item"
+        [class.chart-legend-item--clickable]="clickable()"
+        [class.chart-legend-item--static]="!clickable()"
+        [disabled]="!clickable()"
+      >
+        <span class="chart-legend-dot" [style.background-color]="segment.color"></span>
+        <span class="chart-legend-label">{{ segment.label }}</span>
+        <span class="chart-legend-value">{{ segment.value | eurCurrency }}</span>
+      </button>
+    }
+  </div>
+}

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { Entity } from '../models/entity.model';
+import { MonthlyExpensesResponse } from '../models/expense.model';
 import {
   EntityBalanceInput,
   ImportPayload,
@@ -83,5 +84,24 @@ export class FinanceApiService {
 
   triggerTransactionSync(): Observable<{ status: string }> {
     return this.http.post<{ status: string }>(`${this.baseUrl}/sync/transactions`, {});
+  }
+
+  getMonthlyExpenses(year: number, month: number): Observable<MonthlyExpensesResponse> {
+    return this.http.get<MonthlyExpensesResponse>(`${this.baseUrl}/expenses/${year}/${month}`);
+  }
+
+  importExpenses(year: number, month: number, files: File[]): Observable<MonthlyExpensesResponse> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file, file.name);
+    }
+    return this.http.post<MonthlyExpensesResponse>(
+      `${this.baseUrl}/expenses/${year}/${month}/import`,
+      formData,
+    );
+  }
+
+  deleteMonthlyExpenses(year: number, month: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/expenses/${year}/${month}`);
   }
 }

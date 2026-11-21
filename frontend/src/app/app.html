@@ -43,6 +43,19 @@
 
         <button
           type="button"
+          id="nav-expenses"
+          class="app-expenses-btn"
+          [class.app-expenses-btn--active]="activeView() === 'expenses'"
+          (click)="navigateTo('expenses')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="app-nav-btn-icon">
+            <path fill-rule="evenodd" d="M1 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4Zm0 5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V9Zm3 2a1 1 0 0 0 0 2h3a1 1 0 0 0 0-2H4Z" clip-rule="evenodd" />
+          </svg>
+          <span class="hidden min-[420px]:inline">Gastos</span>
+        </button>
+
+        <button
+          type="button"
           id="nav-investment-ledger"
           class="app-manage-tx-btn"
           [class.app-manage-tx-btn--active]="activeView() === 'investment-ledger'"
