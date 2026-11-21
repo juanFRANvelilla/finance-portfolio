@@ -1,5 +1,4 @@
 import io
-import os
 import unittest
 import pandas as pd
 from sqlalchemy import create_engine
@@ -31,18 +30,7 @@ def _generate_mock_excel(data: list[dict], is_account: bool) -> bytes:
 
 
 def get_test_excel_bytes() -> tuple[bytes, bytes]:
-    candidates = [
-        "/Users/juanfran/Downloads/GASTOS/octubre",
-        "/Users/juanfran/Downloads",
-    ]
-    for c in candidates:
-        acc_path = os.path.join(c, "transactions_2026-10-30T18_35_01.460Z.xls")
-        card_path = os.path.join(c, "export20261030.xls")
-        if os.path.exists(acc_path) and os.path.exists(card_path):
-            with open(acc_path, "rb") as f1, open(card_path, "rb") as f2:
-                return f1.read(), f2.read()
-
-    # Fallback hermético para entornos CI/CD (Jenkins, Docker, etc.)
+    """Genera extractos Excel sintéticos en memoria para tests herméticos sin acceder a disco."""
     acc_data = [
         {"FECHA OPERACIÓN": "30/10/2026", "FECHA VALOR": "30/10/2026", "CONCEPTO": "Recibo Paypal Europe S.a.r.l. Nº Recibo 0049 Bblhzfx", "IMPORTE EUR": -15.85, "SALDO": 3499.04},
         {"FECHA OPERACIÓN": "26/10/2026", "FECHA VALOR": "26/10/2026", "CONCEPTO": "Recibo Paypal Europe S.a.r.l. Nº Recibo 0049 Bblhrhz", "IMPORTE EUR": -17.99, "SALDO": 10.47},
