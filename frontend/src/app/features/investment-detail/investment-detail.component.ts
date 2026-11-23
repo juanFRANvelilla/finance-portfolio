@@ -752,6 +752,16 @@ export class InvestmentDetailComponent {
     return segments;
   }
 
+  visibleAssetsFor(categoryId: string): AssetInvestmentDetail[] {
+    const detail = this.panel(categoryId).detail;
+    if (!detail) return [];
+    return detail.assets.filter((a) => this.hasAssetInvestment(a));
+  }
+
+  hasAssetInvestment(asset: AssetInvestmentDetail): boolean {
+    return asset.amount_eur > 0 || asset.amount > 0 || ((asset.units ?? 0) > 0);
+  }
+
   canSellAsset(asset: AssetInvestmentDetail): boolean {
     if ((asset.units ?? 0) > 0) {
       return true;

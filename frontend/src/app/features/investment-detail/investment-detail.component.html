@@ -270,7 +270,7 @@
                 }
 
                 @if (!panel(cat.category_id).assetEditMode) {
-                  @if (panel(cat.category_id).detail!.assets.length > 0) {
+                  @if (visibleAssetsFor(cat.category_id).length > 0) {
                     <div class="overflow-x-auto rounded-xl ring-1 ring-white/5" [class.mt-4]="assetSegmentsFor(cat.category_id).length > 0">
                       <table class="w-full min-w-[600px] text-sm">
                         <thead>
@@ -287,8 +287,8 @@
                           </tr>
                         </thead>
                         <tbody>
-                          @for (asset of panel(cat.category_id).detail!.assets; track asset.asset_type_id) {
-                              <tr class="border-t border-white/5" [class.opacity-50]="asset.amount_eur <= 0 && !asset.units">
+                          @for (asset of visibleAssetsFor(cat.category_id); track asset.asset_type_id) {
+                              <tr class="border-t border-white/5">
                                 <td class="px-3 py-2 text-slate-300">
                                   <div class="flex items-center gap-1.5">
                                     <span class="min-w-0">
@@ -426,14 +426,18 @@
                     </div>
                   } @else {
                     <p class="py-6 text-center text-sm text-slate-500">
-                      Todavía no hay activos en esta categoría. Usa «Editar activos» para crear el primero.
+                      @if (panel(cat.category_id).detail!.assets.length === 0) {
+                        Todavía no hay activos en esta categoría. Usa «Editar activos» para crear el primero.
+                      } @else {
+                        No hay activos con inversión en esta categoría para este mes. Usa «Editar activos» para registrar posiciones o gestionar el catálogo.
+                      }
                     </p>
                   }
                 } @else {
                   <!-- ---- Modo edición: catálogo de activos ---- -->
                   <p class="mb-1 text-sm font-semibold text-slate-300">Catálogo de activos</p>
                   <p class="mb-3 text-xs text-slate-500">
-                    Títulos e importe del mes se editan con el lápiz en la tabla.
+                    Títulos e importe del mes se editan con «Posición mensual» o con el lápiz en la tabla.
                   </p>
 
                   <div class="flex flex-col gap-3">
@@ -459,13 +463,22 @@
                           }
                         </div>
                         @if (assetDetailForRow(cat.category_id, row.assetTypeId); as assetDetail) {
-                          <button
-                            type="button"
-                            class="rounded-xl bg-slate-800/80 px-3 py-2 text-xs font-semibold text-indigo-300 ring-1 ring-white/10 transition hover:bg-slate-700/80"
-                            (click)="openAssetEditDialog(cat.category_id, assetDetail)"
-                          >
-                            Propiedades
-                          </button>
+                          <div class="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              class="rounded-xl bg-slate-800/80 px-3 py-2 text-xs font-semibold text-indigo-300 ring-1 ring-white/10 transition hover:bg-slate-700/80"
+                              (click)="openAssetMonthlyDialog(cat.category_id, assetDetail)"
+                            >
+                              Posición mensual
+                            </button>
+                            <button
+                              type="button"
+                              class="rounded-xl bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition hover:bg-slate-700/80"
+                              (click)="openAssetEditDialog(cat.category_id, assetDetail)"
+                            >
+                              Propiedades
+                            </button>
+                          </div>
                         }
                       </div>
                     }
