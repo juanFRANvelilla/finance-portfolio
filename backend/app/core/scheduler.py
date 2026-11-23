@@ -12,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.kucoin_fiat_cash_flows_sync_service import run_scheduled_kucoin_fiat_cash_flows_sync
 from app.services.kucoin_sync_service import run_scheduled_kucoin_sync
+from app.services.market_price_service import run_scheduled_market_prices_refresh
 from app.services.monthly_asset_snapshot import run_ensure_current_month_snapshots
 from app.services.monthly_entity_position_snapshot import run_ensure_current_month_entity_positions
 from app.services.myinvestor_sync_service import run_scheduled_myinvestor_sync
@@ -29,6 +30,16 @@ _portfolio_sync_gate = threading.Lock()
 PORTFOLIO_SYNC_INTERVAL_HOURS = 4
 KUCOIN_SYNC_INTERVAL_HOURS = PORTFOLIO_SYNC_INTERVAL_HOURS
 MYINVESTOR_SYNC_INTERVAL_HOURS = PORTFOLIO_SYNC_INTERVAL_HOURS
+MARKET_PRICES_REFRESH_INTERVAL_SECONDS = 45
+
+
+async def _market_prices_refresh_job() -> None:
+    """Mantiene los precios de mercado en vivo siempre calientes en segundo plano."""
+    try:
+        updated = await asyncio.to_thread(run_scheduled_market_prices_refresh)
+        logger.debug("Refresco periódico de precios de mercado completado: %s activo(s)", updated)
+    except Exception:
+        logger.exception("Error en refresco periódico de precios de mercado")
 
 
 def _defer_interval_job_first_run(*, hours: int) -> datetime:
@@ -222,11 +233,23 @@ def start_scheduler() -> AsyncIOScheduler:
         coalesce=True,
     )
 
+    _scheduler.add_job(
+        _market_prices_refresh_job,
+        trigger="interval",
+        seconds=MARKET_PRICES_REFRESH_INTERVAL_SECONDS,
+        next_run_time=datetime.now(timezone.utc),
+        id="market_prices_refresh",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     _scheduler.start()
     logger.info(
         "Ciclo portfolio programado: arranque en background; luego cada %s h "
-        "(apertura de mes una vez → KuCoin → MyInvestor)",
+        "(apertura de mes una vez → KuCoin → MyInvestor). Refresco de precios de mercado cada %s s.",
         PORTFOLIO_SYNC_INTERVAL_HOURS,
+        MARKET_PRICES_REFRESH_INTERVAL_SECONDS,
     )
     return _scheduler
 
